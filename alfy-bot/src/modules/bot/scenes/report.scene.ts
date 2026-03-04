@@ -50,34 +50,28 @@ export class ReportScene {
 
     const buttons = generateQuestionButtons(question.type as QuestionType);
 
+    const extraButtons: { text: string; callback_data: string }[][] = [];
+
     if (question.can_skip) {
-      const skipButton = [
+      extraButtons.push([
         { text: '⏭ Пропустить', callback_data: 'skip_question' },
-      ];
-      if (buttons) {
-        buttons.push(skipButton);
-      } else {
-        const sentMessage = await ctx.reply(questionText, {
-          reply_markup: {
-            inline_keyboard: [skipButton],
-          },
-        });
-        ctx.session.lastQuestionMessageId = sentMessage.message_id;
-        return;
-      }
+      ]);
     }
 
-    if (buttons) {
-      const sentMessage = await ctx.reply(questionText, {
-        reply_markup: {
-          inline_keyboard: buttons,
-        },
-      });
-      ctx.session.lastQuestionMessageId = sentMessage.message_id;
-    } else {
-      const sentMessage = await ctx.reply(questionText);
-      ctx.session.lastQuestionMessageId = sentMessage.message_id;
-    }
+    extraButtons.push([
+      { text: '❌ Отменить отчет', callback_data: 'cancel_report_action' },
+    ]);
+
+    const allButtons = buttons
+      ? [...buttons, ...extraButtons]
+      : extraButtons;
+
+    const sentMessage = await ctx.reply(questionText, {
+      reply_markup: {
+        inline_keyboard: allButtons,
+      },
+    });
+    ctx.session.lastQuestionMessageId = sentMessage.message_id;
   }
 
   private async processAnswer(ctx: SceneContext, answer: string) {
@@ -226,7 +220,13 @@ export class ReportScene {
     message += 'Напиши номер цели для отчета:';
 
     ctx.session.availableGoals = availableGoals;
-    await ctx.reply(message);
+    await ctx.reply(message, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '❌ Назад', callback_data: 'no_more' }],
+        ],
+      },
+    });
   }
 
   @Action('no_more')
@@ -398,9 +398,8 @@ export class ReportScene {
 
     if (ctx.session.availableGoals && !ctx.session.goalId) {
       const num = parseInt(answer);
-      if (isNaN(num)) return;
-      if (num < 1 || num > ctx.session.availableGoals.length) {
-        await ctx.reply(`Такой цели нет. Напиши номер от 1 до ${ctx.session.availableGoals.length}`);
+      if (isNaN(num) || num < 1 || num > ctx.session.availableGoals.length) {
+        await ctx.reply(`❌ Напиши номер от 1 до ${ctx.session.availableGoals.length}`);
         return;
       }
       const goal = ctx.session.availableGoals[num - 1];
@@ -409,12 +408,31 @@ export class ReportScene {
       return;
     }
 
-    await this.processAnswer(ctx, answer);
+    if (
+      ctx.session.questions &&
+      ctx.session.currentQuestionIndex !== undefined
+    ) {
+      const currentQuestion =
+        ctx.session.questions[ctx.session.currentQuestionIndex];
+      const qType = currentQuestion?.type as QuestionType;
 
-    try {
-      await ctx.deleteMessage(userMessageId);
-    } catch {
-      // ignore
+      if (qType === 'number') {
+        const num = parseFloat(answer);
+        if (isNaN(num)) {
+          await ctx.reply('❌ Введи число. Попробуй ещё раз.');
+          return;
+        }
+      }
+
+      if (qType === 'rating') {
+        const num = parseInt(answer);
+        if (isNaN(num) || num < 1 || num > 5) {
+          await ctx.reply('❌ Введи число от 1 до 5.');
+          return;
+        }
+      }
     }
+
+    await this.processAnswer(ctx, answer);
   }
 }

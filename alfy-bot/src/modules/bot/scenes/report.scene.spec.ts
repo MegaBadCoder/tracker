@@ -97,9 +97,15 @@ describe('ReportScene', () => {
 
       expect(ctx.reply).toHaveBeenCalledWith(
         expect.stringContaining('Твои цели'),
-      );
-      expect(ctx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Напиши номер цели'),
+        expect.objectContaining({
+          reply_markup: expect.objectContaining({
+            inline_keyboard: expect.arrayContaining([
+              expect.arrayContaining([
+                expect.objectContaining({ callback_data: 'no_more' }),
+              ]),
+            ]),
+          }),
+        }),
       );
       expect(ctx.session.availableGoals).toEqual([goal]);
     });
@@ -146,6 +152,7 @@ describe('ReportScene', () => {
       expect(ctx.session.questions).toEqual([q1]);
       expect(ctx.reply).toHaveBeenCalledWith(
         expect.stringContaining('Вопрос 1'),
+        expect.objectContaining({ reply_markup: expect.any(Object) }),
       );
     });
 
@@ -173,17 +180,20 @@ describe('ReportScene', () => {
       await scene.handleTextAnswer(ctx);
 
       expect(ctx.reply).toHaveBeenCalledWith(
-        expect.stringContaining('Такой цели нет'),
+        expect.stringContaining('Напиши номер от 1 до'),
       );
     });
 
-    it('должен игнорировать нечисловой ввод', async () => {
+    it('должен показать ошибку при нечисловом вводе', async () => {
       const goal = makeGoal({ id: 10 });
       const ctx = makeCtx({ availableGoals: [goal] });
       ctx.message = { text: 'abc', message_id: 200 };
 
       await scene.handleTextAnswer(ctx);
 
+      expect(ctx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Напиши номер от 1 до'),
+      );
       expect(goalService.findById).not.toHaveBeenCalled();
       expect(reportService.addAnswer).not.toHaveBeenCalled();
     });
@@ -231,6 +241,7 @@ describe('ReportScene', () => {
       expect(ctx.session.currentQuestionIndex).toBe(1);
       expect(ctx.reply).toHaveBeenCalledWith(
         expect.stringContaining('Вопрос 2'),
+        expect.objectContaining({ reply_markup: expect.any(Object) }),
       );
     });
 
