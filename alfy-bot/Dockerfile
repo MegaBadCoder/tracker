@@ -16,4 +16,4 @@ COPY --from=build /app/package.json ./
 ENV NODE_ENV=production
 EXPOSE 3002
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
