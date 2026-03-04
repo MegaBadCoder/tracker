@@ -1,0 +1,9 @@
+tracker.rocketup.tech {
+	handle /api/* {
+		reverse_proxy backend:3002
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

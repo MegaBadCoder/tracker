@@ -1,0 +1,40 @@
+services:
+  backend:
+    image: ${REGISTRY_URL}/alfy-backend:latest
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - bot-data:/app/data
+    networks:
+      - app
+
+  frontend:
+    image: ${REGISTRY_URL}/alfy-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - app
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+    networks:
+      - app
+
+volumes:
+  bot-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  app:

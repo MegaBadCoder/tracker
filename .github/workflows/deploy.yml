@@ -1,0 +1,48 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: ${{ secrets.REGISTRY_URL }}
+  BACKEND_IMAGE: ${{ secrets.REGISTRY_URL }}/alfy-backend
+  FRONTEND_IMAGE: ${{ secrets.REGISTRY_URL }}/alfy-frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Registry
+        run: echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+
+      - name: Build & push backend
+        run: |
+          docker build -t $BACKEND_IMAGE:${{ github.sha }} -t $BACKEND_IMAGE:latest ./alfy-bot
+          docker push $BACKEND_IMAGE --all-tags
+
+      - name: Build & push frontend
+        run: |
+          docker build \
+            --build-arg VITE_API_URL=https://tracker.rocketup.tech \
+            -t $FRONTEND_IMAGE:${{ github.sha }} -t $FRONTEND_IMAGE:latest \
+            ./alfy-bot-frontend
+          docker push $FRONTEND_IMAGE --all-tags
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ secrets.REGISTRY_URL }} -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+            cd ~/alfy
+            docker compose pull
+            docker compose up -d
