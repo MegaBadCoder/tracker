@@ -62,9 +62,7 @@ export class ReportScene {
       { text: '❌ Отменить отчет', callback_data: 'cancel_report_action' },
     ]);
 
-    const allButtons = buttons
-      ? [...buttons, ...extraButtons]
-      : extraButtons;
+    const allButtons = buttons ? [...buttons, ...extraButtons] : extraButtons;
 
     const sentMessage = await ctx.reply(questionText, {
       reply_markup: {
@@ -85,6 +83,8 @@ export class ReportScene {
 
     const currentQuestion =
       ctx.session.questions[ctx.session.currentQuestionIndex];
+
+    if (!currentQuestion) return;
 
     await this.reportService.addAnswer(
       ctx.session.userId,
@@ -222,9 +222,7 @@ export class ReportScene {
     ctx.session.availableGoals = availableGoals;
     await ctx.reply(message, {
       reply_markup: {
-        inline_keyboard: [
-          [{ text: '❌ Назад', callback_data: 'no_more' }],
-        ],
+        inline_keyboard: [[{ text: '❌ Назад', callback_data: 'no_more' }]],
       },
     });
   }
@@ -317,7 +315,11 @@ export class ReportScene {
     return await ctx.scene.leave();
   }
 
-  private async startReport(ctx: SceneContext, goalId: number, targetDate: string) {
+  private async startReport(
+    ctx: SceneContext,
+    goalId: number,
+    targetDate: string,
+  ) {
     if (!ctx.from) return;
 
     const goal = await this.goalService.findById(goalId);
@@ -389,50 +391,74 @@ export class ReportScene {
     await this.processAnswer(ctx, answer);
   }
 
+  private isSelectingGoal(ctx: SceneContext): boolean {
+    return !!(ctx.session.availableGoals && !ctx.session.goalId);
+  }
+
+  private async handleGoalSelection(
+    ctx: SceneContext,
+    answer: string,
+  ): Promise<void> {
+    const goals = ctx.session.availableGoals!;
+    const num = parseInt(answer);
+
+    if (isNaN(num) || num < 1 || num > goals.length) {
+      await ctx.reply(`❌ Напиши номер от 1 до ${goals.length}`);
+      return;
+    }
+
+    const goal = goals[num - 1];
+    ctx.session.availableGoals = undefined;
+    await this.checkUnfilledOrStart(ctx, goal.id);
+  }
+
+  private async validateAnswerByType(
+    ctx: SceneContext,
+    answer: string,
+  ): Promise<boolean> {
+    const question =
+      ctx.session.questions?.[ctx.session.currentQuestionIndex ?? -1];
+    const qType = question?.type as QuestionType;
+
+    if (qType === 'number') {
+      if (isNaN(parseFloat(answer))) {
+        await ctx.reply('❌ Введи число. Попробуй ещё раз.');
+        return false;
+      }
+    }
+
+    if (qType === 'rating') {
+      const num = parseInt(answer);
+      if (isNaN(num) || num < 1 || num > 5) {
+        await ctx.reply('❌ Введи число от 1 до 5.');
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   @On('text')
   async handleTextAnswer(@Ctx() ctx: SceneContext) {
     if (!ctx.from || !ctx.message || !('text' in ctx.message)) return;
 
     const answer = ctx.message.text;
-    const userMessageId = ctx.message.message_id;
 
-    if (ctx.session.availableGoals && !ctx.session.goalId) {
-      const num = parseInt(answer);
-      if (isNaN(num) || num < 1 || num > ctx.session.availableGoals.length) {
-        await ctx.reply(`❌ Напиши номер от 1 до ${ctx.session.availableGoals.length}`);
+    try {
+      if (this.isSelectingGoal(ctx)) {
+        await this.handleGoalSelection(ctx, answer);
         return;
       }
-      const goal = ctx.session.availableGoals[num - 1];
-      ctx.session.availableGoals = undefined;
-      await this.checkUnfilledOrStart(ctx, goal.id);
-      return;
+
+      const isValid = await this.validateAnswerByType(ctx, answer);
+      if (!isValid) return;
+
+      await this.processAnswer(ctx, answer);
+    } catch (e) {
+      console.error('handleTextAnswer error:', e);
+      await ctx.reply(
+        '⚠️ Что-то пошло не так. Попробуй ещё раз или введи /cancel',
+      );
     }
-
-    if (
-      ctx.session.questions &&
-      ctx.session.currentQuestionIndex !== undefined
-    ) {
-      const currentQuestion =
-        ctx.session.questions[ctx.session.currentQuestionIndex];
-      const qType = currentQuestion?.type as QuestionType;
-
-      if (qType === 'number') {
-        const num = parseFloat(answer);
-        if (isNaN(num)) {
-          await ctx.reply('❌ Введи число. Попробуй ещё раз.');
-          return;
-        }
-      }
-
-      if (qType === 'rating') {
-        const num = parseInt(answer);
-        if (isNaN(num) || num < 1 || num > 5) {
-          await ctx.reply('❌ Введи число от 1 до 5.');
-          return;
-        }
-      }
-    }
-
-    await this.processAnswer(ctx, answer);
   }
 }
