@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { authorizeWithWidget } from '../api/auth'
+import { authorize, authorizeWithWidget } from '../api/auth'
 
 const router = useRouter()
 const error = ref<string | null>(null)
@@ -9,7 +9,20 @@ const widgetContainer = ref<HTMLDivElement>()
 
 const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'AlfyTrackerBot'
 
-onMounted(() => {
+onMounted(async () => {
+  const tg = window.Telegram?.WebApp
+
+  if (tg?.initData) {
+    try {
+      tg.ready()
+      await authorize()
+      router.replace('/')
+      return
+    } catch {
+      error.value = 'Ошибка авторизации через WebApp'
+    }
+  }
+
   window.onTelegramAuth = async (user: TelegramLoginWidgetUser) => {
     try {
       await authorizeWithWidget(user)
@@ -34,7 +47,8 @@ onMounted(() => {
 <template>
   <div class="login-page">
     <h1>Alfy</h1>
-    <p>Войдите через Telegram, чтобы продолжить</p>
+    123123
+    <p>Войдите через Telegram, чтобы продолжить123123</p>
     <div ref="widgetContainer" class="widget-container" />
     <p v-if="error" class="error">{{ error }}</p>
   </div>

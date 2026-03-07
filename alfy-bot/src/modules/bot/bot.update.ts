@@ -1,5 +1,8 @@
 import { Command, Ctx, Hears, On, Start, Update } from 'nestjs-telegraf';
 import { Context, Scenes } from 'telegraf';
+import { Telegraf } from 'telegraf';
+import { OnModuleInit } from '@nestjs/common';
+import { InjectBot } from 'nestjs-telegraf';
 import {
   GOALS_MENU_KEYBOARD,
   MAIN_MENU_KEYBOARD,
@@ -11,8 +14,24 @@ interface BotContext extends Context {
 }
 
 @Update()
-export class BotUpdate {
-  constructor(private readonly userService: UserService) { }
+export class BotUpdate implements OnModuleInit {
+  constructor(
+    private readonly userService: UserService,
+    @InjectBot() private readonly bot: Telegraf,
+  ) {}
+
+  async onModuleInit() {
+    const url = process.env.WEBAPP_URL;
+    if (!url) return;
+
+    await this.bot.telegram.setChatMenuButton({
+      menuButton: {
+        type: 'web_app',
+        text: 'Открыть трекер',
+        web_app: { url },
+      },
+    });
+  }
 
   private getMainMenuKeyboard() {
     return MAIN_MENU_KEYBOARD;

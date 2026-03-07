@@ -52,10 +52,10 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: BOT_TOKEN,JWT_SECRET,REGISTRY_URL,REGISTRY_USER,REGISTRY_PASSWORD
+          envs: BOT_TOKEN,JWT_SECRET,REGISTRY_URL,REGISTRY_USER,REGISTRY_PASSWORD,WEBAPP_URL
           script: |
-            printf 'BOT_TOKEN=%s\nJWT_SECRET=%s\nPORT=3002\nNODE_ENV=production\nREGISTRY_URL=%s\n' \
-              "$BOT_TOKEN" "$JWT_SECRET" "$REGISTRY_URL" > ~/alfy/.env
+            printf 'BOT_TOKEN=%s\nJWT_SECRET=%s\nPORT=3002\nNODE_ENV=production\nREGISTRY_URL=%s\nWEBAPP_URL=%s\n' \
+              "$BOT_TOKEN" "$JWT_SECRET" "$REGISTRY_URL" "$WEBAPP_URL" > ~/alfy/.env
             echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USER" --password-stdin
             cd ~/alfy
             docker compose pull
@@ -66,3 +66,4 @@ jobs:
           REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
           REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+          WEBAPP_URL: ${{ secrets.WEBAPP_URL }}

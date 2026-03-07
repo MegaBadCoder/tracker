@@ -16,6 +16,9 @@ const AUTH_DATE_MAX_AGE_SEC = 86400; // 24h
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private debugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+    fetch('http://127.0.0.1:7243/ingest/308101b5-8b60-49f8-bb00-4c26a74393b7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8d0dd9'},body:JSON.stringify({sessionId:'8d0dd9',runId:'pre-fix',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
+  }
 
   constructor(
     private readonly jwtService: JwtService,
@@ -114,8 +117,22 @@ export class AuthService {
   }
 
   async login(dto: TelegramAuthDto): Promise<{ accessToken: string }> {
+    try {
+    // #region agent log
+    this.debugLog('H6', 'src/modules/auth/auth.service.ts:121', 'auth login called', {
+      hasInitData: !!dto.initData,
+      hasWidgetId: typeof dto.id === 'number',
+      hasWidgetHash: !!dto.hash,
+      hasDevTelegramId: typeof dto.devTelegramId === 'number',
+      nodeEnv: this.configService.get<string>('NODE_ENV') ?? 'unknown',
+    });
+    // #endregion
+
     // --- Dev flow ---
     if (dto.devTelegramId !== undefined) {
+      // #region agent log
+      this.debugLog('H6', 'src/modules/auth/auth.service.ts:132', 'auth login selected dev flow', {});
+      // #endregion
       if (this.configService.get<string>('NODE_ENV') !== 'development') {
         throw new ForbiddenException('Dev login is only available in development mode');
       }
@@ -126,6 +143,11 @@ export class AuthService {
 
     // --- WebApp flow ---
     if (dto.initData) {
+      // #region agent log
+      this.debugLog('H7', 'src/modules/auth/auth.service.ts:143', 'auth login selected webapp flow', {
+        initDataLength: dto.initData.length,
+      });
+      // #endregion
       const data = this.validateInitData(dto.initData);
 
       interface TelegramUser {
@@ -144,11 +166,21 @@ export class AuthService {
 
       const payload = { telegramId: user.telegramId, sub: user.id };
       const accessToken = this.jwtService.sign(payload);
+      // #region agent log
+      this.debugLog('H7', 'src/modules/auth/auth.service.ts:164', 'auth webapp flow success', {
+        telegramId,
+      });
+      // #endregion
       return { accessToken };
     }
 
     // --- Login Widget flow ---
     if (dto.id && dto.hash) {
+      // #region agent log
+      this.debugLog('H8', 'src/modules/auth/auth.service.ts:172', 'auth login selected widget flow', {
+        telegramId: dto.id,
+      });
+      // #endregion
       const widgetUser = this.validateLoginWidget(dto);
 
       const user = await this.userService.findOrCreate(widgetUser.id, {
@@ -158,9 +190,28 @@ export class AuthService {
 
       const payload = { telegramId: user.telegramId, sub: user.id };
       const accessToken = this.jwtService.sign(payload);
+      // #region agent log
+      this.debugLog('H8', 'src/modules/auth/auth.service.ts:184', 'auth widget flow success', {
+        telegramId: widgetUser.id,
+      });
+      // #endregion
       return { accessToken };
     }
 
+    // #region agent log
+    this.debugLog('H6', 'src/modules/auth/auth.service.ts:191', 'auth login rejected bad payload', {});
+    // #endregion
     throw new BadRequestException('Provide initData (WebApp) or Login Widget fields');
+    } catch (error) {
+      const err = error as { name?: string; message?: string; status?: number };
+      // #region agent log
+      this.debugLog('H9', 'src/modules/auth/auth.service.ts:196', 'auth login threw error', {
+        name: err?.name ?? 'unknown',
+        message: err?.message ?? 'unknown',
+        status: typeof err?.status === 'number' ? err.status : null,
+      });
+      // #endregion
+      throw error;
+    }
   }
 }

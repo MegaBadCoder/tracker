@@ -33,8 +33,24 @@ interface SceneContext extends Context {
   scene: Scenes.SceneContextScene<SceneContext>;
 }
 
+interface TextRoute {
+  match: (ctx: SceneContext) => boolean;
+  handle: (ctx: SceneContext, answer: string) => Promise<void>;
+}
+
 @Scene('report')
 export class ReportScene {
+  private readonly textRoutes: TextRoute[] = [
+    {
+      match: (ctx) => this.isInGoalSelection(ctx),
+      handle: (ctx, answer) => this.handleGoalSelection(ctx, answer),
+    },
+    {
+      match: (ctx) => this.isInReportFlow(ctx),
+      handle: (ctx, answer) => this.handleReportAnswer(ctx, answer),
+    },
+  ];
+
   constructor(
     private goalService: GoalService,
     private reportService: ReportService,
@@ -391,7 +407,7 @@ export class ReportScene {
     await this.processAnswer(ctx, answer);
   }
 
-  private isSelectingGoal(ctx: SceneContext): boolean {
+  private isInGoalSelection(ctx: SceneContext): boolean {
     return !!(ctx.session.availableGoals && !ctx.session.goalId);
   }
 
@@ -412,30 +428,34 @@ export class ReportScene {
     await this.checkUnfilledOrStart(ctx, goal.id);
   }
 
-  private async validateAnswerByType(
+  private isInReportFlow(ctx: SceneContext): boolean {
+    return !!(
+      ctx.session.questions && ctx.session.currentQuestionIndex !== undefined
+    );
+  }
+
+  private async handleReportAnswer(
     ctx: SceneContext,
     answer: string,
-  ): Promise<boolean> {
+  ): Promise<void> {
     const question =
       ctx.session.questions?.[ctx.session.currentQuestionIndex ?? -1];
     const qType = question?.type as QuestionType;
 
-    if (qType === 'number') {
-      if (isNaN(parseFloat(answer))) {
-        await ctx.reply('❌ Введи число. Попробуй ещё раз.');
-        return false;
-      }
+    if (qType === 'number' && isNaN(parseFloat(answer))) {
+      await ctx.reply('❌ Введи число. Попробуй ещё раз.');
+      return;
     }
 
     if (qType === 'rating') {
       const num = parseInt(answer);
       if (isNaN(num) || num < 1 || num > 5) {
         await ctx.reply('❌ Введи число от 1 до 5.');
-        return false;
+        return;
       }
     }
 
-    return true;
+    await this.processAnswer(ctx, answer);
   }
 
   @On('text')
@@ -445,15 +465,8 @@ export class ReportScene {
     const answer = ctx.message.text;
 
     try {
-      if (this.isSelectingGoal(ctx)) {
-        await this.handleGoalSelection(ctx, answer);
-        return;
-      }
-
-      const isValid = await this.validateAnswerByType(ctx, answer);
-      if (!isValid) return;
-
-      await this.processAnswer(ctx, answer);
+      const route = this.textRoutes.find(({ match }) => match(ctx));
+      if (route) await route.handle(ctx, answer);
     } catch (e) {
       console.error('handleTextAnswer error:', e);
       await ctx.reply(
