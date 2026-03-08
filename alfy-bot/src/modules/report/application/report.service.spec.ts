@@ -24,7 +24,7 @@ describe('ReportService', () => {
     };
 
     scheduleService = {
-      isQuestionDueOnDate: jest.fn().mockReturnValue(true),
+      isQuestionDueOnDateHistorical: jest.fn().mockReturnValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({

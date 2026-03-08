@@ -1,11 +1,9 @@
 import {
-  Body,
   Controller,
   Get,
   NotFoundException,
   Param,
   ParseIntPipe,
-  Patch,
   Query,
   Request,
   UseGuards,
@@ -23,12 +21,7 @@ import type { GoalStatus } from '../../shared/constants/goal-statuses';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { GoalService } from './application/goal.service';
-import {
-  GoalDto,
-  QuestionDto,
-  ScheduleDto,
-} from './dto/goal-response.dto';
-import { UpdateScheduleDto } from './dto/update-schedule.dto';
+import { GoalDto } from './dto/goal-response.dto';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -86,53 +79,4 @@ export class GoalController {
     return goal as GoalDto;
   }
 
-  @Get('questions/:questionId')
-  @ApiOperation({ summary: 'Вопрос по ID с расписанием' })
-  @ApiOkResponse({ type: QuestionDto })
-  @ApiNotFoundResponse({ description: 'Вопрос не найден' })
-  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
-  async findQuestion(
-    @Request() req: AuthRequest,
-    @Param('questionId', ParseIntPipe) questionId: number,
-  ): Promise<QuestionDto> {
-    const question = await this.goalService.findQuestionById(questionId);
-
-    const ownerUserId = question?.goal?.user_id ?? question?.user_id;
-    if (!question || ownerUserId !== req.user.sub) {
-      throw new NotFoundException(`Question #${questionId} not found`);
-    }
-
-    return question as unknown as QuestionDto;
-  }
-
-  @Patch('questions/:questionId/schedule')
-  @ApiOperation({
-    summary: 'Изменить расписание вопроса',
-    description:
-      'Варианты:\n' +
-      '- **Каждый день:** `{ "frequency_type": "daily" }`\n' +
-      '- **По дням недели:** `{ "frequency_type": "weekly_days", "days_of_week": [1,3,5] }` (Пн, Ср, Пт)\n' +
-      '- **Раз в N дней:** `{ "frequency_type": "interval", "interval_days": 3 }`',
-  })
-  @ApiOkResponse({ type: ScheduleDto })
-  @ApiNotFoundResponse({ description: 'Вопрос не найден' })
-  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
-  async updateSchedule(
-    @Request() req: AuthRequest,
-    @Param('questionId', ParseIntPipe) questionId: number,
-    @Body() dto: UpdateScheduleDto,
-  ): Promise<ScheduleDto> {
-    const question = await this.goalService.findQuestionById(questionId);
-
-    const ownerUserId = question?.goal?.user_id ?? question?.user_id;
-    if (!question || ownerUserId !== req.user.sub) {
-      throw new NotFoundException(`Question #${questionId} not found`);
-    }
-
-    return this.goalService.updateQuestionSchedule(questionId, {
-      frequency_type: dto.frequency_type,
-      days_of_week: dto.days_of_week,
-      interval_days: dto.interval_days,
-    }) as unknown as Promise<ScheduleDto>;
-  }
 }

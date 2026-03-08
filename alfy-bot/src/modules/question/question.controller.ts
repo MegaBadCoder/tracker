@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -16,6 +18,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -24,7 +27,9 @@ import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { QuestionService } from './application/question.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
-import { QuestionDto } from '../goal/dto/goal-response.dto';
+import { UpdateScheduleDto } from '../goal/dto/update-schedule.dto';
+import { HabitWithHistoryDto } from './dto/habit-response.dto';
+import { QuestionDto, ScheduleDto } from '../goal/dto/goal-response.dto';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -38,12 +43,15 @@ export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 
   @Get('habits')
-  @ApiOperation({ summary: 'Все активные привычки пользователя' })
-  @ApiOkResponse({ type: [QuestionDto] })
+  @ApiOperation({ summary: 'Все активные привычки пользователя с историей' })
+  @ApiQuery({ name: 'days', required: false, enum: [7, 14, 30] })
+  @ApiOkResponse({ type: [HabitWithHistoryDto] })
   @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
-  async getHabits(@Request() req: AuthRequest): Promise<QuestionDto[]> {
-    const habits = await this.questionService.getHabits(req.user.sub);
-    return habits as unknown as QuestionDto[];
+  async getHabits(
+    @Request() req: AuthRequest,
+    @Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number,
+  ): Promise<HabitWithHistoryDto[]> {
+    return this.questionService.getHabitsWithHistory(req.user.sub, days);
   }
 
   @Get(':id')
@@ -55,14 +63,7 @@ export class QuestionController {
     @Request() req: AuthRequest,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<QuestionDto> {
-    // updateQuestion does ownership check and returns updated entity,
-    // but for GET we just need to read — use updateQuestion with empty data
-    // Actually let's just use the service to check ownership via a read
-    const question = await this.questionService.updateQuestion(
-      id,
-      req.user.sub,
-      {},
-    );
+    const question = await this.questionService.findById(id, req.user.sub);
     return question as unknown as QuestionDto;
   }
 
@@ -76,6 +77,30 @@ export class QuestionController {
   ): Promise<QuestionDto> {
     const habit = await this.questionService.createHabit(req.user.sub, dto);
     return habit as unknown as QuestionDto;
+  }
+
+  @Patch(':id/schedule')
+  @ApiOperation({
+    summary: 'Изменить расписание вопроса',
+    description:
+      'Варианты:\n' +
+      '- **Каждый день:** `{ "frequency_type": "daily" }`\n' +
+      '- **По дням недели:** `{ "frequency_type": "weekly_days", "days_of_week": [1,3,5] }` (Пн, Ср, Пт)\n' +
+      '- **Раз в N дней:** `{ "frequency_type": "interval", "interval_days": 3 }`',
+  })
+  @ApiOkResponse({ type: ScheduleDto })
+  @ApiNotFoundResponse({ description: 'Вопрос не найден' })
+  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
+  async updateSchedule(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateScheduleDto,
+  ): Promise<ScheduleDto> {
+    return this.questionService.updateSchedule(id, req.user.sub, {
+      frequency_type: dto.frequency_type,
+      days_of_week: dto.days_of_week,
+      interval_days: dto.interval_days,
+    }) as unknown as Promise<ScheduleDto>;
   }
 
   @Patch(':id')

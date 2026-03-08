@@ -19,8 +19,16 @@ export async function fetchGoalById(id: number): Promise<Goal> {
   return data
 }
 
-export async function fetchQuestionById(questionId: number): Promise<Question> {
-  const { data } = await api.get<Question>(`/goals/questions/${questionId}`)
+export async function fetchQuestion(questionId: number): Promise<Question> {
+  const { data } = await api.get<Question>(`/questions/${questionId}`)
+  return data
+}
+
+export async function updateQuestion(
+  questionId: number,
+  dto: { is_habit?: boolean },
+): Promise<Question> {
+  const { data } = await api.patch<Question>(`/questions/${questionId}`, dto)
   return data
 }
 
@@ -29,7 +37,7 @@ export async function updateQuestionSchedule(
   dto: UpdateScheduleDto,
 ): Promise<Schedule> {
   const { data } = await api.patch<Schedule>(
-    `/goals/questions/${questionId}/schedule`,
+    `/questions/${questionId}/schedule`,
     dto,
   )
   return data

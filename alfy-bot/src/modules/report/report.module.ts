@@ -18,6 +18,6 @@ import { ReportController } from './report.controller';
     },
     ReportService,
   ],
-  exports: [ReportService],
+  exports: [ReportService, ReportAnswerRepositoryPort],
 })
 export class ReportModule { }

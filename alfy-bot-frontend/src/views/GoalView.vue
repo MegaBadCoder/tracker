@@ -14,7 +14,7 @@ const router = useRouter()
 const id = Number(route.params.id)
 
 const goToQuestion = (q: { id: number }) =>
-  router.push(`/goals/${id}/question/${q.id}`)
+  router.push({ name: 'questionReport', params: { id: q.id } })
 
 const goal = ref<Goal | null>(null)
 const loading = ref(true)

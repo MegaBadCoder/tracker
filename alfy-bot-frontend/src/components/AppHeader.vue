@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ArrowLeft, Target } from 'lucide-vue-next'
+import { ArrowLeft, Target, Menu } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 
 const props = defineProps<{
   title: string
   showBack?: boolean
+  onMenuClick?: () => void
 }>()
 
 const router = useRouter()
@@ -24,6 +25,15 @@ const router = useRouter()
           @click="router.back()"
         >
           <ArrowLeft class="w-5 h-5" />
+        </Button>
+        <Button
+          v-else-if="onMenuClick"
+          variant="ghost"
+          size="icon"
+          class="flex-shrink-0 sm:hidden"
+          @click="onMenuClick"
+        >
+          <Menu class="w-5 h-5" />
         </Button>
         <Target v-else class="w-5 h-5 text-primary flex-shrink-0" />
         <span class="font-semibold text-base truncate">{{ title }}</span>

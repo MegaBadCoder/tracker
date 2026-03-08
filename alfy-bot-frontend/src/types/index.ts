@@ -18,6 +18,7 @@ export interface Question {
   can_skip: boolean
   order_index: number
   is_active: boolean
+  is_habit: boolean
   createdAt: string
   schedule: Schedule
 }
@@ -50,4 +51,21 @@ export interface Goal {
   status: GoalStatus
   createdAt: string
   questions: Question[]
+}
+
+export type HabitHistoryStatus = 'filled' | 'not_filled' | 'not_due'
+
+export interface HabitHistoryEntry {
+  date: string
+  status: HabitHistoryStatus
+}
+
+export interface HabitWithHistory {
+  id: number
+  question: string
+  type: QuestionType
+  can_skip: boolean
+  is_active: boolean
+  createdAt: string
+  history: HabitHistoryEntry[]
 }

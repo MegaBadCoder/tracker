@@ -45,7 +45,7 @@ export class ScheduleService {
    */
   isScheduleDueOnDate(
     schedule: Schedule,
-    goalStart: string,
+    referenceDate: string,
     date: Date,
   ): boolean {
     if (!schedule) return true;
@@ -61,7 +61,7 @@ export class ScheduleService {
         return days.includes(target.getDay());
       }
       case 'interval': {
-        const startDate = new Date(goalStart);
+        const startDate = new Date(referenceDate);
         startDate.setHours(0, 0, 0, 0);
         const diffMs = target.getTime() - startDate.getTime();
         const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
@@ -73,17 +73,16 @@ export class ScheduleService {
   }
 
   /**
-   * Backward-compat wrapper: uses question.schedule (latest) to check if due on date.
-   * Suitable for "is due today" checks where only the current schedule matters.
+   * Uses question.schedule (latest) to check if due on date.
+   * Reference date is question.createdAt.
    */
   isQuestionDueOnDate(
     question: Question,
-    goalStart: string,
     date: Date,
   ): boolean {
     const schedule = question.schedule;
     if (!schedule) return true;
-    return this.isScheduleDueOnDate(schedule, goalStart, date);
+    return this.isScheduleDueOnDate(schedule, toLocalISO(question.createdAt), date);
   }
 
   /**
@@ -92,29 +91,23 @@ export class ScheduleService {
    */
   isQuestionDueOnDateHistorical(
     question: Question,
-    goalStart: string,
     date: Date,
   ): boolean {
     const schedule = this.getScheduleForDate(question.schedules, date);
     if (!schedule) return true;
-    return this.isScheduleDueOnDate(schedule, goalStart, date);
+    return this.isScheduleDueOnDate(schedule, toLocalISO(question.createdAt), date);
   }
 
-  isQuestionDueToday(question: Question, goalStart: string): boolean {
-    return this.isQuestionDueOnDate(question, goalStart, new Date());
+  isQuestionDueToday(question: Question): boolean {
+    return this.isQuestionDueOnDate(question, new Date());
   }
 
   hasAnyQuestionDueToday(goal: Goal): boolean {
     const activeQuestions = (goal.questions || []).filter((q) => q.is_active);
-    return activeQuestions.some((q) =>
-      this.isQuestionDueToday(q, goal.goal_start),
-    );
+    return activeQuestions.some((q) => this.isQuestionDueToday(q));
   }
 
-  filterDueQuestions(
-    questions: Question[],
-    goalStart: string,
-  ): Question[] {
-    return questions.filter((q) => this.isQuestionDueToday(q, goalStart));
+  filterDueQuestions(questions: Question[]): Question[] {
+    return questions.filter((q) => this.isQuestionDueToday(q));
   }
 }

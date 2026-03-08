@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Question, Schedule } from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
 import { GoalModule } from '../goal/goal.module';
+import { ReportModule } from '../report/report.module';
 import { QuestionService } from './application/question.service';
 import { QuestionRepositoryPort } from './domain/question-repository.port';
 import { TypeOrmQuestionRepository } from './infrastructure/typeorm-question.repository';
@@ -15,6 +16,7 @@ import { TypeOrmScheduleRepository } from '../goal/infrastructure/typeorm-schedu
     TypeOrmModule.forFeature([Question, Schedule]),
     AuthModule,
     GoalModule,
+    ReportModule,
   ],
   controllers: [QuestionController],
   providers: [

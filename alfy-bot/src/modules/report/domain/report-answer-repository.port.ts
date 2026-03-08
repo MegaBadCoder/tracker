@@ -29,4 +29,10 @@ export abstract class ReportAnswerRepositoryPort {
     questionIds: number[],
     scheduledDate: string,
   ): Promise<number>;
+
+  abstract findByQuestionsAndDateRange(
+    questionIds: number[],
+    startDate: string,
+    endDate: string,
+  ): Promise<ReportAnswer[]>;
 }

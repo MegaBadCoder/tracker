@@ -79,11 +79,7 @@ export class ReportService {
     const dueQuestions = goal.questions
       .filter((q) => q.is_active && !q.can_skip)
       .filter((q) =>
-        this.scheduleService.isQuestionDueOnDateHistorical(
-          q,
-          goal.goal_start,
-          targetDate,
-        ),
+        this.scheduleService.isQuestionDueOnDateHistorical(q, targetDate),
       );
 
     if (dueQuestions.length === 0) return true;
@@ -112,11 +108,7 @@ export class ReportService {
     const dueQuestions = goal.questions
       .filter((q) => q.is_active)
       .filter((q) =>
-        this.scheduleService.isQuestionDueOnDateHistorical(
-          q,
-          goal.goal_start,
-          targetDate,
-        ),
+        this.scheduleService.isQuestionDueOnDateHistorical(q, targetDate),
       )
       .sort((a, b) => a.order_index - b.order_index);
 
@@ -161,11 +153,7 @@ export class ReportService {
       const hasAnyDue = goal.questions
         .filter((q) => q.is_active)
         .some((q) =>
-          this.scheduleService.isQuestionDueOnDateHistorical(
-            q,
-            goal.goal_start,
-            cursor,
-          ),
+          this.scheduleService.isQuestionDueOnDateHistorical(q, cursor),
         );
 
       if (hasAnyDue) {
@@ -239,7 +227,7 @@ export class ReportService {
       const isDue = schedule
         ? this.scheduleService.isScheduleDueOnDate(
           schedule,
-          goal.goal_start,
+          toLocalISO(question.createdAt),
           cursor,
         )
         : true;

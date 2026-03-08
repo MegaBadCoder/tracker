@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, inject } from 'vue'
 import AppHeader from '../components/AppHeader.vue'
 import GoalCard from '../components/GoalCard.vue'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -11,6 +11,7 @@ type Filter = 'all' | GoalStatus
 const goals = ref<Goal[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const openSidebar = inject<() => void>('openSidebar')
 const filter = ref<Filter>('all')
 
 async function load() {
@@ -32,7 +33,7 @@ watch(filter, load, { immediate: true })
 </script>
 
 <template>
-  <AppHeader title="Мои цели" />
+  <AppHeader title="Мои цели" :on-menu-click="openSidebar" />
 
   <main class="max-w-6xl mx-auto px-4 py-6">
     <!-- filters -->

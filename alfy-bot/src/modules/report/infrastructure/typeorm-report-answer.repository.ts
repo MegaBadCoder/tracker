@@ -73,4 +73,18 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
     });
   }
 
+  async findByQuestionsAndDateRange(
+    questionIds: number[],
+    startDate: string,
+    endDate: string,
+  ): Promise<ReportAnswer[]> {
+    if (questionIds.length === 0) return [];
+    return this.repo.find({
+      where: {
+        question_id: In(questionIds),
+        scheduled_date: Between(startDate, endDate),
+      },
+      order: { scheduled_date: 'ASC' },
+    });
+  }
 }

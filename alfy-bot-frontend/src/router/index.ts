@@ -6,8 +6,34 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('../views/HomeView.vue'),
+      component: () => import('../components/AppLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'home',
+          component: () => import('../views/HomeView.vue'),
+        },
+        {
+          path: 'habits',
+          name: 'habits',
+          component: () => import('../views/HabitsView.vue'),
+        },
+        {
+          path: 'goals/:id',
+          name: 'goal',
+          component: () => import('../views/GoalView.vue'),
+        },
+        {
+          path: 'questions/:id',
+          name: 'questionReport',
+          component: () => import('../views/QuestionReportView.vue'),
+        },
+        {
+          path: ':pathMatch(.*)*',
+          name: 'not-found',
+          component: () => import('../views/NotFoundView.vue'),
+        },
+      ],
     },
     {
       path: '/login',
@@ -15,27 +41,11 @@ const router = createRouter({
       component: () => import('../views/LoginView.vue'),
       meta: { public: true },
     },
-    {
-      path: '/goals/:id',
-      name: 'goal',
-      component: () => import('../views/GoalView.vue'),
-    },
-    {
-      path: '/goals/:id/question/:questionId',
-      name: 'questionReport',
-      component: () => import('../views/QuestionReportView.vue'),
-    },
-    {
-      path: '/:pathMatch(.*)*',
-      name: 'not-found',
-      component: () => import('../views/NotFoundView.vue'),
-    },
   ],
 })
 
 router.beforeEach((to) => {
-  const inWebApp = !!window.Telegram?.WebApp?.initData
-  if (!to.meta.public && !isAuthenticated() && !inWebApp) {
+  if (!to.meta.public && !isAuthenticated()) {
     return { name: 'login' }
   }
 })
