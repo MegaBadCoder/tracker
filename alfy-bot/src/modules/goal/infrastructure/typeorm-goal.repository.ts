@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
-import { Goal, GoalQuestion } from '../../../shared/entities';
+import { Goal, Question } from '../../../shared/entities';
 import {
   GoalRepositoryPort,
   QuestionData,
@@ -12,8 +12,8 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
   constructor(
     @InjectRepository(Goal)
     private goalRepo: Repository<Goal>,
-    @InjectRepository(GoalQuestion)
-    private questionRepo: Repository<GoalQuestion>,
+    @InjectRepository(Question)
+    private questionRepo: Repository<Question>,
   ) {
     super();
   }
@@ -23,11 +23,11 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
     goalData:
       | Partial<Goal>
       | {
-        goal_name: string;
-        goal_start: string;
-        goal_end: string;
-        questions?: QuestionData[];
-      },
+          goal_name: string;
+          goal_start: string;
+          goal_end: string;
+          questions?: QuestionData[];
+        },
   ): Promise<Goal> {
     if ('questions' in goalData && Array.isArray(goalData.questions)) {
       const { questions, ...goalInfo } = goalData as {
@@ -119,7 +119,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
   async addQuestions(
     goalId: number,
     questions: Array<{ question: string; type: string; canSkip: boolean }>,
-  ): Promise<GoalQuestion[]> {
+  ): Promise<Question[]> {
     const maxOrder = await this.questionRepo
       .createQueryBuilder('q')
       .select('MAX(q.order_index)', 'max')
@@ -142,7 +142,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
     return this.questionRepo.save(entities);
   }
 
-  async findQuestionById(questionId: number): Promise<GoalQuestion | null> {
+  async findQuestionById(questionId: number): Promise<Question | null> {
     return this.questionRepo.findOne({
       where: { id: questionId },
       relations: ['goal'],

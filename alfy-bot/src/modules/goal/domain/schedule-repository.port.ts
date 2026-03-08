@@ -1,4 +1,4 @@
-import { GoalSchedule } from '../../../shared/entities';
+import { Schedule } from '../../../shared/entities';
 
 export interface ScheduleData {
   frequency_type: string;
@@ -11,9 +11,9 @@ export abstract class ScheduleRepositoryPort {
   abstract create(
     questionId: number,
     data: ScheduleData,
-  ): Promise<GoalSchedule>;
+  ): Promise<Schedule>;
   abstract createNewVersion(
     questionId: number,
     data: ScheduleData,
-  ): Promise<GoalSchedule>;
+  ): Promise<Schedule>;
 }

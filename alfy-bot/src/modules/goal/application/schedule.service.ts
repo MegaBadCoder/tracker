@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Goal, GoalQuestion, GoalSchedule } from '../../../shared/entities';
+import { Goal, Question, Schedule } from '../../../shared/entities';
 
 /** Форматирует Date в 'YYYY-MM-DD' по локальному времени */
 function toLocalISO(d: Date): string {
@@ -13,13 +13,13 @@ export class ScheduleService {
    * Returns the schedule with the largest effective_from <= date.
    */
   getScheduleForDate(
-    schedules: GoalSchedule[],
+    schedules: Schedule[],
     date: Date,
-  ): GoalSchedule | null {
+  ): Schedule | null {
     if (!schedules || schedules.length === 0) return null;
 
     const dateStr = toLocalISO(date);
-    let best: GoalSchedule | null = null;
+    let best: Schedule | null = null;
 
     for (const s of schedules) {
       const ef = s.effective_from;
@@ -44,7 +44,7 @@ export class ScheduleService {
    * Checks if a specific schedule is due on a given date.
    */
   isScheduleDueOnDate(
-    schedule: GoalSchedule,
+    schedule: Schedule,
     goalStart: string,
     date: Date,
   ): boolean {
@@ -77,7 +77,7 @@ export class ScheduleService {
    * Suitable for "is due today" checks where only the current schedule matters.
    */
   isQuestionDueOnDate(
-    question: GoalQuestion,
+    question: Question,
     goalStart: string,
     date: Date,
   ): boolean {
@@ -91,7 +91,7 @@ export class ScheduleService {
    * from the question's schedule history, then checks if due.
    */
   isQuestionDueOnDateHistorical(
-    question: GoalQuestion,
+    question: Question,
     goalStart: string,
     date: Date,
   ): boolean {
@@ -100,7 +100,7 @@ export class ScheduleService {
     return this.isScheduleDueOnDate(schedule, goalStart, date);
   }
 
-  isQuestionDueToday(question: GoalQuestion, goalStart: string): boolean {
+  isQuestionDueToday(question: Question, goalStart: string): boolean {
     return this.isQuestionDueOnDate(question, goalStart, new Date());
   }
 
@@ -112,9 +112,9 @@ export class ScheduleService {
   }
 
   filterDueQuestions(
-    questions: GoalQuestion[],
+    questions: Question[],
     goalStart: string,
-  ): GoalQuestion[] {
+  ): Question[] {
     return questions.filter((q) => this.isQuestionDueToday(q, goalStart));
   }
 }

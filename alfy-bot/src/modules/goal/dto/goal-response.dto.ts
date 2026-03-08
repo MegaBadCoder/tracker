@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class GoalScheduleDto {
+export class ScheduleDto {
   @ApiProperty({ example: 1 })
   id: number;
 
@@ -31,7 +31,7 @@ export class GoalScheduleDto {
   effective_from: string | null;
 }
 
-export class GoalQuestionDto {
+export class QuestionDto {
   @ApiProperty({ example: 1 })
   id: number;
 
@@ -53,11 +53,17 @@ export class GoalQuestionDto {
   @ApiProperty({ example: true })
   is_active: boolean;
 
+  @ApiProperty({ example: false })
+  is_habit: boolean;
+
+  @ApiPropertyOptional({ example: null, nullable: true })
+  user_id: number | null;
+
   @ApiProperty({ example: '2026-02-01T10:00:00.000Z' })
   createdAt: Date;
 
-  @ApiPropertyOptional({ type: () => GoalScheduleDto })
-  schedule: GoalScheduleDto;
+  @ApiPropertyOptional({ type: () => ScheduleDto })
+  schedule: ScheduleDto;
 }
 
 export class GoalDto {
@@ -79,6 +85,6 @@ export class GoalDto {
   @ApiProperty({ example: '2026-02-01T10:00:00.000Z' })
   createdAt: Date;
 
-  @ApiProperty({ type: () => [GoalQuestionDto] })
-  questions: GoalQuestionDto[];
+  @ApiProperty({ type: () => [QuestionDto] })
+  questions: QuestionDto[];
 }

@@ -9,16 +9,18 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { BotModule } from './modules/bot/bot.module';
 import { GoalModule } from './modules/goal/goal.module';
+import { QuestionModule } from './modules/question/question.module';
 import { ReportModule } from './modules/report/report.module';
 import { UserModule } from './modules/user/user.module';
 import {
   Goal,
-  GoalQuestion,
-  GoalSchedule,
+  Question,
+  Schedule,
   ReportAnswer,
   User,
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
+import { QuestionMigrationService } from './shared/database/question-migration.service';
 import { SharedModule } from './shared/shared.module';
 
 @Module({
@@ -28,7 +30,7 @@ import { SharedModule } from './shared/shared.module';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'data/database.sqlite',
-      entities: [User, Goal, GoalQuestion, ReportAnswer, GoalSchedule],
+      entities: [User, Goal, Question, ReportAnswer, Schedule],
       synchronize: true,
     }),
     TelegrafModule.forRoot({
@@ -39,10 +41,11 @@ import { SharedModule } from './shared/shared.module';
     UserModule,
     AuthModule,
     GoalModule,
+    QuestionModule,
     ReportModule,
     BotModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ScheduleMigrationService],
+  providers: [AppService, ScheduleMigrationService, QuestionMigrationService],
 })
 export class AppModule { }

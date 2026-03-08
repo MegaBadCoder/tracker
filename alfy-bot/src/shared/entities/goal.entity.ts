@@ -8,7 +8,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
-import { GoalQuestion } from './goal-question.entity';
+import { Question } from './question.entity';
 
 @Entity('goals')
 export class Goal {
@@ -34,8 +34,8 @@ export class Goal {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @OneToMany(() => GoalQuestion, (question) => question.goal)
-  questions: GoalQuestion[];
+  @OneToMany(() => Question, (question) => question.goal)
+  questions: Question[];
 
   @CreateDateColumn()
   createdAt: Date;

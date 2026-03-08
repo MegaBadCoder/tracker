@@ -1,4 +1,4 @@
-import { Goal, GoalQuestion } from '../../../shared/entities';
+import { Goal, Question } from '../../../shared/entities';
 
 export interface QuestionData {
   question: string;
@@ -15,11 +15,11 @@ export abstract class GoalRepositoryPort {
     goalData:
       | Partial<Goal>
       | {
-        goal_name: string;
-        goal_start: string;
-        goal_end: string;
-        questions?: QuestionData[];
-      },
+          goal_name: string;
+          goal_start: string;
+          goal_end: string;
+          questions?: QuestionData[];
+        },
   ): Promise<Goal>;
   abstract findByUser(userId: number): Promise<Goal[]>;
   abstract findActiveByUser(userId: number): Promise<Goal[]>;
@@ -31,6 +31,6 @@ export abstract class GoalRepositoryPort {
   abstract addQuestions(
     goalId: number,
     questions: Array<{ question: string; type: string; canSkip: boolean }>,
-  ): Promise<GoalQuestion[]>;
-  abstract findQuestionById(questionId: number): Promise<GoalQuestion | null>;
+  ): Promise<Question[]>;
+  abstract findQuestionById(questionId: number): Promise<Question | null>;
 }

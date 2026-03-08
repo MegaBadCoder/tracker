@@ -5,7 +5,7 @@ import { MESSAGES } from '../../../shared/constants/messages';
 import { formatDate } from '../../../shared/utils/date-ui.util';
 import { QuestionType } from '../../../shared/types/question-types';
 import { generateQuestionButtons } from '../../../shared/utils/question-ui.util';
-import { Goal, GoalQuestion } from '../../../shared/entities';
+import { Goal, Question } from '../../../shared/entities';
 import { GoalService } from '../../goal/application/goal.service';
 import { ReportService } from '../../report/application/report.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
@@ -21,7 +21,7 @@ interface SessionData extends Scenes.SceneSessionData {
   userId?: number;
   targetDate?: string;
   currentQuestionIndex?: number;
-  questions?: GoalQuestion[];
+  questions?: Question[];
   lastQuestionMessageId?: number;
   preselectedGoalId?: number;
   pendingCurrentGoalId?: number;
@@ -58,7 +58,7 @@ export class ReportScene {
     private scheduleService: ScheduleService,
   ) {}
 
-  private async askQuestion(ctx: SceneContext, question: GoalQuestion) {
+  private async askQuestion(ctx: SceneContext, question: Question) {
     const currentIndex = ctx.session.currentQuestionIndex ?? 0;
     const totalQuestions = ctx.session.questions?.length ?? 0;
     const progressText = `📊 Вопрос ${currentIndex + 1} из ${totalQuestions}\n\n`;

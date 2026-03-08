@@ -1,7 +1,7 @@
 import { DAYS_OF_WEEK } from '../constants/schedule-types';
-import { GoalSchedule } from '../entities';
+import { Schedule } from '../entities';
 
-export function formatSchedule(schedule: GoalSchedule): string {
+export function formatSchedule(schedule: Schedule): string {
   switch (schedule.frequency_type) {
     case 'daily':
       return 'Каждый день';

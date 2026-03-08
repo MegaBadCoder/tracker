@@ -25,8 +25,8 @@ import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { GoalService } from './application/goal.service';
 import {
   GoalDto,
-  GoalQuestionDto,
-  GoalScheduleDto,
+  QuestionDto,
+  ScheduleDto,
 } from './dto/goal-response.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 
@@ -88,20 +88,21 @@ export class GoalController {
 
   @Get('questions/:questionId')
   @ApiOperation({ summary: 'Вопрос по ID с расписанием' })
-  @ApiOkResponse({ type: GoalQuestionDto })
+  @ApiOkResponse({ type: QuestionDto })
   @ApiNotFoundResponse({ description: 'Вопрос не найден' })
   @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
   async findQuestion(
     @Request() req: AuthRequest,
     @Param('questionId', ParseIntPipe) questionId: number,
-  ): Promise<GoalQuestionDto> {
+  ): Promise<QuestionDto> {
     const question = await this.goalService.findQuestionById(questionId);
 
-    if (!question || question.goal?.user_id !== req.user.sub) {
+    const ownerUserId = question?.goal?.user_id ?? question?.user_id;
+    if (!question || ownerUserId !== req.user.sub) {
       throw new NotFoundException(`Question #${questionId} not found`);
     }
 
-    return question as unknown as GoalQuestionDto;
+    return question as unknown as QuestionDto;
   }
 
   @Patch('questions/:questionId/schedule')
@@ -113,17 +114,18 @@ export class GoalController {
       '- **По дням недели:** `{ "frequency_type": "weekly_days", "days_of_week": [1,3,5] }` (Пн, Ср, Пт)\n' +
       '- **Раз в N дней:** `{ "frequency_type": "interval", "interval_days": 3 }`',
   })
-  @ApiOkResponse({ type: GoalScheduleDto })
+  @ApiOkResponse({ type: ScheduleDto })
   @ApiNotFoundResponse({ description: 'Вопрос не найден' })
   @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
   async updateSchedule(
     @Request() req: AuthRequest,
     @Param('questionId', ParseIntPipe) questionId: number,
     @Body() dto: UpdateScheduleDto,
-  ): Promise<GoalScheduleDto> {
+  ): Promise<ScheduleDto> {
     const question = await this.goalService.findQuestionById(questionId);
 
-    if (!question || question.goal?.user_id !== req.user.sub) {
+    const ownerUserId = question?.goal?.user_id ?? question?.user_id;
+    if (!question || ownerUserId !== req.user.sub) {
       throw new NotFoundException(`Question #${questionId} not found`);
     }
 
@@ -131,6 +133,6 @@ export class GoalController {
       frequency_type: dto.frequency_type,
       days_of_week: dto.days_of_week,
       interval_days: dto.interval_days,
-    }) as unknown as Promise<GoalScheduleDto>;
+    }) as unknown as Promise<ScheduleDto>;
   }
 }

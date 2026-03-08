@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { GoalQuestion } from '../../../shared/entities';
+import { Question } from '../../../shared/entities';
 import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportAnswerRepositoryPort } from '../domain/report-answer-repository.port';
@@ -102,7 +102,7 @@ export class ReportService {
   async getUnansweredQuestions(
     goalId: number,
     date: string,
-  ): Promise<GoalQuestion[]> {
+  ): Promise<Question[]> {
     const goal = await this.goalService.findById(goalId);
     if (!goal) return [];
 
@@ -193,7 +193,7 @@ export class ReportService {
     if (!question)
       throw new NotFoundException(`Question #${questionId} not found`);
 
-    const goal = await this.goalService.findById(question.goal_id);
+    const goal = await this.goalService.findById(question.goal_id!);
     if (!goal) throw new NotFoundException('Goal not found');
     if (goal.user_id !== dbUserId) throw new ForbiddenException();
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { GoalStatus } from '../../../shared/constants/goal-statuses';
-import { Goal, GoalQuestion, GoalSchedule } from '../../../shared/entities';
+import { Goal, Question, Schedule } from '../../../shared/entities';
 import { GoalRepositoryPort } from '../domain/goal-repository.port';
 import {
   ScheduleData,
@@ -34,15 +34,15 @@ export class GoalService {
     goalData:
       | Partial<Goal>
       | {
-        goal_name: string;
-        goal_start: string;
-        goal_end: string;
-        questions?: Array<{
-          question: string;
-          type: string;
-          canSkip: boolean;
-        }>;
-      },
+          goal_name: string;
+          goal_start: string;
+          goal_end: string;
+          questions?: Array<{
+            question: string;
+            type: string;
+            canSkip: boolean;
+          }>;
+        },
   ): Promise<Goal> {
     return this.goalRepo.create(userId, goalData);
   }
@@ -70,14 +70,14 @@ export class GoalService {
   async addQuestions(
     goalId: number,
     questions: Array<{ question: string; type: string; canSkip: boolean }>,
-  ): Promise<GoalQuestion[]> {
+  ): Promise<Question[]> {
     return this.goalRepo.addQuestions(goalId, questions);
   }
 
   async addQuestionsWithSchedules(
     goalId: number,
     questions: QuestionWithSchedule[],
-  ): Promise<GoalQuestion[]> {
+  ): Promise<Question[]> {
     const goal = await this.goalRepo.findById(goalId);
     const effectiveFrom = goal?.goal_start ?? todayISO();
 
@@ -119,7 +119,7 @@ export class GoalService {
   async updateQuestionSchedule(
     questionId: number,
     data: ScheduleData,
-  ): Promise<GoalSchedule> {
+  ): Promise<Schedule> {
     const question = await this.goalRepo.findQuestionById(questionId);
     if (!question) {
       throw new NotFoundException(

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Goal, GoalQuestion, GoalSchedule } from '../../shared/entities';
+import { Goal, Question, Schedule } from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
 import { GoalService } from './application/goal.service';
 import { ScheduleService } from './application/schedule.service';
@@ -12,7 +12,7 @@ import { TypeOrmScheduleRepository } from './infrastructure/typeorm-schedule.rep
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Goal, GoalQuestion, GoalSchedule]),
+    TypeOrmModule.forFeature([Goal, Question, Schedule]),
     AuthModule,
   ],
   controllers: [GoalController],

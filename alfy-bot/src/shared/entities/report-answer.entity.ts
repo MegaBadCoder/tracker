@@ -7,7 +7,7 @@ import {
   CreateDateColumn,
   Index,
 } from 'typeorm';
-import { GoalQuestion } from './goal-question.entity';
+import { Question } from './question.entity';
 
 @Entity('report_answers')
 @Index(['question_id', 'scheduled_date'])
@@ -38,7 +38,7 @@ export class ReportAnswer {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => GoalQuestion)
+  @ManyToOne(() => Question)
   @JoinColumn({ name: 'question_id' })
-  question: GoalQuestion;
+  question: Question;
 }

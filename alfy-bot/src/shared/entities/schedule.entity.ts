@@ -6,10 +6,10 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { GoalQuestion } from './goal-question.entity';
+import { Question } from './question.entity';
 
-@Entity('goal_schedules')
-export class GoalSchedule {
+@Entity('schedules')
+export class Schedule {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -43,9 +43,9 @@ export class GoalSchedule {
   @Column({ type: 'text', nullable: true })
   effective_from: string | null;
 
-  @ManyToOne(() => GoalQuestion, (question) => question.schedules)
+  @ManyToOne(() => Question, (question) => question.schedules)
   @JoinColumn({ name: 'question_id' })
-  question: GoalQuestion;
+  question: Question;
 
   @CreateDateColumn()
   createdAt: Date;

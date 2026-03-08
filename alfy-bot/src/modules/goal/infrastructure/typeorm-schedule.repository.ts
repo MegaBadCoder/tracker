@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { GoalSchedule } from '../../../shared/entities';
+import { Schedule } from '../../../shared/entities';
 import {
   ScheduleData,
   ScheduleRepositoryPort,
@@ -10,13 +10,13 @@ import {
 @Injectable()
 export class TypeOrmScheduleRepository extends ScheduleRepositoryPort {
   constructor(
-    @InjectRepository(GoalSchedule)
-    private repo: Repository<GoalSchedule>,
+    @InjectRepository(Schedule)
+    private repo: Repository<Schedule>,
   ) {
     super();
   }
 
-  async create(questionId: number, data: ScheduleData): Promise<GoalSchedule> {
+  async create(questionId: number, data: ScheduleData): Promise<Schedule> {
     const schedule = this.repo.create({
       question_id: questionId,
       frequency_type: data.frequency_type,
@@ -30,7 +30,7 @@ export class TypeOrmScheduleRepository extends ScheduleRepositoryPort {
   async createNewVersion(
     questionId: number,
     data: ScheduleData,
-  ): Promise<GoalSchedule> {
+  ): Promise<Schedule> {
     const schedule = this.repo.create({
       question_id: questionId,
       frequency_type: data.frequency_type,
