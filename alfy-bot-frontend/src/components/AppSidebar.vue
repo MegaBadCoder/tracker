@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Target, ListChecks } from 'lucide-vue-next'
+import { Target, ListChecks, CheckSquare } from 'lucide-vue-next'
 import { RouterLink, useRoute } from 'vue-router'
 
 defineProps<{
@@ -15,6 +15,7 @@ const route = useRoute()
 const links = [
   { to: '/', label: 'Цели', icon: Target },
   { to: '/habits', label: 'Привычки', icon: ListChecks },
+  { to: '/tasks', label: 'Задачи', icon: CheckSquare },
 ]
 </script>
 

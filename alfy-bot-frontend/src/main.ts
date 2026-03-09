@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
 import { authorize } from './api/auth'
 import router from './router'
@@ -18,7 +19,7 @@ async function bootstrap() {
     await authorize()
   }
 
-  createApp(App).use(router).mount('#app')
+  createApp(App).use(createPinia()).use(router).mount('#app')
 }
 
 bootstrap()

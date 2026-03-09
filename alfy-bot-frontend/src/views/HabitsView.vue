@@ -3,6 +3,7 @@ import { ref, computed, watch, inject } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Check, X, Minus, ChevronRight } from 'lucide-vue-next'
 import AppHeader from '../components/AppHeader.vue'
+import PageContainer from '@/components/PageContainer.vue'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { fetchHabits } from '../api/habits'
 import type { HabitWithHistory } from '../types'
@@ -69,7 +70,7 @@ function isToday(dateStr: string): boolean {
 <template>
   <AppHeader title="Привычки" :on-menu-click="openSidebar" />
 
-  <main class="max-w-6xl mx-auto px-4 py-6">
+  <PageContainer>
     <Tabs
       :model-value="String(days)"
       class="mb-4"
@@ -78,7 +79,6 @@ function isToday(dateStr: string): boolean {
       <TabsList>
         <TabsTrigger value="7">7 дней</TabsTrigger>
         <TabsTrigger value="14">14 дней</TabsTrigger>
-        <TabsTrigger value="30">30 дней</TabsTrigger>
       </TabsList>
     </Tabs>
 
@@ -189,5 +189,5 @@ function isToday(dateStr: string): boolean {
         </tbody>
       </table>
     </div>
-  </main>
+  </PageContainer>
 </template>

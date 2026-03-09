@@ -5,6 +5,7 @@ import GoalCard from '../components/GoalCard.vue'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { fetchGoals } from '../api/goals'
 import type { Goal, GoalStatus } from '../types'
+import PageContainer from '@/components/PageContainer.vue'
 
 type Filter = 'all' | GoalStatus
 
@@ -35,7 +36,7 @@ watch(filter, load, { immediate: true })
 <template>
   <AppHeader title="Мои цели" :on-menu-click="openSidebar" />
 
-  <main class="max-w-6xl mx-auto px-4 py-6">
+  <PageContainer>
     <!-- filters -->
     <Tabs
       :model-value="filter"
@@ -71,5 +72,5 @@ watch(filter, load, { immediate: true })
     <div v-else class="py-20 text-center text-muted-foreground">
       <p class="text-lg">Нет целей в этой категории</p>
     </div>
-  </main>
+  </PageContainer>
 </template>
