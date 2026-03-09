@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Question, Schedule } from '../../../shared/entities';
 import { QuestionRepositoryPort } from '../domain/question-repository.port';
@@ -104,6 +105,7 @@ export class QuestionService {
         type: habit.type,
         can_skip: habit.can_skip,
         is_active: habit.is_active,
+        target_value: habit.target_value,
         createdAt: habit.createdAt,
         history,
       };
@@ -116,6 +118,7 @@ export class QuestionService {
       question: string;
       type: string;
       can_skip?: boolean;
+      target_value?: string;
       frequency_type?: string;
       days_of_week?: number[];
       interval_days?: number;
@@ -125,6 +128,7 @@ export class QuestionService {
       question: data.question,
       type: data.type,
       can_skip: data.can_skip ?? false,
+      target_value: data.target_value ?? null,
       is_habit: true,
       is_active: true,
       goal_id: null,
@@ -149,9 +153,19 @@ export class QuestionService {
   async updateQuestion(
     id: number,
     userId: number,
-    data: Partial<Pick<Question, 'question' | 'type' | 'can_skip' | 'is_habit'>>,
+    data: Partial<
+      Pick<Question, 'question' | 'type' | 'can_skip' | 'is_habit' | 'target_value'>
+    >,
   ): Promise<Question> {
     const question = await this.assertOwnership(id, userId);
+
+    // Validate target_value for number type
+    if (data.target_value !== undefined) {
+      const effectiveType = data.type ?? question.type;
+      if (effectiveType === 'number' && data.target_value !== null && isNaN(Number(data.target_value))) {
+        throw new BadRequestException('target_value must be a valid number for number-type questions');
+      }
+    }
 
     // Backfill user_id when converting a goal question to a habit
     if (data.is_habit === true && !question.user_id && question.goal?.user_id) {

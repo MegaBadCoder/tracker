@@ -47,12 +47,15 @@ interface CreateGoalSessionData extends Scenes.SceneSessionData {
     scheduleType: FrequencyType;
     selectedDays?: number[];
     intervalDays?: number;
+    targetValue?: string;
   }>;
   awaitingQuestionText?: boolean;
   selectedQuestionType?: string;
   questionSetupMessageId?: number;
   _pendingQuestionText?: string;
   _pendingCanSkip?: boolean;
+  awaitingTargetValue?: boolean;
+  _pendingTargetValue?: string;
 }
 
 interface SceneContext extends Context {
@@ -384,6 +387,14 @@ export class CreateGoalScene {
     );
   }
 
+  @Action('skip_target_value')
+  async handleSkipTargetValue(@Ctx() ctx: SceneContext) {
+    await ctx.answerCbQuery();
+    ctx.session.awaitingTargetValue = false;
+    ctx.session._pendingTargetValue = undefined;
+    await this.showCanSkipStep(ctx);
+  }
+
   @Action('questions_done')
   async handleQuestionsDone(@Ctx() ctx: SceneContext) {
     await ctx.answerCbQuery();
@@ -528,26 +539,45 @@ export class CreateGoalScene {
       return;
     }
 
+    if (ctx.session.awaitingTargetValue) {
+      const num = Number(text);
+      if (isNaN(num)) {
+        const msgId =
+          ctx.session.questionSetupMessageId || ctx.session.messageId;
+        await ctx.telegram.editMessageText(
+          ctx.chat?.id,
+          msgId,
+          undefined,
+          `❌ ${MESSAGES.QUESTION_SETUP.TARGET_VALUE_ERROR}\n\n${MESSAGES.QUESTION_SETUP.TARGET_VALUE}`,
+          Markup.inlineKeyboard([
+            [
+              {
+                text: `⏭ ${MESSAGES.QUESTION_SETUP.TARGET_VALUE_SKIP}`,
+                callback_data: 'skip_target_value',
+              },
+            ],
+            [{ text: '❌ Отмена', callback_data: 'cancel_goal' }],
+          ]),
+        );
+        return;
+      }
+
+      ctx.session.awaitingTargetValue = false;
+      ctx.session._pendingTargetValue = text;
+      await this.showCanSkipStep(ctx);
+      return;
+    }
+
     if (ctx.session.awaitingQuestionText && ctx.session.selectedQuestionType) {
       ctx.session.awaitingQuestionText = false;
       ctx.session._pendingQuestionText = text;
 
-      const msgId = ctx.session.questionSetupMessageId || ctx.session.messageId;
-      await ctx.telegram.editMessageText(
-        ctx.chat?.id,
-        msgId,
-        undefined,
-        `"${text}"\n\n${MESSAGES.QUESTION_SETUP.CAN_SKIP}`,
-        Markup.inlineKeyboard([
-          [
-            {
-              text: 'Да',
-              callback_data: 'question_can_skip_yes',
-            },
-            { text: 'Нет', callback_data: 'question_can_skip_no' },
-          ],
-        ]),
-      );
+      if (ctx.session.selectedQuestionType === 'number') {
+        await this.showTargetValueStep(ctx);
+        return;
+      }
+
+      await this.showCanSkipStep(ctx);
       return;
     }
   }
@@ -587,6 +617,46 @@ export class CreateGoalScene {
         [{ text: 'Да', callback_data: 'pointa_yes' }],
         [{ text: 'Нет', callback_data: 'pointa_no' }],
         [{ text: '❌ Отмена', callback_data: 'cancel_goal' }],
+      ]),
+    );
+  }
+
+  private async showTargetValueStep(@Ctx() ctx: SceneContext) {
+    ctx.session.awaitingTargetValue = true;
+    const msgId = ctx.session.questionSetupMessageId || ctx.session.messageId;
+    await ctx.telegram.editMessageText(
+      ctx.chat?.id,
+      msgId,
+      undefined,
+      `"${ctx.session._pendingQuestionText}"\n\n${MESSAGES.QUESTION_SETUP.TARGET_VALUE}`,
+      Markup.inlineKeyboard([
+        [
+          {
+            text: `⏭ ${MESSAGES.QUESTION_SETUP.TARGET_VALUE_SKIP}`,
+            callback_data: 'skip_target_value',
+          },
+        ],
+        [{ text: '❌ Отмена', callback_data: 'cancel_goal' }],
+      ]),
+    );
+  }
+
+  private async showCanSkipStep(@Ctx() ctx: SceneContext) {
+    const questionText = ctx.session._pendingQuestionText;
+    const msgId = ctx.session.questionSetupMessageId || ctx.session.messageId;
+    await ctx.telegram.editMessageText(
+      ctx.chat?.id,
+      msgId,
+      undefined,
+      `"${questionText}"\n\n${MESSAGES.QUESTION_SETUP.CAN_SKIP}`,
+      Markup.inlineKeyboard([
+        [
+          {
+            text: 'Да',
+            callback_data: 'question_can_skip_yes',
+          },
+          { text: 'Нет', callback_data: 'question_can_skip_no' },
+        ],
       ]),
     );
   }
@@ -789,10 +859,12 @@ export class CreateGoalScene {
         ? [...ctx.session.selectedDays]
         : undefined,
       intervalDays: ctx.session.intervalDays,
+      targetValue: ctx.session._pendingTargetValue,
     });
 
     ctx.session._pendingQuestionText = undefined;
     ctx.session._pendingCanSkip = undefined;
+    ctx.session._pendingTargetValue = undefined;
     ctx.session.selectedQuestionType = undefined;
     ctx.session.scheduleType = undefined;
     ctx.session.selectedDays = undefined;

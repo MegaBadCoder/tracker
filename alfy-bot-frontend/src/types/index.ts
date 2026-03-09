@@ -19,6 +19,7 @@ export interface Question {
   order_index: number
   is_active: boolean
   is_habit: boolean
+  target_value?: string | null
   createdAt: string
   schedule: Schedule
 }

@@ -118,7 +118,12 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
 
   async addQuestions(
     goalId: number,
-    questions: Array<{ question: string; type: string; canSkip: boolean }>,
+    questions: Array<{
+      question: string;
+      type: string;
+      canSkip: boolean;
+      targetValue?: string;
+    }>,
   ): Promise<Question[]> {
     const maxOrder = await this.questionRepo
       .createQueryBuilder('q')
@@ -134,6 +139,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
         question: q.question,
         type: q.type,
         can_skip: q.canSkip,
+        target_value: q.targetValue ?? null,
         order_index: startIndex + index,
         is_active: true,
       }),

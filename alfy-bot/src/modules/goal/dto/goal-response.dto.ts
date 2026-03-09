@@ -56,6 +56,13 @@ export class QuestionDto {
   @ApiProperty({ example: false })
   is_habit: boolean;
 
+  @ApiPropertyOptional({
+    example: '100',
+    description: 'Эталонное значение (цель)',
+    nullable: true,
+  })
+  target_value: string | null;
+
   @ApiPropertyOptional({ example: null, nullable: true })
   user_id: number | null;
 

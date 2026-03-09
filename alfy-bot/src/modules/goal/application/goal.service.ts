@@ -20,6 +20,7 @@ interface QuestionWithSchedule {
   scheduleType: string;
   selectedDays?: number[];
   intervalDays?: number;
+  targetValue?: string;
 }
 
 @Injectable()
@@ -85,6 +86,7 @@ export class GoalService {
       question: q.question,
       type: q.type,
       canSkip: q.canSkip,
+      targetValue: q.targetValue,
     }));
     const savedQuestions = await this.goalRepo.addQuestions(
       goalId,

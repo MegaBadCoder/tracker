@@ -25,4 +25,13 @@ export class UpdateQuestionDto {
   @IsBoolean()
   @IsOptional()
   is_habit?: boolean;
+
+  @ApiPropertyOptional({
+    example: '100',
+    description: 'Эталонное значение (цель). Для number — числовой ориентир на графике.',
+    nullable: true,
+  })
+  @IsString()
+  @IsOptional()
+  target_value?: string;
 }

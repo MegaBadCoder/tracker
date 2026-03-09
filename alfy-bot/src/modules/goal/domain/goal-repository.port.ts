@@ -30,7 +30,12 @@ export abstract class GoalRepositoryPort {
   abstract updateGoalStatus(goalId: number, status: string): Promise<void>;
   abstract addQuestions(
     goalId: number,
-    questions: Array<{ question: string; type: string; canSkip: boolean }>,
+    questions: Array<{
+      question: string;
+      type: string;
+      canSkip: boolean;
+      targetValue?: string;
+    }>,
   ): Promise<Question[]>;
   abstract findQuestionById(questionId: number): Promise<Question | null>;
 }

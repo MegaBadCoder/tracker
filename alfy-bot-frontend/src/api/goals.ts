@@ -26,7 +26,7 @@ export async function fetchQuestion(questionId: number): Promise<Question> {
 
 export async function updateQuestion(
   questionId: number,
-  dto: { is_habit?: boolean },
+  dto: { is_habit?: boolean; question?: string },
 ): Promise<Question> {
   const { data } = await api.patch<Question>(`/questions/${questionId}`, dto)
   return data

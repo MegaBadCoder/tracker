@@ -42,6 +42,9 @@ export class Question {
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 
+  @Column({ type: 'text', nullable: true })
+  target_value: string | null;
+
   @Column({ type: 'boolean', default: false })
   is_habit: boolean;
 

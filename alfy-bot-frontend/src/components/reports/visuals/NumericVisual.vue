@@ -10,6 +10,7 @@ const props = defineProps<{
   dataPoints: DataPoint[]
   accent: string
   highlightIndex?: number
+  targetValue?: number
 }>()
 
 const labels = computed(() => props.dataPoints.map(d => formatDateShort(d.date)))
@@ -56,6 +57,7 @@ const avg = computed(() =>
       :question-text="questionText"
       :highlight-index="highlightIndex"
       :bare="true"
+      :target-value="targetValue"
     />
   </div>
 </template>

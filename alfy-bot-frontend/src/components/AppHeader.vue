@@ -36,7 +36,9 @@ const router = useRouter()
           <Menu class="w-5 h-5" />
         </Button>
         <Target v-else class="w-5 h-5 text-primary flex-shrink-0" />
-        <span class="font-semibold text-base truncate">{{ title }}</span>
+        <slot name="title">
+          <span class="font-semibold text-base truncate">{{ title }}</span>
+        </slot>
       </div>
 
       <!-- right slot -->

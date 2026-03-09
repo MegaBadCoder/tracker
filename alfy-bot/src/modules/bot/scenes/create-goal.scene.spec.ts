@@ -364,4 +364,129 @@ describe('CreateGoalScene - Simple Goal', () => {
       );
     });
   });
+
+  describe('handleText - ввод эталонного значения для number', () => {
+    it('должен показать запрос эталонного значения после ввода текста вопроса типа number', async () => {
+      mockCtx.message = { text: 'Сколько км пробежал?', message_id: 100 };
+      mockCtx.session = {
+        messageId: 123,
+        goalName: 'Моя цель',
+        awaitingQuestionText: true,
+        selectedQuestionType: 'number',
+      };
+
+      await scene.handleText(mockCtx);
+
+      expect(mockCtx.session.awaitingQuestionText).toBe(false);
+      expect(mockCtx.session._pendingQuestionText).toBe(
+        'Сколько км пробежал?',
+      );
+      expect(mockCtx.telegram.editMessageText).toHaveBeenCalledWith(
+        mockCtx.chat.id,
+        123,
+        undefined,
+        expect.stringContaining('эталонное значение'),
+        expect.objectContaining({
+          reply_markup: expect.objectContaining({
+            inline_keyboard: expect.arrayContaining([
+              expect.arrayContaining([
+                expect.objectContaining({
+                  callback_data: 'skip_target_value',
+                }),
+              ]),
+            ]),
+          }),
+        }),
+      );
+    });
+
+    it('должен принять числовое эталонное значение и перейти к can_skip', async () => {
+      mockCtx.message = { text: '100', message_id: 101 };
+      mockCtx.session = {
+        messageId: 123,
+        goalName: 'Моя цель',
+        awaitingTargetValue: true,
+        _pendingQuestionText: 'Сколько км пробежал?',
+        selectedQuestionType: 'number',
+      };
+
+      await scene.handleText(mockCtx);
+
+      expect(mockCtx.session._pendingTargetValue).toBe('100');
+      expect(mockCtx.session.awaitingTargetValue).toBe(false);
+      expect(mockCtx.telegram.editMessageText).toHaveBeenCalledWith(
+        mockCtx.chat.id,
+        123,
+        undefined,
+        expect.stringContaining('Можно ли пропустить'),
+        expect.any(Object),
+      );
+    });
+
+    it('должен показать ошибку при нечисловом вводе эталона', async () => {
+      mockCtx.message = { text: 'abc', message_id: 102 };
+      mockCtx.session = {
+        messageId: 123,
+        goalName: 'Моя цель',
+        awaitingTargetValue: true,
+        _pendingQuestionText: 'Сколько км пробежал?',
+        selectedQuestionType: 'number',
+      };
+
+      await scene.handleText(mockCtx);
+
+      expect(mockCtx.session.awaitingTargetValue).toBe(true);
+      expect(mockCtx.telegram.editMessageText).toHaveBeenCalledWith(
+        mockCtx.chat.id,
+        123,
+        undefined,
+        expect.stringContaining('Введи число'),
+        expect.any(Object),
+      );
+    });
+
+    it('не должен показывать запрос эталона для типов != number', async () => {
+      mockCtx.message = { text: 'Как настроение?', message_id: 103 };
+      mockCtx.session = {
+        messageId: 123,
+        goalName: 'Моя цель',
+        awaitingQuestionText: true,
+        selectedQuestionType: 'text',
+      };
+
+      await scene.handleText(mockCtx);
+
+      expect(mockCtx.session._pendingQuestionText).toBe('Как настроение?');
+      // Should go directly to can_skip, not target value
+      expect(mockCtx.telegram.editMessageText).toHaveBeenCalledWith(
+        mockCtx.chat.id,
+        123,
+        undefined,
+        expect.stringContaining('Можно ли пропустить'),
+        expect.any(Object),
+      );
+    });
+
+    it('должен пропустить эталонное значение по кнопке skip_target_value', async () => {
+      mockCtx.session = {
+        messageId: 123,
+        goalName: 'Моя цель',
+        awaitingTargetValue: true,
+        _pendingQuestionText: 'Сколько км?',
+        selectedQuestionType: 'number',
+      };
+
+      await scene.handleSkipTargetValue(mockCtx);
+
+      expect(mockCtx.session.awaitingTargetValue).toBe(false);
+      expect(mockCtx.session._pendingTargetValue).toBeUndefined();
+      expect(mockCtx.telegram.editMessageText).toHaveBeenCalledWith(
+        mockCtx.chat.id,
+        123,
+        undefined,
+        expect.stringContaining('Можно ли пропустить'),
+        expect.any(Object),
+      );
+    });
+  });
 });

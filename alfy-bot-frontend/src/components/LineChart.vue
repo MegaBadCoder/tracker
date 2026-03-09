@@ -21,8 +21,9 @@ const props = withDefaults(
     questionText: string
     highlightIndex?: number
     bare?: boolean
+    targetValue?: number
   }>(),
-  { highlightIndex: undefined, bare: false },
+  { highlightIndex: undefined, bare: false, targetValue: undefined },
 )
 
 const color = computed(() => props.color)
@@ -40,23 +41,36 @@ const chartData = computed(() => {
           i === hi ? color.value : color.value + '80',
         )
       : color.value + '80'
-  return {
-    labels: props.labels,
-    datasets: [
-      {
-        label: props.questionText,
-        data: props.values,
-        borderColor: color.value,
-        backgroundColor: color.value + '20',
-        borderWidth: 2,
-        pointRadius,
-        pointHoverRadius: 8,
-        pointBackgroundColor,
-        tension: 0.4,
-        fill: true,
-      },
-    ],
+  const datasets = [
+    {
+      label: props.questionText,
+      data: props.values,
+      borderColor: color.value,
+      backgroundColor: color.value + '20',
+      borderWidth: 2,
+      pointRadius,
+      pointHoverRadius: 8,
+      pointBackgroundColor,
+      tension: 0.4,
+      fill: true,
+    },
+  ]
+  if (props.targetValue != null && props.labels.length) {
+    datasets.push({
+      label: 'Цель',
+      data: Array(props.labels.length).fill(props.targetValue),
+      borderColor: 'rgba(239,68,68,0.6)',
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      pointBackgroundColor: 'transparent',
+      tension: 0,
+      fill: false,
+      borderDash: [6, 4],
+    } as any)
   }
+  return { labels: props.labels, datasets }
 })
 
 const options = {
@@ -109,6 +123,10 @@ const avg = computed(() =>
         <div class="text-xs text-muted-foreground mb-0.5">Макс</div>
         <div class="text-sm font-semibold text-foreground">{{ max }}</div>
       </div>
+      <div v-if="targetValue != null" class="flex-1 bg-muted rounded-lg px-3 py-2 text-center">
+        <div class="text-xs text-muted-foreground mb-0.5">Цель</div>
+        <div class="text-sm font-semibold text-foreground">{{ targetValue }}</div>
+      </div>
     </div>
   </div>
   <div v-else class="bg-card border border-border rounded-xl p-5">
@@ -128,6 +146,10 @@ const avg = computed(() =>
       <div class="flex-1 bg-muted rounded-lg px-3 py-2 text-center">
         <div class="text-xs text-muted-foreground mb-0.5">Макс</div>
         <div class="text-sm font-semibold text-foreground">{{ max }}</div>
+      </div>
+      <div v-if="targetValue != null" class="flex-1 bg-muted rounded-lg px-3 py-2 text-center">
+        <div class="text-xs text-muted-foreground mb-0.5">Цель</div>
+        <div class="text-sm font-semibold text-foreground">{{ targetValue }}</div>
       </div>
     </div>
   </div>

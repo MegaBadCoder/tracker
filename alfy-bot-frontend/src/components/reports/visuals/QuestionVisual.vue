@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Question } from '../../../types'
 import type { DataPoint } from '../../../utils/reportAnswer'
 import NumericVisual from './NumericVisual.vue'
@@ -16,6 +17,13 @@ const props = defineProps<{
 }>()
 
 const isNumeric = (t: string) => ['number', 'rating', 'time_spent'].includes(t)
+
+const targetValue = computed(() => {
+  if (props.question.target_value == null) return undefined
+  const v = parseFloat(props.question.target_value)
+  return Number.isNaN(v) ? undefined : v
+})
+
 </script>
 
 <template>
@@ -25,6 +33,7 @@ const isNumeric = (t: string) => ['number', 'rating', 'time_spent'].includes(t)
     :data-points="dataPoints"
     :accent="accent"
     :highlight-index="highlightIndex"
+    :target-value="targetValue"
   />
   <YesNoVisual
     v-else-if="question.type === 'yes_no'"

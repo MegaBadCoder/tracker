@@ -20,6 +20,15 @@ export class CreateQuestionDto {
   can_skip?: boolean;
 
   @ApiPropertyOptional({
+    example: '100',
+    description: 'Эталонное значение (цель). Для number — числовой ориентир на графике.',
+    nullable: true,
+  })
+  @IsString()
+  @IsOptional()
+  target_value?: string;
+
+  @ApiPropertyOptional({
     example: 'daily',
     enum: ['daily', 'weekly_days', 'interval'],
   })

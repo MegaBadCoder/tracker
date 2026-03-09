@@ -32,6 +32,9 @@ export class HabitWithHistoryDto {
   @ApiProperty()
   is_active: boolean;
 
+  @ApiProperty({ nullable: true })
+  target_value: string | null;
+
   @ApiProperty()
   createdAt: Date;
 

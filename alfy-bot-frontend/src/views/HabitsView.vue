@@ -43,12 +43,26 @@ async function load() {
 
 watch(days, load, { immediate: true })
 
-const reversedDates = computed(() =>
-  habits.value[0]?.history ? [...habits.value[0].history].reverse() : [],
-)
+const periodDates = computed(() => {
+  const result: { date: string }[] = []
+  const now = new Date()
+  for (let i = 0; i < days.value; i++) {
+    const d = new Date(now)
+    d.setDate(now.getDate() - i)
+    result.push({ date: d.toISOString().slice(0, 10) })
+  }
+  return result
+})
 
-function reversedHistory(habit: HabitWithHistory) {
-  return [...habit.history].reverse()
+function historyByPeriod(habit: HabitWithHistory) {
+  const map = new Map(habit.history.map(h => [h.date.slice(0, 10), h]))
+  return periodDates.value.map(d => map.get(d.date) ?? { date: d.date, status: 'not_due' as const })
+}
+
+const today = new Date().toISOString().slice(0, 10)
+
+function isToday(dateStr: string): boolean {
+  return dateStr.slice(0, 10) === today
 }
 </script>
 
@@ -110,12 +124,13 @@ function reversedHistory(habit: HabitWithHistory) {
               Привычка
             </th>
             <th
-              v-for="entry in reversedDates"
+              v-for="entry in periodDates"
               :key="entry.date"
               class="text-center px-1 py-2 min-w-[36px]"
+              :class="isToday(entry.date) ? 'bg-primary/10' : ''"
             >
-              <div class="text-[10px] text-muted-foreground leading-tight">{{ dayLabel(entry.date) }}</div>
-              <div class="text-[10px] text-muted-foreground leading-tight">{{ dayNumber(entry.date) }}</div>
+              <div class="text-[10px] leading-tight" :class="isToday(entry.date) ? 'text-primary font-semibold' : 'text-muted-foreground'">{{ dayLabel(entry.date) }}</div>
+              <div class="text-[10px] leading-tight" :class="isToday(entry.date) ? 'text-primary font-semibold' : 'text-muted-foreground'">{{ dayNumber(entry.date) }}</div>
             </th>
             <th class="w-8" />
           </tr>
@@ -137,9 +152,10 @@ function reversedHistory(habit: HabitWithHistory) {
             </td>
             <!-- status cells -->
             <td
-              v-for="entry in reversedHistory(habit)"
+              v-for="entry in historyByPeriod(habit)"
               :key="entry.date"
               class="text-center px-1 py-2.5"
+              :class="isToday(entry.date) ? 'bg-primary/10' : ''"
             >
               <span
                 v-if="entry.status === 'filled'"
