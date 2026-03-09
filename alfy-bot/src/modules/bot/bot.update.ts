@@ -22,15 +22,23 @@ export class BotUpdate implements OnModuleInit {
 
   async onModuleInit() {
     const url = process.env.WEBAPP_URL;
-    if (!url) return;
+    if (!url) {
+      console.warn('[BotUpdate] WEBAPP_URL is not set, skipping menu button');
+      return;
+    }
 
-    await this.bot.telegram.setChatMenuButton({
-      menuButton: {
-        type: 'web_app',
-        text: 'Открыть трекер',
-        web_app: { url },
-      },
-    });
+    try {
+      await this.bot.telegram.setChatMenuButton({
+        menuButton: {
+          type: 'web_app',
+          text: 'Открыть трекер',
+          web_app: { url },
+        },
+      });
+      console.log(`[BotUpdate] Menu button set to ${url}`);
+    } catch (error) {
+      console.error('[BotUpdate] Failed to set menu button:', error);
+    }
   }
 
   private getMainMenuKeyboard() {
