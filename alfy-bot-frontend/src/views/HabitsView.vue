@@ -19,7 +19,7 @@ const days = ref<Days>(7)
 function dayLabel(dateStr: string): string {
   const date = new Date(dateStr)
   const labels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-  return labels[date.getDay()]
+  return labels[date.getDay()] ?? ''
 }
 
 function dayNumber(dateStr: string): string {
