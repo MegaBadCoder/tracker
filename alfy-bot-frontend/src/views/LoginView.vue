@@ -7,7 +7,7 @@ const router = useRouter()
 const error = ref<string | null>(null)
 const widgetContainer = ref<HTMLDivElement>()
 
-const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || 'AlfyTrackerBot'
+const BOT_USERNAME = (import.meta.env.VITE_BOT_USERNAME || 'AlfyTrackerBot').replace(/^@/, '')
 
 onMounted(async () => {
   const tg = window.Telegram?.WebApp

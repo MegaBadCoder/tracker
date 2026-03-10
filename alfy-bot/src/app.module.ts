@@ -11,6 +11,7 @@ import { BotModule } from './modules/bot/bot.module';
 import { GoalModule } from './modules/goal/goal.module';
 import { QuestionModule } from './modules/question/question.module';
 import { ReportModule } from './modules/report/report.module';
+import { TaskModule } from './modules/task/task.module';
 import { UserModule } from './modules/user/user.module';
 import {
   Goal,
@@ -18,6 +19,9 @@ import {
   Schedule,
   ReportAnswer,
   User,
+  Task,
+  PomodoroConfig,
+  TimerSession,
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
@@ -30,7 +34,7 @@ import { SharedModule } from './shared/shared.module';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'data/database.sqlite',
-      entities: [User, Goal, Question, ReportAnswer, Schedule],
+      entities: [User, Goal, Question, ReportAnswer, Schedule, Task, PomodoroConfig, TimerSession],
       synchronize: true,
     }),
     TelegrafModule.forRoot({
@@ -43,6 +47,7 @@ import { SharedModule } from './shared/shared.module';
     GoalModule,
     QuestionModule,
     ReportModule,
+    TaskModule,
     BotModule,
   ],
   controllers: [AppController],

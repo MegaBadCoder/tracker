@@ -8,6 +8,7 @@ import { fetchGoalById } from '../api/goals'
 import type { Goal } from '../types'
 import { goalAccent } from '../utils/goalColor'
 import { daysLeft, formatDate } from '../utils/date'
+import PageContainer from '@/components/PageContainer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,7 +57,7 @@ const questionTypeLabel: Record<string, string> = {
       </template>
     </AppHeader>
 
-    <main class="max-w-6xl mx-auto px-4 py-6 space-y-8">
+    <PageContainer class="space-y-8">
       <!-- summary -->
       <section>
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -96,6 +97,6 @@ const questionTypeLabel: Record<string, string> = {
           </button>
         </div>
       </section>
-    </main>
+    </PageContainer>
   </div>
 </template>

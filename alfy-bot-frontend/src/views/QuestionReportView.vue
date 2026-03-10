@@ -11,6 +11,7 @@ import { fetchQuestion, updateQuestion } from '../api/goals'
 import { fetchQuestionAnalytics } from '../api/reports'
 import { analyticsToDataPoints, type DataPoint } from '../utils/reportAnswer'
 import type { Question } from '../types'
+import PageContainer from '@/components/PageContainer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,7 +127,7 @@ onMounted(async () => {
       </template>
     </AppHeader>
 
-    <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <PageContainer class="space-y-6">
       <QuestionVisual
         v-if="dataPoints.length"
         :question="question"
@@ -155,6 +156,6 @@ onMounted(async () => {
           @update:checked="toggleHabit"
         />
       </div>
-    </main>
+    </PageContainer>
   </div>
 </template>
