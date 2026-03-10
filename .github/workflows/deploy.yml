@@ -26,7 +26,7 @@ jobs:
       - name: Build & push frontend
         run: |
           docker build \
-            --build-arg VITE_API_URL=https://tracker.rocketup.tech \
+            --build-arg VITE_API_URL=${{ secrets.VITE_API_URL }} \
             --build-arg VITE_BOT_USERNAME=${{ secrets.BOT_USERNAME }} \
             -t $FRONTEND_IMAGE:${{ github.sha }} -t $FRONTEND_IMAGE:latest \
             ./alfy-bot-frontend

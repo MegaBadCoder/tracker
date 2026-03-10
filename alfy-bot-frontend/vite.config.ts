@@ -6,6 +6,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
   server: {
+    host: true,
     allowedHosts: true,
   },
   resolve: {
