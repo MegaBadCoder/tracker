@@ -84,8 +84,13 @@ const {
   fetchTasks,
   createTask,
   toggleTask,
-  deleteTask
+  deleteTask,
+  incrementPomodoro
 } = useTasks()
+
+timerStore.onPomodoroIncrement = (taskId: string, increment: number) => {
+  incrementPomodoro(taskId, increment)
+}
 
 const { confirm } = useConfirm()
 

@@ -84,16 +84,11 @@ export class TaskController {
   }
 
   @Patch(':id/pomodoro')
-  @ApiOperation({ summary: 'Обновить прогресс помодоро' })
-  async updatePomodoro(
-    @Request() req: AuthRequest,
+  @ApiOperation({ summary: 'Инкремент выполненных помодоро' })
+  async incrementPomodoro(
     @Param('id') id: string,
-    @Body() body: { pomodoroCompleted: number },
+    @Body() body: { increment: number },
   ) {
-    return this.taskService.updatePomodoro(
-      req.user.sub,
-      id,
-      body.pomodoroCompleted,
-    );
+    await this.taskService.incrementPomodoro(id, body.increment);
   }
 }

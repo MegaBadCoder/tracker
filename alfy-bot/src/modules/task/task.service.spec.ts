@@ -54,6 +54,7 @@ describe('TaskService', () => {
         Promise.resolve(makeTask({ id, ...data })),
       ),
       delete: jest.fn().mockResolvedValue(undefined),
+      incrementPomodoroCompleted: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -188,22 +189,17 @@ describe('TaskService', () => {
     });
   });
 
-  describe('updatePomodoro', () => {
-    it('обновляет pomodoroCompleted', async () => {
-      const task = makeTask({ pomodoroConfig: makePomodoroConfig() });
-      repo.findById.mockResolvedValue(task);
+  describe('incrementPomodoro', () => {
+    it('вызывает increment напрямую по taskId', async () => {
+      await service.incrementPomodoro('task-1', 1.0);
 
-      await service.updatePomodoro(1, 'task-1', 3);
-
-      expect(task.pomodoroConfig!.pomodoroCompleted).toBe(3);
-      expect(repo.update).toHaveBeenCalled();
+      expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith('task-1', 1.0);
     });
 
-    it('бросает NotFoundException если нет pomodoroConfig', async () => {
-      repo.findById.mockResolvedValue(makeTask());
+    it('передаёт дробные значения', async () => {
+      await service.incrementPomodoro('task-1', 0.6);
 
-      await expect(service.updatePomodoro(1, 'task-1', 1))
-        .rejects.toThrow(NotFoundException);
+      expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith('task-1', 0.6);
     });
   });
 

@@ -30,7 +30,7 @@ export class PomodoroConfig {
   @Column({ default: 4 })
   longBreakInterval: number;
 
-  @Column({ default: 0 })
+  @Column({ type: 'real', default: 0 })
   pomodoroCompleted: number;
 
   @OneToOne(() => Task, (task) => task.pomodoroConfig, { onDelete: 'CASCADE' })

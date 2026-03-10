@@ -52,4 +52,11 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     if (!task) throw new NotFoundException(`Task #${id} not found`);
     await this.taskRepo.remove(task);
   }
+
+  async incrementPomodoroCompleted(
+    taskId: string,
+    increment: number,
+  ): Promise<void> {
+    await this.pomodoroRepo.increment({ taskId }, 'pomodoroCompleted', increment);
+  }
 }

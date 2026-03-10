@@ -4,7 +4,8 @@ import { Cron } from '@nestjs/schedule';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
-import { TimerSession, User } from '../../shared/entities';
+import { TimerSession } from '../../shared/entities/timer-session.entity';
+import { UserService } from '../user/application/user.service';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
 
 @Injectable()
@@ -14,21 +15,19 @@ export class TimerSessionService {
   constructor(
     @InjectRepository(TimerSession)
     private readonly timerRepo: Repository<TimerSession>,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
+    private readonly userService: UserService,
     @InjectBot() private readonly bot: Telegraf,
   ) {}
 
-  private async getTelegramId(userId: number): Promise<number | null> {
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    return user?.telegramId ?? null;
-  }
-
+  /**
+   * Отправляет сообщение пользователю в Telegram.
+   * Логирует warning, если у пользователя нет telegramId. Ошибки отправки логирует, но не пробрасывает.
+   */
   private async sendNotification(
     userId: number,
     message: string,
   ): Promise<void> {
-    const telegramId = await this.getTelegramId(userId);
+    const telegramId = await this.userService.getTelegramId(userId);
     if (!telegramId) {
       this.logger.warn(`User ${userId} has no telegramId`);
       return;
@@ -43,6 +42,10 @@ export class TimerSessionService {
     }
   }
 
+  /**
+   * Создаёт или обновляет сессию таймера для пользователя.
+   * Обновляет последнюю сессию по userId, если она есть; иначе создаёт новую.
+   */
   async upsert(
     userId: number,
     dto: UpsertTimerSessionDto,
@@ -74,6 +77,9 @@ export class TimerSessionService {
     return this.timerRepo.save(session);
   }
 
+  /**
+   * Возвращает последнюю по времени сессию таймера пользователя с подгруженными task и pomodoroConfig.
+   */
   async getLatest(userId: number): Promise<TimerSession | null> {
     return this.timerRepo.findOne({
       where: { userId },
@@ -82,6 +88,10 @@ export class TimerSessionService {
     });
   }
 
+  /**
+   * Останавливает таймер пользователя: отправляет уведомление в Telegram и удаляет сессию из БД.
+   * Ничего не делает, если активной сессии нет.
+   */
   async deactivate(userId: number): Promise<void> {
     const session = await this.timerRepo.findOne({
       where: { userId },
@@ -97,6 +107,10 @@ export class TimerSessionService {
     await this.timerRepo.remove(session);
   }
 
+  /**
+   * Cron: каждые 30 секунд находит истёкшие активные сессии (expiresAt <= now),
+   * деактивирует их, сохраняет в БД и отправляет уведомление в Telegram о завершении таймера.
+   */
   @Cron('*/30 * * * * *')
   async handleExpiredTimers(): Promise<void> {
     const expired = await this.timerRepo.find({

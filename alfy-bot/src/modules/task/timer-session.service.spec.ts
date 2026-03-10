@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getBotToken } from 'nestjs-telegraf';
 import { TimerSessionService } from './timer-session.service';
-import { TimerSession, Task, User } from '../../shared/entities';
+import { UserService } from '../user/application/user.service';
+import { TimerSession, Task } from '../../shared/entities';
 
 function makeSession(overrides: Partial<TimerSession> = {}): TimerSession {
   const session = new TimerSession();
@@ -26,7 +27,7 @@ function makeSession(overrides: Partial<TimerSession> = {}): TimerSession {
 describe('TimerSessionService', () => {
   let service: TimerSessionService;
   let timerRepo: Record<string, jest.Mock>;
-  let userRepo: Record<string, jest.Mock>;
+  let userService: Record<string, jest.Mock>;
   let bot: { telegram: { sendMessage: jest.Mock } };
 
   beforeEach(async () => {
@@ -38,8 +39,8 @@ describe('TimerSessionService', () => {
       remove: jest.fn().mockResolvedValue(undefined),
     };
 
-    userRepo = {
-      findOne: jest.fn().mockResolvedValue({ id: 1, telegramId: 999 } as User),
+    userService = {
+      getTelegramId: jest.fn().mockResolvedValue(999),
     };
 
     bot = {
@@ -52,7 +53,7 @@ describe('TimerSessionService', () => {
       providers: [
         TimerSessionService,
         { provide: getRepositoryToken(TimerSession), useValue: timerRepo },
-        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: UserService, useValue: userService },
         { provide: getBotToken(), useValue: bot },
       ],
     }).compile();
@@ -136,7 +137,7 @@ describe('TimerSessionService', () => {
   });
 
   describe('deactivate', () => {
-    it('удаляет сессию и отправляет уведомление в Telegram', async () => {
+    it('удаляет сессию и отправляет уведомление по telegramId', async () => {
       const session = makeSession({
         task: { id: 'task-1', title: 'Код ревью' } as Task,
       });
@@ -144,6 +145,7 @@ describe('TimerSessionService', () => {
 
       await service.deactivate(1);
 
+      expect(userService.getTelegramId).toHaveBeenCalledWith(1);
       expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
         999,
         '⏹ Таймер по задаче "Код ревью" остановлен',
@@ -177,7 +179,7 @@ describe('TimerSessionService', () => {
 
       expect(expired.isActive).toBe(false);
       expect(timerRepo.save).toHaveBeenCalledWith(expired);
-      expect(userRepo.findOne).toHaveBeenCalledWith({ where: { id: 1 } });
+      expect(userService.getTelegramId).toHaveBeenCalledWith(1);
       expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
         999,
         '⏰ Таймер по задаче "Написать отчёт" завершён!',

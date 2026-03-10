@@ -111,8 +111,27 @@ export const useTimerStore = defineStore('timer', () => {
       playSound(isWorkEnd ? 'timer_end' : 'break_end')
     }
 
+    if (checkPhase.isWorkPhase(phase.value)) {
+      incrementPomodoro()
+    }
+
     nextPhase()
     syncToBackend()
+  }
+
+  const onPomodoroIncrement = ref<((taskId: string, increment: number) => void) | null>(null)
+
+  function incrementPomodoro(): void {
+    const taskId = currentSettings.value.taskId
+    if (!taskId) return
+
+    const phaseTime = getPhaseInfo(phase.value).time
+    const elapsed = phaseTime - timeBlock.value
+    const fraction = Math.round((elapsed / phaseTime) * 100) / 100
+
+    if (fraction <= 0) return
+
+    onPomodoroIncrement.value?.(taskId, fraction)
   }
 
   function calculateSeconds(minutes: number): number {
@@ -303,6 +322,7 @@ export const useTimerStore = defineStore('timer', () => {
     timeBlock,
     namePhase,
     timerInterval,
+    onPomodoroIncrement,
     startTimer,
     pauseTimer,
     nextPhase,

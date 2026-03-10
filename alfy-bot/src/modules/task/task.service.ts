@@ -99,18 +99,8 @@ export class TaskService {
     return this.taskRepo.update(id, userId, updateData);
   }
 
-  async updatePomodoro(
-    userId: number,
-    id: string,
-    pomodoroCompleted: number,
-  ): Promise<Task> {
-    const task = await this.taskRepo.findById(id, userId);
-    if (!task) throw new NotFoundException(`Task #${id} not found`);
-    if (!task.pomodoroConfig)
-      throw new NotFoundException(`Task #${id} has no pomodoro config`);
-
-    task.pomodoroConfig.pomodoroCompleted = pomodoroCompleted;
-    return this.taskRepo.update(id, userId, {});
+  async incrementPomodoro(taskId: string, increment: number): Promise<void> {
+    await this.taskRepo.incrementPomodoroCompleted(taskId, increment);
   }
 
   async delete(userId: number, id: string): Promise<void> {

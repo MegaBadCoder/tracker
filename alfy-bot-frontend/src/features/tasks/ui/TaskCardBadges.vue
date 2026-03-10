@@ -37,7 +37,7 @@
       @click="$emit('showTimer')"
     >
       <Timer :size="12" />
-      {{ pomodoroCompleted || 0 }}/{{ pomodoroCount || 0 }}
+      {{ formatPomodoro(pomodoroCompleted || 0) }}/{{ pomodoroCount || 0 }}
     </Badge>
   </div>
 </template>
@@ -72,4 +72,8 @@ interface Emits {
 
 defineProps<Props>()
 defineEmits<Emits>()
+
+function formatPomodoro(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
 </script>

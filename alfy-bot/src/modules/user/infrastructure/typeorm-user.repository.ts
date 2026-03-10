@@ -13,6 +13,10 @@ export class TypeOrmUserRepository extends UserRepositoryPort {
     super();
   }
 
+  async findOneById(id: number): Promise<User | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
   async findOneByTelegramId(telegramId: number): Promise<User | null> {
     return this.repo.findOne({ where: { telegramId } });
   }

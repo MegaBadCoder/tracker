@@ -6,16 +6,15 @@ import router from './router'
 import './style.css'
 
 const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID
+const DEV_USE_WIDGET = import.meta.env.VITE_DEV_USE_WIDGET === 'true'
 
 async function bootstrap() {
   const tg = window.Telegram?.WebApp
 
   if (tg?.initData) {
-    // Telegram WebApp — auto-authorize before mounting
     tg.ready()
     await authorize()
-  } else if (DEV_TELEGRAM_ID) {
-    // Dev mode — authorize with dev telegram id
+  } else if (DEV_TELEGRAM_ID && !DEV_USE_WIDGET) {
     await authorize()
   }
 

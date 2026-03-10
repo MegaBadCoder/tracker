@@ -124,12 +124,18 @@ export function useTasks() {
     }
   }
 
-  const incrementPomodoro = async (taskId: string) => {
+  const incrementPomodoro = async (taskId: string, increment: number) => {
     const task = tasks.value.find(t => t.id === taskId)
     if (!task || !task.isPomodoroTask) return
 
-    const newCount = (task.pomodoroCompleted || 0) + 1
-    return updateTask(taskId, { pomodoroCompleted: newCount })
+    task.pomodoroCompleted = (task.pomodoroCompleted || 0) + increment
+
+    try {
+      await api.patch(`/tasks/${taskId}/pomodoro`, { increment })
+    } catch (err) {
+      task.pomodoroCompleted = (task.pomodoroCompleted || 0) - increment
+      console.error('Ошибка сохранения помодоро:', err)
+    }
   }
 
   const completedTasks = computed(() => tasks.value.filter(t => t.completed))

@@ -6,6 +6,11 @@ import { UserRepositoryPort } from '../domain/user-repository.port';
 export class UserService {
   constructor(private userRepo: UserRepositoryPort) {}
 
+  async getTelegramId(userId: number): Promise<number | null> {
+    const user = await this.userRepo.findOneById(userId);
+    return user?.telegramId ?? null;
+  }
+
   async findOrCreate(
     telegramId: number,
     userData: Partial<User>,

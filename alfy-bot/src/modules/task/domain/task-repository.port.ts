@@ -10,4 +10,8 @@ export abstract class TaskRepositoryPort {
     data: Partial<Task>,
   ): Promise<Task>;
   abstract delete(id: string, userId: number): Promise<void>;
+  abstract incrementPomodoroCompleted(
+    taskId: string,
+    increment: number,
+  ): Promise<void>;
 }
