@@ -162,7 +162,7 @@ export class ReportScene {
     for (const goal of allGoals) {
       if (goal.id === ctx.session.goalId) continue;
       if (!this.scheduleService.hasAnyQuestionDueToday(goal)) continue;
-      const filled = await this.reportService.isDateFilled(goal.id, today);
+      const filled = await this.reportService.isDateFilled(goal.id, today, goal);
       if (!filled) {
         remainingGoals.push(goal);
       }
@@ -218,7 +218,7 @@ export class ReportScene {
     const availableGoals: Goal[] = [];
     for (const goal of allGoals) {
       if (!this.scheduleService.hasAnyQuestionDueToday(goal)) continue;
-      const filled = await this.reportService.isDateFilled(goal.id, today);
+      const filled = await this.reportService.isDateFilled(goal.id, today, goal);
       if (!filled) {
         availableGoals.push(goal);
       }

@@ -8,6 +8,10 @@ import { TimerSession } from '../../shared/entities/timer-session.entity';
 import { UserService } from '../user/application/user.service';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
 
+/**
+ * Сервис сессий таймера (помодоро).
+ * Хранит состояние активного таймера, деактивирует истёкшие по крону и отправляет уведомления в Telegram.
+ */
 @Injectable()
 export class TimerSessionService {
   private readonly logger = new Logger(TimerSessionService.name);
@@ -21,6 +25,11 @@ export class TimerSessionService {
 
   /**
    * Отправляет сообщение пользователю в Telegram.
+   *
+   * @param userId - ID пользователя (внутренний)
+   * @param message - Текст сообщения
+   *
+   * @remarks
    * Логирует warning, если у пользователя нет telegramId. Ошибки отправки логирует, но не пробрасывает.
    */
   private async sendNotification(
@@ -44,6 +53,12 @@ export class TimerSessionService {
 
   /**
    * Создаёт или обновляет сессию таймера для пользователя.
+   *
+   * @param userId - ID пользователя
+   * @param dto - Данные сессии (taskId, phase, expiresAt и т.д.)
+   * @returns Сохранённая сессия
+   *
+   * @remarks
    * Обновляет последнюю сессию по userId, если она есть; иначе создаёт новую.
    */
   async upsert(
@@ -78,7 +93,10 @@ export class TimerSessionService {
   }
 
   /**
-   * Возвращает последнюю по времени сессию таймера пользователя с подгруженными task и pomodoroConfig.
+   * Возвращает последнюю сессию таймера пользователя.
+   *
+   * @param userId - ID пользователя
+   * @returns Сессия с relations `task`, `task.pomodoroConfig` или null
    */
   async getLatest(userId: number): Promise<TimerSession | null> {
     return this.timerRepo.findOne({
@@ -89,8 +107,12 @@ export class TimerSessionService {
   }
 
   /**
-   * Останавливает таймер пользователя: отправляет уведомление в Telegram и удаляет сессию из БД.
-   * Ничего не делает, если активной сессии нет.
+   * Останавливает таймер пользователя и удаляет сессию.
+   *
+   * @param userId - ID пользователя
+   *
+   * @remarks
+   * Отправляет уведомление в Telegram. Ничего не делает, если активной сессии нет.
    */
   async deactivate(userId: number): Promise<void> {
     const session = await this.timerRepo.findOne({
@@ -108,8 +130,11 @@ export class TimerSessionService {
   }
 
   /**
-   * Cron: каждые 30 секунд находит истёкшие активные сессии (expiresAt <= now),
-   * деактивирует их, сохраняет в БД и отправляет уведомление в Telegram о завершении таймера.
+   * Cron: каждые 30 секунд обрабатывает истёкшие активные сессии.
+   *
+   * @remarks
+   * Находит сессии с `expiresAt <= now`, помечает их неактивными, сохраняет в БД
+   * и отправляет уведомление в Telegram о завершении таймера.
    */
   @Cron('*/30 * * * * *')
   async handleExpiredTimers(): Promise<void> {

@@ -4,14 +4,32 @@ import { TaskRepositoryPort } from './domain/task-repository.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
+/**
+ * Сервис управления задачами и помодоро-конфигурацией.
+ * Делегирует персистентность в {@link TaskRepositoryPort}.
+ */
 @Injectable()
 export class TaskService {
   constructor(private readonly taskRepo: TaskRepositoryPort) {}
 
+  /**
+   * Возвращает все задачи пользователя.
+   *
+   * @param userId - ID пользователя
+   * @returns Список задач
+   */
   async getAll(userId: number): Promise<Task[]> {
     return this.taskRepo.findAllByUser(userId);
   }
 
+  /**
+   * Создаёт новую задачу.
+   * При `isPomodoroTask: true` инициализирует {@link PomodoroConfig}.
+   *
+   * @param userId - ID пользователя
+   * @param dto - Данные для создания задачи
+   * @returns Созданная задача
+   */
   async create(userId: number, dto: CreateTaskDto): Promise<Task> {
     const {
       isPomodoroTask,
@@ -47,6 +65,16 @@ export class TaskService {
     return this.taskRepo.create(taskData);
   }
 
+  /**
+   * Обновляет задачу по ID.
+   * Добавляет/удаляет помодоро-конфиг в зависимости от `isPomodoroTask`.
+   *
+   * @param userId - ID пользователя (владельца задачи)
+   * @param id - ID задачи
+   * @param dto - Частичные данные для обновления
+   * @returns Обновлённая задача
+   * @throws {NotFoundException} Если задача не найдена
+   */
   async update(userId: number, id: string, dto: UpdateTaskDto): Promise<Task> {
     const {
       isPomodoroTask,
@@ -87,8 +115,7 @@ export class TaskService {
         task.pomodoroConfig.pomodoroCount = pomodoroCount;
       if (pomodoroDuration !== undefined)
         task.pomodoroConfig.pomodoroDuration = pomodoroDuration;
-      if (shortBreak !== undefined)
-        task.pomodoroConfig.shortBreak = shortBreak;
+      if (shortBreak !== undefined) task.pomodoroConfig.shortBreak = shortBreak;
       if (longBreak !== undefined) task.pomodoroConfig.longBreak = longBreak;
       if (longBreakInterval !== undefined)
         task.pomodoroConfig.longBreakInterval = longBreakInterval;
@@ -99,10 +126,22 @@ export class TaskService {
     return this.taskRepo.update(id, userId, updateData);
   }
 
+  /**
+   * Увеличивает счётчик завершённых помодоро у задачи.
+   *
+   * @param taskId - ID задачи
+   * @param increment - На сколько увеличить (обычно 1)
+   */
   async incrementPomodoro(taskId: string, increment: number): Promise<void> {
     await this.taskRepo.incrementPomodoroCompleted(taskId, increment);
   }
 
+  /**
+   * Удаляет задачу.
+   *
+   * @param userId - ID пользователя (владельца)
+   * @param id - ID задачи
+   */
   async delete(userId: number, id: string): Promise<void> {
     return this.taskRepo.delete(id, userId);
   }

@@ -37,11 +37,11 @@
         </div>
       </div>
 
-      <div v-if="sortedTasks.length === 0" class="p-6 text-center text-muted-foreground bg-card rounded-lg shadow">
+      <div v-if="sortedTasks.length === 0" class="p-6 text-center text-muted-foreground bg-card rounded-lg border border-border">
         Пока нет задач. Добавьте первую задачу выше.
       </div>
 
-      <div v-else class="space-y-3">
+      <div v-else class="bg-card rounded-lg border border-border overflow-hidden divide-y divide-border">
         <TaskCard
           v-for="task in sortedTasks"
           :key="task.id"

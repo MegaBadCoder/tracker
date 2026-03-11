@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Question } from '../../../shared/entities';
+import { Goal, Question } from '../../../shared/entities';
 import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportAnswerRepositoryPort } from '../domain/report-answer-repository.port';
@@ -67,10 +67,11 @@ export class ReportService {
   }
 
   /**
-   * Проверяет, заполнены ли все обязательные due-вопросы на дату
+   * Проверяет, заполнены ли все обязательные due-вопросы на дату.
+   * Принимает опциональный goal, чтобы не делать лишний запрос.
    */
-  async isDateFilled(goalId: number, date: string): Promise<boolean> {
-    const goal = await this.goalService.findById(goalId);
+  async isDateFilled(goalId: number, date: string, preloadedGoal?: Goal): Promise<boolean> {
+    const goal = preloadedGoal ?? await this.goalService.findById(goalId);
     if (!goal) return false;
 
     const targetDate = new Date(date);
@@ -131,12 +132,14 @@ export class ReportService {
     const goal = await this.goalService.findById(goalId);
     if (!goal) return null;
 
+    const activeQuestions = (goal.questions || []).filter((q) => q.is_active);
+    if (activeQuestions.length === 0) return null;
+
     const start = new Date(goal.goal_start);
     start.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Вчера — максимальная дата для "пропуска"
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
@@ -146,27 +149,38 @@ export class ReportService {
     endDate.setHours(0, 0, 0, 0);
     const limit = yesterday < endDate ? yesterday : endDate;
 
-    // Идём от limit назад, ищем первую дату где есть due-вопросы
     const cursor = new Date(limit);
+    const MAX_LOOKBACK_DAYS = 30;
+    let daysChecked = 0;
 
-    while (cursor >= start) {
-      const hasAnyDue = goal.questions
-        .filter((q) => q.is_active)
-        .some((q) =>
-          this.scheduleService.isQuestionDueOnDateHistorical(q, cursor),
-        );
+    while (cursor >= start && daysChecked < MAX_LOOKBACK_DAYS) {
+      const hasAnyDue = activeQuestions.some((q) =>
+        this.scheduleService.isQuestionDueOnDateHistorical(q, cursor),
+      );
 
       if (hasAnyDue) {
         const dateStr = toLocalISO(cursor);
-        const filled = await this.isDateFilled(goalId, dateStr);
-        if (!filled) {
+        const dueQuestions = activeQuestions
+          .filter((q) => !q.can_skip)
+          .filter((q) =>
+            this.scheduleService.isQuestionDueOnDateHistorical(q, cursor),
+          );
+
+        if (dueQuestions.length === 0) return null;
+
+        const answered = await this.answerRepo.countByQuestionsAndDate(
+          dueQuestions.map((q) => q.id),
+          dateStr,
+        );
+
+        if (answered < dueQuestions.length) {
           return dateStr;
         }
-        // Последняя дата по расписанию заполнена — всё ок
         return null;
       }
 
       cursor.setDate(cursor.getDate() - 1);
+      daysChecked++;
     }
 
     return null;
