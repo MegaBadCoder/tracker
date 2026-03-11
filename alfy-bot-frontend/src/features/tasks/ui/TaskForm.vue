@@ -1,14 +1,23 @@
 <template>
   <div class="bg-card rounded-xl border border-border overflow-hidden">
     <!-- Title -->
-    <div class="px-5 pt-5 pb-3">
+    <div class="px-4 pt-3" :class="expanded ? 'pb-2' : 'pb-3'">
       <Input
+        ref="titleInputRef"
         v-model="form.title"
         placeholder="Название задачи"
         class="border-0 shadow-none px-0 text-lg font-semibold placeholder:font-normal focus-visible:ring-0"
+        @focus="expanded = true"
         @keyup.enter="handleSubmit"
       />
     </div>
+
+    <!-- Collapsible body -->
+    <div
+      class="grid transition-all duration-200 ease-out"
+      :class="expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'"
+    >
+      <div class="overflow-hidden">
 
     <!-- Description -->
     <div class="px-5 pb-4">
@@ -187,81 +196,89 @@
       <!-- Pomodoro Settings -->
       <div
         v-if="form.isPomodoroTask"
-        class="mt-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200"
+        class="mt-3 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-1 duration-200"
       >
-        <div class="flex items-center gap-3">
-          <label class="text-sm whitespace-nowrap text-muted-foreground">Раунды</label>
+        <div class="space-y-1">
+          <label class="text-[11px] text-muted-foreground/70 leading-none">Раунды</label>
           <Input
             v-model.number="form.pomodoroCount"
             type="number"
             :min="1"
             :max="10"
-            class="w-20 h-8 text-sm"
+            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1">
-            <label class="text-xs text-muted-foreground">Фокус (мин)</label>
-            <Input
-              v-model.number="form.pomodoroDuration"
-              type="number"
-              :min="1"
-              :max="60"
-              class="h-8 text-sm"
-            />
-          </div>
-          <div class="space-y-1">
-            <label class="text-xs text-muted-foreground">Перерыв (мин)</label>
-            <Input
-              v-model.number="form.shortBreak"
-              type="number"
-              :min="1"
-              :max="15"
-              class="h-8 text-sm"
-            />
-          </div>
+        <div class="space-y-1">
+          <label class="text-[11px] text-muted-foreground/70 leading-none">Фокус</label>
+          <Input
+            v-model.number="form.pomodoroDuration"
+            type="number"
+            :min="1"
+            :max="60"
+            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1">
-            <label class="text-xs text-muted-foreground">Большой перерыв (мин)</label>
-            <Input
-              v-model.number="form.longBreak"
-              type="number"
-              :min="5"
-              :max="30"
-              class="h-8 text-sm"
-            />
-          </div>
-          <div class="space-y-1">
-            <label class="text-xs text-muted-foreground">Через раундов</label>
-            <Input
-              v-model.number="form.longBreakInterval"
-              type="number"
-              :min="2"
-              :max="10"
-              class="h-8 text-sm"
-            />
-          </div>
+        <div class="space-y-1">
+          <label class="text-[11px] text-muted-foreground/70 leading-none">Перерыв</label>
+          <Input
+            v-model.number="form.shortBreak"
+            type="number"
+            :min="1"
+            :max="15"
+            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </div>
+        <div class="space-y-1">
+          <label class="text-[11px] text-muted-foreground/70 leading-none">Долгий</label>
+          <Input
+            v-model.number="form.longBreak"
+            type="number"
+            :min="5"
+            :max="30"
+            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+        </div>
+        <div class="space-y-1">
+          <label class="text-[11px] text-muted-foreground/70 leading-none">Интервал</label>
+          <Input
+            v-model.number="form.longBreakInterval"
+            type="number"
+            :min="2"
+            :max="10"
+            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
         </div>
       </div>
     </div>
 
     <!-- Submit -->
-    <div class="border-t border-border px-5 py-3">
+    <div class="border-t border-border px-4 py-2.5 flex justify-end gap-2">
       <Button
-        class="w-full cursor-pointer transition-all duration-150"
+        variant="outline"
+        size="sm"
+        class="cursor-pointer transition-all duration-150"
+        @click="handleCancel"
+      >
+        Отмена
+      </Button>
+      <Button
+        size="sm"
+        class="cursor-pointer transition-all duration-150"
         :disabled="!form.title.trim() || loading"
         @click="handleSubmit"
       >
-        <div v-if="loading" class="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent mr-2" />
+        <div v-if="loading" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-current border-t-transparent mr-1.5" />
         {{ loading ? 'Добавление...' : 'Добавить задачу' }}
       </Button>
+    </div>
+
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -324,6 +341,8 @@ const form = reactive<TaskFormData>({
   longBreakInterval: 4
 })
 
+const expanded = ref(false)
+const titleInputRef = ref<InstanceType<typeof Input> | null>(null)
 const newTag = ref('')
 const deadlineTime = ref('')
 
@@ -363,6 +382,22 @@ const resetForm = () => {
   form.longBreakInterval = 4
   deadlineTime.value = ''
 }
+
+const handleCancel = () => {
+  expanded.value = false
+  resetForm()
+  const input = titleInputRef.value?.$el as HTMLInputElement | undefined
+  input?.blur()
+}
+
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && expanded.value) {
+    handleCancel()
+  }
+}
+
+onMounted(() => document.addEventListener('keydown', handleKeydown))
+onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
 const handleSubmit = () => {
   if (!form.title.trim()) return

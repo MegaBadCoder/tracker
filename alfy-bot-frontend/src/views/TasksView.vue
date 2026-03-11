@@ -25,18 +25,6 @@
 
     <!-- Список задач -->
     <div v-else class="space-y-4">
-      <div class="px-6 py-4 bg-card rounded-lg shadow">
-        <div class="flex items-center justify-between">
-          <h2 class="text-xl font-semibold">
-            Список задач ({{ tasks.length }})
-          </h2>
-          <label class="flex items-center gap-2 cursor-pointer">
-            <Checkbox v-model="showCompleted" />
-            <span class="text-sm text-muted-foreground">Показать завершенные</span>
-          </label>
-        </div>
-      </div>
-
       <div v-if="sortedTasks.length === 0" class="p-6 text-center text-muted-foreground bg-card rounded-lg border border-border">
         Пока нет задач. Добавьте первую задачу выше.
       </div>
@@ -65,7 +53,6 @@ import type { Task } from '@/features/tasks/model/types'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import { TimeBlock, useTimerStore } from '@/features/task-timer'
 import { useTasks } from '@/features/tasks/api/tasks-api'
-import { Checkbox } from '@/components/ui/checkbox'
 import { useConfirm } from '@/composables/useConfirm'
 import PageContainer from '@/components/PageContainer.vue'
 import AppHeader from '@/components/AppHeader.vue'
@@ -94,14 +81,8 @@ timerStore.onPomodoroIncrement = (taskId: string, increment: number) => {
 
 const { confirm } = useConfirm()
 
-const showCompleted = ref(true)
-
 const sortedTasks = computed(() => {
-  const filtered = showCompleted.value
-    ? tasks.value
-    : tasks.value.filter(t => !t.completed)
-
-  return [...filtered].sort((a, b) => {
+  return [...tasks.value].sort((a, b) => {
     if (a.completed === b.completed) return 0
     return a.completed ? 1 : -1
   })
