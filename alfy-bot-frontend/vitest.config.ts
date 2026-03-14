@@ -1,13 +1,13 @@
 import path from 'node:path'
-import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
-  server: {
-    host: true,
-    allowedHosts: true,
+  plugins: [vue()],
+  test: {
+    environment: 'happy-dom',
+    globals: true,
+    include: ['tests/**/*.spec.ts'],
   },
   resolve: {
     alias: {
