@@ -1,7 +1,8 @@
 <template>
   <div
+    role="listitem"
     :class="[
-      'group flex items-center gap-3 px-4 py-3 transition-colors duration-150 hover:bg-muted/50',
+      'group flex items-center gap-3 px-4 py-3 min-h-[44px] cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm hover:pl-5',
       task.completed && 'opacity-50'
     ]"
   >
@@ -15,11 +16,6 @@
     <!-- Content -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
-        <!-- Priority indicator -->
-        <div
-          v-if="task.priority"
-          :class="['w-1.5 h-1.5 rounded-full shrink-0', priorityDotColor]"
-        />
         <span
           :class="[
             'text-sm truncate',
@@ -31,35 +27,47 @@
       </div>
 
       <!-- Meta chips -->
-      <div v-if="hasMeta" class="flex flex-wrap items-center gap-1 mt-1">
-        <Badge v-if="task.dueDate" variant="outline" class="gap-1 text-[11px] px-1.5 py-0 h-5">
-          <CalendarIcon :size="11" />
-          {{ formatDate(task.dueDate, 'MMM d') }}
-        </Badge>
-        <Badge
-          v-if="task.deadline"
-          variant="outline"
-          class="gap-1 text-[11px] px-1.5 py-0 h-5 text-orange-600 border-orange-300/50 dark:text-orange-400 dark:border-orange-500/30"
-        >
-          <Clock :size="11" />
-          {{ formatDate(task.deadline, 'MMM d, HH:mm') }}
-        </Badge>
-        <Badge v-if="task.priority" variant="outline" :class="['gap-1 text-[11px] px-1.5 py-0 h-5', priorityChipClass]">
-          <Flag :size="11" />
-          {{ PRIORITY_LABELS[task.priority] }}
-        </Badge>
-        <Badge v-if="task.location" variant="outline" class="gap-1 text-[11px] px-1.5 py-0 h-5">
-          <MapPin :size="11" />
-          {{ task.location }}
-        </Badge>
+      <div v-if="hasMeta" class="flex flex-wrap items-center gap-1.5 mt-1">
         <Badge
           v-if="task.isPomodoroTask"
           variant="outline"
-          class="gap-1 text-[11px] px-1.5 py-0 h-5 text-red-600 border-red-300/50 bg-red-50 dark:text-red-400 dark:border-red-500/30 dark:bg-red-500/10 cursor-pointer hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors duration-150"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors duration-150"
           @click.stop="$emit('showTimer', task.id)"
         >
           <Timer :size="11" />
           {{ formatPomodoro(task.pomodoroCompleted || 0) }}/{{ task.pomodoroCount || 0 }}
+        </Badge>
+        <Badge
+          v-if="task.priority"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
+        >
+          <Flag :size="11" :class="priorityIconColor" />
+          {{ PRIORITY_LABELS[task.priority] }}
+        </Badge>
+        <Badge
+          v-if="task.dueDate"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
+        >
+          <CalendarIcon :size="11" />
+          {{ formatDate(task.dueDate, 'd MMM') }}
+        </Badge>
+        <Badge
+          v-if="task.deadline"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
+        >
+          <Clock :size="11" />
+          {{ formatDate(task.deadline, 'd MMM, HH:mm') }}
+        </Badge>
+        <Badge
+          v-if="task.location"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
+        >
+          <MapPin :size="11" />
+          {{ task.location }}
         </Badge>
       </div>
     </div>
@@ -102,26 +110,17 @@ import type { TaskCardProps, TaskCardEmits } from '../model/types'
 const props = defineProps<TaskCardProps>()
 defineEmits<TaskCardEmits>()
 
-const priorityDotColor = computed(() => {
+const priorityIconColor = computed(() => {
   const colors = {
-    high: 'bg-red-500',
-    medium: 'bg-yellow-500',
-    low: 'bg-green-500',
+    high: 'text-red-500',
+    medium: 'text-yellow-500',
+    low: 'text-green-500',
   }
   return props.task.priority ? colors[props.task.priority] : ''
 })
 
-const priorityChipClass = computed(() => {
-  const classes = {
-    high: 'text-red-600 border-red-300/50 dark:text-red-400 dark:border-red-500/30',
-    medium: 'text-yellow-600 border-yellow-300/50 dark:text-yellow-400 dark:border-yellow-500/30',
-    low: 'text-green-600 border-green-300/50 dark:text-green-400 dark:border-green-500/30',
-  }
-  return props.task.priority ? classes[props.task.priority] : ''
-})
-
 const hasMeta = computed(() =>
-  props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask
+  props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask
 )
 
 function formatPomodoro(value: number): string {

@@ -2,6 +2,37 @@ import { ref, computed } from 'vue'
 import { api } from '@/api/client'
 import type { Task } from '../model/types'
 
+function serializeDate(value: unknown): string | undefined {
+  if (!value) return undefined
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value) {
+    const v = value as { year: number; month: number; day: number; hour?: number; minute?: number }
+    const d = new Date(v.year, v.month - 1, v.day, v.hour ?? 0, v.minute ?? 0)
+    return d.toISOString()
+  }
+  if (typeof value === 'string') return value
+  return undefined
+}
+
+function parseDateValue(value: unknown): Date | undefined {
+  if (!value) return undefined
+  if (value instanceof Date) return value
+  if (typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value) {
+    const v = value as { year: number; month: number; day: number; hour?: number; minute?: number }
+    return new Date(v.year, v.month - 1, v.day, v.hour ?? 0, v.minute ?? 0)
+  }
+  if (typeof value === 'string') return new Date(value)
+  return undefined
+}
+
+function serializeTaskDates<T extends Record<string, unknown>>(data: T): T {
+  return {
+    ...data,
+    ...(data.dueDate !== undefined && { dueDate: serializeDate(data.dueDate) }),
+    ...(data.deadline !== undefined && { deadline: serializeDate(data.deadline) }),
+  }
+}
+
 function parseTask(raw: Record<string, unknown>): Task {
   const config = raw.pomodoroConfig as Record<string, unknown> | null
   return {
@@ -45,12 +76,14 @@ export function useTasks() {
       id: tempId,
       completed: false,
       pomodoroCompleted: 0,
+      dueDate: parseDateValue(taskData.dueDate),
+      deadline: parseDateValue(taskData.deadline),
     }
 
     tasks.value.unshift(tempTask)
 
     try {
-      const { data } = await api.post('/tasks', taskData)
+      const { data } = await api.post('/tasks', serializeTaskDates(taskData as unknown as Record<string, unknown>))
       const created = parseTask(data)
 
       const index = tasks.value.findIndex(t => t.id === tempId)
@@ -73,7 +106,7 @@ export function useTasks() {
     }
 
     try {
-      const { data } = await api.patch(`/tasks/${taskId}`, updates)
+      const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(updates as unknown as Record<string, unknown>))
       const updatedTask = parseTask(data)
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {

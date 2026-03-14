@@ -5,6 +5,11 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],
+  test: {
+    environment: 'happy-dom',
+    globals: true,
+    include: ['tests/**/*.spec.ts'],
+  },
   server: {
     host: true,
     allowedHosts: true,

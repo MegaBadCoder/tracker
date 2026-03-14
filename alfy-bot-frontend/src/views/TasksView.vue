@@ -24,12 +24,12 @@
     </div>
 
     <!-- Список задач -->
-    <div v-else class="space-y-4">
-      <div v-if="sortedTasks.length === 0" class="p-6 text-center text-muted-foreground bg-card rounded-lg border border-border">
+    <div v-else>
+      <div v-if="sortedTasks.length === 0" class="p-6 text-center text-muted-foreground">
         Пока нет задач. Добавьте первую задачу выше.
       </div>
 
-      <div v-else class="bg-card rounded-lg border border-border overflow-hidden divide-y divide-border">
+      <div v-else role="list" class="divide-y divide-border">
         <TaskCard
           v-for="task in sortedTasks"
           :key="task.id"

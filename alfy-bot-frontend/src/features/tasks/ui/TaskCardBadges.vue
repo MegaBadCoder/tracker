@@ -33,7 +33,7 @@
     <Badge
       v-if="isPomodoroTask"
       variant="outline"
-      class="gap-1 bg-red-500/10 border-red-500/40 text-red-600 dark:text-red-400 dark:border-red-500/30 dark:bg-red-500/15 cursor-pointer hover:bg-red-500/20 dark:hover:bg-red-500/25"
+      class="gap-1 bg-red-500/10 border-red-500/40 text-red-600 dark:text-red-300 dark:border-red-500/30 dark:bg-red-500/20 cursor-pointer hover:bg-red-500/20 dark:hover:bg-red-500/30"
       @click="$emit('showTimer')"
     >
       <Timer :size="12" />
