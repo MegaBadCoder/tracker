@@ -1,22 +1,57 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useTimerStore } from '../model/timer-store'
 import { Button } from '@/components/ui/button'
 import { Play, Pause, Square } from 'lucide-vue-next'
 
 const store = useTimerStore()
 const isFullscreen = ref(false)
+let wakeLock: WakeLockSentinel | null = null
 
 const formattedTime = computed(() => {
   return store.formatTime(store.timeBlock)
 })
 
+const timerColorClass = computed(() => {
+  if (store.isBreakPhase) return 'timer-break'
+  if (store.isActive) return 'timer-work'
+  return ''
+})
+
+const requestWakeLock = async () => {
+  if (!('wakeLock' in navigator)) return
+  try {
+    wakeLock = await navigator.wakeLock.request('screen')
+    wakeLock.addEventListener('release', () => { wakeLock = null })
+  } catch { /* ignore — browser denied */ }
+}
+
+const releaseWakeLock = async () => {
+  await wakeLock?.release()
+  wakeLock = null
+}
+
 const toggleFullscreen = () => {
   isFullscreen.value = !isFullscreen.value
 }
 
+watch(
+  () => isFullscreen.value && store.phase > 0,
+  (shouldLock) => shouldLock ? requestWakeLock() : releaseWakeLock()
+)
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && isFullscreen.value && store.phase > 0) {
+    await requestWakeLock()
+  }
+})
+
 onMounted(() => {
   store.restoreSession()
+})
+
+onUnmounted(() => {
+  releaseWakeLock()
 })
 </script>
 
@@ -31,9 +66,8 @@ onMounted(() => {
       v-if="store.phase > 0"
       :class="[
         'timer-block z-[1000]',
-        isFullscreen
-          ? 'fixed inset-0 w-full h-full p-10 bg-black/90 flex flex-col items-center justify-center z-[10000]'
-          : 'fixed bottom-5 left-1/2 -translate-x-1/2 inline-flex flex-row items-center gap-3 px-4 py-3 rounded-lg shadow-lg bg-card border border-border group'
+        timerColorClass,
+        isFullscreen ? 'timer-fullscreen' : 'timer-compact group'
       ]"
     >
     <button
@@ -92,22 +126,107 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.phase-name {
-  font-size: 24px;
-  color: white;
-  margin-bottom: 20px;
+/* Base — transition for color changes */
+.timer-block {
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .timer-block {
+    transition: none;
+  }
+}
+
+/* ── Compact (bottom bar) ── */
+.timer-compact {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px oklch(0 0 0 / 0.08);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-card);
+}
+
+/* ── Fullscreen ── */
+.timer-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  background-color: oklch(0.13 0 0 / 0.95);
+}
+
+/* ── Work phase — soft red ── */
+
+/* Light */
+.timer-work.timer-compact {
+  background-color: oklch(0.95 0.03 25);
+  border-color: oklch(0.88 0.05 25);
+}
+
+.timer-work.timer-fullscreen {
+  background-color: oklch(0.18 0.06 25 / 0.96);
+}
+
+/* ── Break phase — soft blue ── */
+
+/* Light */
+.timer-break.timer-compact {
+  background-color: oklch(0.95 0.03 250);
+  border-color: oklch(0.88 0.05 250);
+}
+
+.timer-break.timer-fullscreen {
+  background-color: oklch(0.18 0.06 250 / 0.96);
+}
+
+/* ── Dark mode overrides ── */
+@media (prefers-color-scheme: dark) {
+  .timer-work.timer-compact {
+    background-color: oklch(0.25 0.06 25);
+    border-color: oklch(0.35 0.08 25);
+  }
+
+  .timer-break.timer-compact {
+    background-color: oklch(0.25 0.06 250);
+    border-color: oklch(0.35 0.08 250);
+  }
+}
+
+/* ── Phase name (fullscreen) ── */
+.phase-name {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: oklch(0.9 0 0);
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.025em;
+}
+
+/* ── Enter / Leave transitions ── */
 .timer-enter-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .timer-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .timer-enter-from,
 .timer-leave-to {
   opacity: 0;
+  transform: translateY(8px);
 }
 </style>
