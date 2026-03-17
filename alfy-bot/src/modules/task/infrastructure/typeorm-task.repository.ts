@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Task, PomodoroConfig } from '../../../shared/entities';
-import { TaskRepositoryPort } from '../domain/task-repository.port';
+import {
+  TaskRepositoryPort,
+  ChecklistData,
+} from '../domain/task-repository.port';
 
 @Injectable()
 export class TypeOrmTaskRepository extends TaskRepositoryPort {
@@ -39,24 +42,34 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     id: string,
     userId: number,
     data: Partial<Task>,
-  ): Promise<Task> {
+  ): Promise<Task | null> {
     const task = await this.findById(id, userId);
-    if (!task) throw new NotFoundException(`Task #${id} not found`);
+    if (!task) return null;
 
     Object.assign(task, data);
     return this.taskRepo.save(task);
   }
 
-  async delete(id: string, userId: number): Promise<void> {
+  async delete(id: string, userId: number): Promise<boolean> {
     const task = await this.findById(id, userId);
-    if (!task) throw new NotFoundException(`Task #${id} not found`);
+    if (!task) return false;
     await this.taskRepo.remove(task);
+    return true;
   }
 
   async incrementPomodoroCompleted(
     taskId: string,
     increment: number,
   ): Promise<void> {
-    await this.pomodoroRepo.increment({ taskId }, 'pomodoroCompleted', increment);
+    await this.pomodoroRepo.increment(
+      { taskId },
+      'pomodoroCompleted',
+      increment,
+    );
+  }
+
+  async updateChecklist(task: Task, data: ChecklistData): Promise<Task> {
+    task.checklist = data;
+    return this.taskRepo.save(task);
   }
 }

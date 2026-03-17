@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { api } from '@/api/client'
-import type { Task } from '../model/types'
+import type { Task, ChecklistItem } from '../model/types'
 
 function serializeDate(value: unknown): string | undefined {
   if (!value) return undefined
@@ -106,11 +106,13 @@ export function useTasks() {
     }
 
     try {
-      const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(updates as unknown as Record<string, unknown>))
+      const { checklist, checklistProgress, ...rest } = updates as Record<string, unknown>
+      const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(rest))
       const updatedTask = parseTask(data)
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
-        tasks.value[index] = updatedTask
+        // Preserve local checklist state (managed via dedicated PUT endpoint)
+        tasks.value[index] = { ...updatedTask, checklist: tasks.value[index].checklist }
       }
       return updatedTask
     } catch (err) {
@@ -161,13 +163,27 @@ export function useTasks() {
     const task = tasks.value.find(t => t.id === taskId)
     if (!task || !task.isPomodoroTask) return
 
-    task.pomodoroCompleted = (task.pomodoroCompleted || 0) + increment
+    task.pomodoroCompleted = Math.round(((task.pomodoroCompleted || 0) + increment) * 100) / 100
 
     try {
       await api.patch(`/tasks/${taskId}/pomodoro`, { increment })
     } catch (err) {
-      task.pomodoroCompleted = (task.pomodoroCompleted || 0) - increment
+      task.pomodoroCompleted = Math.round(((task.pomodoroCompleted || 0) - increment) * 100) / 100
       console.error('Ошибка сохранения помодоро:', err)
+    }
+  }
+
+  const updateChecklist = async (taskId: string, items: ChecklistItem[]) => {
+    try {
+      const { data } = await api.put(`/tasks/${taskId}/checklist`, { items })
+      const updated = parseTask(data)
+      const index = tasks.value.findIndex(t => t.id === taskId)
+      if (index !== -1) {
+        tasks.value[index] = { ...tasks.value[index], checklist: updated.checklist }
+      }
+    } catch (err) {
+      console.error('Ошибка обновления чеклиста:', err)
+      throw err
     }
   }
 
@@ -190,5 +206,6 @@ export function useTasks() {
     toggleTask,
     deleteTask,
     incrementPomodoro,
+    updateChecklist,
   }
 }

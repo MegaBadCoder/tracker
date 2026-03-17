@@ -17,6 +17,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     deadline: null,
     location: null,
     tags: null,
+    checklist: null,
     pomodoroConfig: null,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -53,8 +54,11 @@ describe('TaskService', () => {
       update: jest.fn().mockImplementation((id, _userId, data) =>
         Promise.resolve(makeTask({ id, ...data })),
       ),
-      delete: jest.fn().mockResolvedValue(undefined),
+      delete: jest.fn().mockResolvedValue(true),
       incrementPomodoroCompleted: jest.fn().mockResolvedValue(undefined),
+      updateChecklist: jest.fn().mockImplementation((task, data) =>
+        Promise.resolve(makeTask({ ...task, checklist: data })),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -190,16 +194,28 @@ describe('TaskService', () => {
   });
 
   describe('incrementPomodoro', () => {
-    it('вызывает increment напрямую по taskId', async () => {
-      await service.incrementPomodoro('task-1', 1.0);
+    it('вызывает increment с проверкой ownership', async () => {
+      repo.findById.mockResolvedValue(makeTask());
 
+      await service.incrementPomodoro(1, 'task-1', 1.0);
+
+      expect(repo.findById).toHaveBeenCalledWith('task-1', 1);
       expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith('task-1', 1.0);
     });
 
     it('передаёт дробные значения', async () => {
-      await service.incrementPomodoro('task-1', 0.6);
+      repo.findById.mockResolvedValue(makeTask());
+
+      await service.incrementPomodoro(1, 'task-1', 0.6);
 
       expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith('task-1', 0.6);
+    });
+
+    it('бросает NotFoundException если задача не найдена', async () => {
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.incrementPomodoro(1, 'nope', 1))
+        .rejects.toThrow(NotFoundException);
     });
   });
 

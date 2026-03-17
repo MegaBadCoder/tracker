@@ -5,6 +5,7 @@
       'group flex items-center gap-3 px-4 py-3 min-h-[44px] cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm hover:pl-5',
       task.completed && 'opacity-50'
     ]"
+    @click="$emit('open', task)"
   >
     <!-- Checkbox -->
     <RoundCheckbox
@@ -103,7 +104,7 @@ import { computed } from 'vue'
 import { Calendar as CalendarIcon, Clock, Flag, MapPin, Timer, Trash2 } from 'lucide-vue-next'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import { Badge } from '@/components/ui/badge'
-import { formatDate } from '../lib/formatters'
+import { formatDate, formatPomodoro } from '../lib/formatters'
 import { PRIORITY_LABELS } from '../model/constants'
 import type { TaskCardProps, TaskCardEmits } from '../model/types'
 
@@ -123,7 +124,4 @@ const hasMeta = computed(() =>
   props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask
 )
 
-function formatPomodoro(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
 </script>

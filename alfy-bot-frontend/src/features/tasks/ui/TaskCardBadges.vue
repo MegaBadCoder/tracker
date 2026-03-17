@@ -52,7 +52,7 @@ import {
   Tag,
   Timer
 } from 'lucide-vue-next'
-import { formatDate } from '../lib/formatters'
+import { formatDate, formatPomodoro } from '../lib/formatters'
 import type { Priority } from '../model/constants'
 
 interface Props {
@@ -73,7 +73,4 @@ interface Emits {
 defineProps<Props>()
 defineEmits<Emits>()
 
-function formatPomodoro(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1)
-}
 </script>

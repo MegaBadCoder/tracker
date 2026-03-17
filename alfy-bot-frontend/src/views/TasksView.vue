@@ -37,20 +37,30 @@
           @toggle="handleToggleTask"
           @show-timer="handleShowTimer"
           @delete="handleDeleteTask"
+          @open="handleOpenTask"
         />
       </div>
     </div>
   </PageContainer>
+  <TaskDetailDialog
+    :task="selectedTask"
+    :open="isDetailOpen"
+    @update:open="isDetailOpen = $event"
+    @delete="handleDeleteFromDialog"
+    @update="handleUpdateTask"
+    @update:checklist="handleUpdateChecklist"
+  />
   <Teleport to="body">
-    <TimeBlock />
+    <TimeBlock v-show="!isDetailOpen" />
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, computed, inject } from 'vue'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
-import type { Task } from '@/features/tasks/model/types'
+import type { Task, ChecklistItem } from '@/features/tasks/model/types'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
+import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 import { TimeBlock, useTimerStore } from '@/features/task-timer'
 import { useTasks } from '@/features/tasks/api/tasks-api'
 import { useConfirm } from '@/composables/useConfirm'
@@ -70,9 +80,11 @@ const {
   error,
   fetchTasks,
   createTask,
+  updateTask,
   toggleTask,
   deleteTask,
-  incrementPomodoro
+  incrementPomodoro,
+  updateChecklist,
 } = useTasks()
 
 timerStore.onPomodoroIncrement = (taskId: string, increment: number) => {
@@ -80,6 +92,65 @@ timerStore.onPomodoroIncrement = (taskId: string, increment: number) => {
 }
 
 const { confirm } = useConfirm()
+
+const selectedTask = ref<Task | null>(null)
+const isDetailOpen = ref(false)
+
+const handleOpenTask = (task: Task) => {
+  selectedTask.value = task
+  isDetailOpen.value = true
+}
+
+const handleUpdateTask = async (updatedTask: Task) => {
+  const index = tasks.value.findIndex(t => t.id === updatedTask.id)
+  const previous = index !== -1 ? { ...tasks.value[index] } : null
+
+  // Optimistic update
+  if (index !== -1) tasks.value[index] = updatedTask
+  selectedTask.value = updatedTask
+
+  try {
+    await updateTask(updatedTask.id, updatedTask, false)
+  } catch (err) {
+    // Rollback
+    if (previous && index !== -1) {
+      tasks.value[index] = previous
+      selectedTask.value = previous
+    }
+    console.error('Ошибка обновления задачи:', err)
+  }
+}
+
+const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => {
+  // Optimistic update
+  const index = tasks.value.findIndex(t => t.id === taskId)
+  const previousChecklist = index !== -1 ? tasks.value[index].checklist : null
+  if (index !== -1) {
+    tasks.value[index] = { ...tasks.value[index], checklist: { items } }
+  }
+  if (selectedTask.value?.id === taskId) {
+    selectedTask.value = { ...selectedTask.value, checklist: { items } }
+  }
+
+  try {
+    await updateChecklist(taskId, items)
+  } catch (err) {
+    // Rollback
+    if (index !== -1) {
+      tasks.value[index] = { ...tasks.value[index], checklist: previousChecklist }
+    }
+    if (selectedTask.value?.id === taskId) {
+      selectedTask.value = { ...selectedTask.value!, checklist: previousChecklist }
+    }
+    console.error('Ошибка обновления чеклиста:', err)
+  }
+}
+
+const handleDeleteFromDialog = async (taskId: string) => {
+  isDetailOpen.value = false
+  selectedTask.value = null
+  await handleDeleteTask(taskId)
+}
 
 const sortedTasks = computed(() => {
   return [...tasks.value].sort((a, b) => {

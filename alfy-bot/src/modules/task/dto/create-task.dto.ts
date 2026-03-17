@@ -3,10 +3,12 @@ import {
   IsBoolean,
   IsDateString,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import type { ChecklistData } from '../domain/task-repository.port';
 
 export class CreateTaskDto {
   @ApiProperty({ example: 'Подготовить презентацию' })
@@ -42,6 +44,11 @@ export class CreateTaskDto {
   @IsOptional()
   @IsArray()
   tags?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  checklist?: ChecklistData;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

@@ -217,16 +217,15 @@ onUnmounted(() => {
 
 /* ── Enter / Leave transitions ── */
 .timer-enter-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.3s ease;
 }
 
 .timer-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .timer-enter-from,
 .timer-leave-to {
   opacity: 0;
-  transform: translateY(8px);
 }
 </style>

@@ -17,6 +17,7 @@ import { TaskService } from './task.service';
 import { TimerSessionService } from './timer-session.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
 
 interface AuthRequest extends Request {
@@ -67,6 +68,16 @@ export class TaskController {
     return this.timerService.deactivate(req.user.sub);
   }
 
+  @Put(':id/checklist')
+  @ApiOperation({ summary: 'Заменить чеклист задачи' })
+  async updateChecklist(
+    @Request() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateChecklistDto,
+  ) {
+    return this.taskService.updateChecklist(req.user.sub, id, dto);
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Обновить задачу' })
   async update(
@@ -86,9 +97,10 @@ export class TaskController {
   @Patch(':id/pomodoro')
   @ApiOperation({ summary: 'Инкремент выполненных помодоро' })
   async incrementPomodoro(
+    @Request() req: AuthRequest,
     @Param('id') id: string,
     @Body() body: { increment: number },
   ) {
-    await this.taskService.incrementPomodoro(id, body.increment);
+    await this.taskService.incrementPomodoro(req.user.sub, id, body.increment);
   }
 }

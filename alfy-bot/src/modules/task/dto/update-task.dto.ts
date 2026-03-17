@@ -13,4 +13,7 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @IsOptional()
   @IsNumber()
   pomodoroCompleted?: number;
+
+  // Explicitly exclude checklist — use PUT /tasks/:id/checklist instead
+  checklist?: never;
 }

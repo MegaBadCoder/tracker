@@ -1,4 +1,4 @@
-import type { Priority } from '../model/constants'
+export type Priority = 'high' | 'medium' | 'low'
 
 export interface ChecklistItem {
   id: string
@@ -46,4 +46,5 @@ export interface TaskCardEmits {
   (e: 'toggle', id: string): void
   (e: 'showTimer', id: string): void
   (e: 'delete', id: string): void
+  (e: 'open', task: Task): void
 }

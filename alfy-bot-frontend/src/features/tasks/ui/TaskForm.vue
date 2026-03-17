@@ -60,17 +60,10 @@
             {{ form.deadline ? formatDate(form.deadline, 'MMM d, HH:mm') : 'Дедлайн' }}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent class="w-auto p-0" align="start">
-          <div class="p-3 space-y-3">
-            <Calendar v-model="form.deadline as any" />
-            <Input
-              v-model="deadlineTime"
-              type="time"
-              class="w-full"
-              @change="handleDeadlineTimeUpdate"
-            />
-          </div>
-        </DropdownMenuContent>
+        <DeadlinePicker
+          :model-value="form.deadline"
+          @update:model-value="form.deadline = $event"
+        />
       </DropdownMenu>
 
       <!-- Priority -->
@@ -85,25 +78,10 @@
             {{ form.priority ? PRIORITY_LABELS[form.priority] : 'Приоритет' }}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent class="w-44" align="start">
-          <DropdownMenuItem
-            v-for="p in priorities"
-            :key="p"
-            class="cursor-pointer gap-2"
-            @click="form.priority = p"
-          >
-            <Flag :size="14" :class="getPriorityColor(p)" />
-            {{ PRIORITY_LABELS[p] }}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            v-if="form.priority"
-            class="cursor-pointer gap-2 text-muted-foreground"
-            @click="form.priority = undefined"
-          >
-            <X :size="14" />
-            Убрать
-          </DropdownMenuItem>
-        </DropdownMenuContent>
+        <PriorityPicker
+          :model-value="form.priority"
+          @update:model-value="form.priority = $event"
+        />
       </DropdownMenu>
 
       <!-- Tags -->
@@ -119,34 +97,10 @@
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-64" align="start">
-          <div class="p-3 space-y-2">
-            <div class="flex gap-2">
-              <Input
-                v-model="newTag"
-                placeholder="Новый тег"
-                class="h-8 text-sm"
-                @keyup.enter="addTag"
-              />
-              <Button size="sm" variant="secondary" class="h-8 px-2 cursor-pointer" @click="addTag">
-                <Plus :size="14" />
-              </Button>
-            </div>
-            <div v-if="form.tags.length" class="flex flex-wrap gap-1 pt-1">
-              <Badge
-                v-for="tag in form.tags"
-                :key="tag"
-                variant="secondary"
-                class="gap-1 text-xs"
-              >
-                {{ tag }}
-                <X
-                  :size="12"
-                  class="cursor-pointer opacity-60 hover:opacity-100 transition-opacity duration-150"
-                  @click="removeTag(tag)"
-                />
-              </Badge>
-            </div>
-          </div>
+          <TagsEditor
+            :model-value="form.tags"
+            @update:model-value="form.tags = $event"
+          />
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -196,58 +150,20 @@
       <!-- Pomodoro Settings -->
       <div
         v-if="form.isPomodoroTask"
-        class="mt-3 grid grid-cols-5 gap-2 animate-in fade-in slide-in-from-top-1 duration-200"
+        class="mt-3 animate-in fade-in slide-in-from-top-1 duration-200"
       >
-        <div class="space-y-1">
-          <label class="text-[11px] text-muted-foreground/70 leading-none">Раунды</label>
-          <Input
-            v-model.number="form.pomodoroCount"
-            type="number"
-            :min="1"
-            :max="10"
-            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-        </div>
-        <div class="space-y-1">
-          <label class="text-[11px] text-muted-foreground/70 leading-none">Фокус</label>
-          <Input
-            v-model.number="form.pomodoroDuration"
-            type="number"
-            :min="1"
-            :max="60"
-            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-        </div>
-        <div class="space-y-1">
-          <label class="text-[11px] text-muted-foreground/70 leading-none">Перерыв</label>
-          <Input
-            v-model.number="form.shortBreak"
-            type="number"
-            :min="1"
-            :max="15"
-            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-        </div>
-        <div class="space-y-1">
-          <label class="text-[11px] text-muted-foreground/70 leading-none">Долгий</label>
-          <Input
-            v-model.number="form.longBreak"
-            type="number"
-            :min="5"
-            :max="30"
-            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-        </div>
-        <div class="space-y-1">
-          <label class="text-[11px] text-muted-foreground/70 leading-none">Интервал</label>
-          <Input
-            v-model.number="form.longBreakInterval"
-            type="number"
-            :min="2"
-            :max="10"
-            class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-          />
-        </div>
+        <PomodoroSettings
+          :count="form.pomodoroCount"
+          :duration="form.pomodoroDuration"
+          :short-break="form.shortBreak"
+          :long-break="form.longBreak"
+          :long-break-interval="form.longBreakInterval"
+          @update:count="form.pomodoroCount = $event"
+          @update:duration="form.pomodoroDuration = $event"
+          @update:short-break="form.shortBreak = $event"
+          @update:long-break="form.longBreak = $event"
+          @update:long-break-interval="form.longBreakInterval = $event"
+        />
       </div>
     </div>
 
@@ -278,17 +194,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, toRaw, onMounted, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Calendar } from '@/components/ui/calendar'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -298,14 +212,15 @@ import {
   Tag,
   MapPin,
   Timer,
-  X,
-  Plus
 } from 'lucide-vue-next'
-import { type Priority, PRIORITY_LABELS } from '../model/constants'
+import { type Priority, PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import type { Task } from '../model/types'
 import { formatDate } from '../lib/formatters'
 import { getPriorityColor } from '../lib/priority'
-import { updateDeadlineTime } from '../lib/dateTime'
+import TagsEditor from './TagsEditor.vue'
+import PriorityPicker from './PriorityPicker.vue'
+import DeadlinePicker from './DeadlinePicker.vue'
+import PomodoroSettings from './PomodoroSettings.vue'
 
 interface TaskFormData extends Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'> {
   tags: string[]
@@ -334,37 +249,15 @@ const form = reactive<TaskFormData>({
   tags: [],
   location: '',
   isPomodoroTask: false,
-  pomodoroCount: 4,
-  pomodoroDuration: 25,
-  shortBreak: 5,
-  longBreak: 15,
-  longBreakInterval: 4
+  pomodoroCount: POMODORO_DEFAULTS.count,
+  pomodoroDuration: POMODORO_DEFAULTS.duration,
+  shortBreak: POMODORO_DEFAULTS.shortBreak,
+  longBreak: POMODORO_DEFAULTS.longBreak,
+  longBreakInterval: POMODORO_DEFAULTS.longBreakInterval,
 })
 
 const expanded = ref(false)
 const titleInputRef = ref<InstanceType<typeof Input> | null>(null)
-const newTag = ref('')
-const deadlineTime = ref('')
-
-const priorities: Priority[] = ['high', 'medium', 'low']
-
-const handleDeadlineTimeUpdate = () => {
-  form.deadline = updateDeadlineTime(form.deadline, deadlineTime.value)
-}
-
-const addTag = () => {
-  if (newTag.value.trim() && !form.tags.includes(newTag.value.trim())) {
-    form.tags.push(newTag.value.trim())
-    newTag.value = ''
-  }
-}
-
-const removeTag = (tag: string) => {
-  const index = form.tags.indexOf(tag)
-  if (index > -1) {
-    form.tags.splice(index, 1)
-  }
-}
 
 const resetForm = () => {
   form.title = ''
@@ -375,12 +268,11 @@ const resetForm = () => {
   form.tags = []
   form.location = ''
   form.isPomodoroTask = false
-  form.pomodoroCount = 4
-  form.pomodoroDuration = 25
-  form.shortBreak = 5
-  form.longBreak = 15
-  form.longBreakInterval = 4
-  deadlineTime.value = ''
+  form.pomodoroCount = POMODORO_DEFAULTS.count
+  form.pomodoroDuration = POMODORO_DEFAULTS.duration
+  form.shortBreak = POMODORO_DEFAULTS.shortBreak
+  form.longBreak = POMODORO_DEFAULTS.longBreak
+  form.longBreakInterval = POMODORO_DEFAULTS.longBreakInterval
 }
 
 const handleCancel = () => {
@@ -401,7 +293,7 @@ onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
 const handleSubmit = () => {
   if (!form.title.trim()) return
-  emit('submit', JSON.parse(JSON.stringify(form)) as Task)
+  emit('submit', structuredClone(toRaw(form)) as Task)
 }
 
 defineExpose({

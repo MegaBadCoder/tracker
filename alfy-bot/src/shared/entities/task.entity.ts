@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PomodoroConfig } from './pomodoro-config.entity';
+import type { ChecklistData } from '../../modules/task/domain/task-repository.port';
 
 @Entity('tasks')
 export class Task {
@@ -42,6 +43,9 @@ export class Task {
 
   @Column('simple-json', { nullable: true })
   tags: string[] | null;
+
+  @Column('simple-json', { nullable: true })
+  checklist: ChecklistData | null;
 
   @CreateDateColumn()
   createdAt: Date;
