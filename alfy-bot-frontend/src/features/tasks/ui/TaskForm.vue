@@ -213,7 +213,7 @@ import {
   MapPin,
   Timer,
 } from 'lucide-vue-next'
-import { type Priority, PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
+import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import type { Task } from '../model/types'
 import { formatDate } from '../lib/formatters'
 import { getPriorityColor } from '../lib/priority'

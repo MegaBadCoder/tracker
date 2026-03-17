@@ -112,7 +112,7 @@ export function useTasks() {
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
         // Preserve local checklist state (managed via dedicated PUT endpoint)
-        tasks.value[index] = { ...updatedTask, checklist: tasks.value[index].checklist }
+        tasks.value[index] = { ...updatedTask, checklist: tasks.value[index]?.checklist }
       }
       return updatedTask
     } catch (err) {
@@ -179,7 +179,8 @@ export function useTasks() {
       const updated = parseTask(data)
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
-        tasks.value[index] = { ...tasks.value[index], checklist: updated.checklist }
+        const existing = tasks.value[index]
+        tasks.value[index] = { ...existing, checklist: updated.checklist } as Task
       }
     } catch (err) {
       console.error('Ошибка обновления чеклиста:', err)

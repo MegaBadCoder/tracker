@@ -103,7 +103,7 @@ const handleOpenTask = (task: Task) => {
 
 const handleUpdateTask = async (updatedTask: Task) => {
   const index = tasks.value.findIndex(t => t.id === updatedTask.id)
-  const previous = index !== -1 ? { ...tasks.value[index] } : null
+  const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
 
   // Optimistic update
   if (index !== -1) tasks.value[index] = updatedTask
@@ -124,12 +124,13 @@ const handleUpdateTask = async (updatedTask: Task) => {
 const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => {
   // Optimistic update
   const index = tasks.value.findIndex(t => t.id === taskId)
-  const previousChecklist = index !== -1 ? tasks.value[index].checklist : null
+  const previousChecklist = index !== -1 ? tasks.value[index]?.checklist : undefined
   if (index !== -1) {
-    tasks.value[index] = { ...tasks.value[index], checklist: { items } }
+    const task = tasks.value[index]
+    tasks.value[index] = { ...task, checklist: { items } } as Task
   }
   if (selectedTask.value?.id === taskId) {
-    selectedTask.value = { ...selectedTask.value, checklist: { items } }
+    selectedTask.value = { ...selectedTask.value, checklist: { items } } as Task
   }
 
   try {
@@ -137,10 +138,11 @@ const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => 
   } catch (err) {
     // Rollback
     if (index !== -1) {
-      tasks.value[index] = { ...tasks.value[index], checklist: previousChecklist }
+      const task = tasks.value[index]
+      tasks.value[index] = { ...task, checklist: previousChecklist } as Task
     }
     if (selectedTask.value?.id === taskId) {
-      selectedTask.value = { ...selectedTask.value!, checklist: previousChecklist }
+      selectedTask.value = { ...selectedTask.value, checklist: previousChecklist } as Task
     }
     console.error('Ошибка обновления чеклиста:', err)
   }
