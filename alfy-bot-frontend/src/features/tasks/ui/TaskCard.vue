@@ -70,6 +70,19 @@
           <MapPin :size="11" />
           {{ task.location }}
         </Badge>
+        <Badge
+          v-if="checklistTotal > 0"
+          variant="outline"
+          :class="[
+            'gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full',
+            checklistDone === checklistTotal
+              ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+              : 'bg-muted text-muted-foreground',
+          ]"
+        >
+          <CheckSquare :size="11" />
+          {{ checklistDone }}/{{ checklistTotal }}
+        </Badge>
       </div>
     </div>
 
@@ -101,10 +114,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar as CalendarIcon, Clock, Flag, MapPin, Timer, Trash2 } from 'lucide-vue-next'
+import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, MapPin, Timer, Trash2 } from 'lucide-vue-next'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatPomodoro } from '../lib/formatters'
+import { computeChecklistProgress } from '../lib/checklist'
 import { PRIORITY_LABELS } from '../model/constants'
 import type { TaskCardProps, TaskCardEmits } from '../model/types'
 
@@ -120,8 +134,12 @@ const priorityIconColor = computed(() => {
   return props.task.priority ? colors[props.task.priority] : ''
 })
 
+const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
+const checklistTotal = computed(() => checklistStats.value.total)
+const checklistDone = computed(() => checklistStats.value.completed)
+
 const hasMeta = computed(() =>
-  props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask
+  props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask || checklistTotal.value > 0
 )
 
 </script>

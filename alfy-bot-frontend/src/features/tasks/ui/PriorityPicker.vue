@@ -26,7 +26,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
-import { type Priority, PRIORITY_LABELS, PRIORITIES } from '../model/constants'
+import type { Priority } from '../model/types'
+import { PRIORITY_LABELS, PRIORITIES } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
 
 defineProps<{

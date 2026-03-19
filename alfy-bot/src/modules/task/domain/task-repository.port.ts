@@ -1,4 +1,4 @@
-import { Task } from '../../../shared/entities';
+import { Task, PomodoroConfig } from '../../../shared/entities';
 
 export interface ChecklistItem {
   id: string;
@@ -15,6 +15,7 @@ export abstract class TaskRepositoryPort {
   abstract findAllByUser(userId: number): Promise<Task[]>;
   abstract findById(id: string, userId: number): Promise<Task | null>;
   abstract create(task: Partial<Task>): Promise<Task>;
+  abstract save(task: Task): Promise<Task>;
   abstract update(
     id: string,
     userId: number,
@@ -28,5 +29,9 @@ export abstract class TaskRepositoryPort {
   abstract updateChecklist(
     task: Task,
     data: ChecklistData,
+  ): Promise<Task>;
+  abstract updatePomodoroConfig(
+    task: Task,
+    data: Partial<PomodoroConfig> | null,
   ): Promise<Task>;
 }

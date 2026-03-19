@@ -7,6 +7,7 @@ import {
   ChecklistData,
 } from '../domain/task-repository.port';
 
+
 @Injectable()
 export class TypeOrmTaskRepository extends TaskRepositoryPort {
   constructor(
@@ -36,6 +37,10 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
   async create(task: Partial<Task>): Promise<Task> {
     const entity = this.taskRepo.create(task);
     return this.taskRepo.save(entity);
+  }
+
+  async save(task: Task): Promise<Task> {
+    return this.taskRepo.save(task);
   }
 
   async update(
@@ -71,5 +76,24 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
   async updateChecklist(task: Task, data: ChecklistData): Promise<Task> {
     task.checklist = data;
     return this.taskRepo.save(task);
+  }
+
+  async updatePomodoroConfig(
+    task: Task,
+    data: Partial<PomodoroConfig> | null,
+  ): Promise<Task> {
+    if (data === null) {
+      if (task.pomodoroConfig) {
+        await this.pomodoroRepo.remove(task.pomodoroConfig);
+        task.pomodoroConfig = null;
+      }
+    } else if (task.pomodoroConfig) {
+      Object.assign(task.pomodoroConfig, data);
+      await this.pomodoroRepo.save(task.pomodoroConfig);
+    } else {
+      const config = this.pomodoroRepo.create({ ...data, taskId: task.id });
+      task.pomodoroConfig = await this.pomodoroRepo.save(config);
+    }
+    return task;
   }
 }

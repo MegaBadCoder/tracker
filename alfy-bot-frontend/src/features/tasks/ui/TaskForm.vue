@@ -1,14 +1,15 @@
 <template>
   <div class="bg-card rounded-xl border border-border overflow-hidden">
     <!-- Title -->
-    <div class="px-4 pt-3" :class="expanded ? 'pb-2' : 'pb-3'">
-      <Input
+    <div class="px-3 pt-3" :class="expanded ? 'pb-2' : 'pb-3'">
+      <ContentEditableInput
         ref="titleInputRef"
         v-model="form.title"
         placeholder="Название задачи"
-        class="border-0 shadow-none px-0 text-lg font-semibold placeholder:font-normal focus-visible:ring-0"
+        class="text-sm font-medium empty:before:font-normal"
+        aria-label="Название задачи"
         @focus="expanded = true"
-        @keyup.enter="handleSubmit"
+        @keydown.enter.prevent="handleSubmit"
       />
     </div>
 
@@ -20,17 +21,18 @@
       <div class="overflow-hidden">
 
     <!-- Description -->
-    <div class="px-5 pb-4">
-      <Textarea
+    <div class="px-3 pb-3">
+      <ContentEditableInput
         v-model="form.description"
         placeholder="Добавить описание..."
-        rows="2"
-        class="border-0 shadow-none px-0 resize-none focus-visible:ring-0 text-muted-foreground placeholder:text-muted-foreground/60"
+        multiline
+        class="text-sm text-muted-foreground min-h-[1.5em]"
+        aria-label="Описание задачи"
       />
     </div>
 
     <!-- Toolbar -->
-    <div class="flex flex-wrap items-center gap-1.5 px-5 pb-4">
+    <div class="flex flex-wrap items-center gap-1.5 px-3 pb-3">
       <!-- Due Date -->
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
@@ -129,7 +131,7 @@
     </div>
 
     <!-- Pomodoro Section -->
-    <div class="border-t border-border px-5 py-3">
+    <div class="border-t border-border px-3 py-3">
       <div
         class="flex items-center justify-between cursor-pointer select-none"
         @click="form.isPomodoroTask = !form.isPomodoroTask"
@@ -168,7 +170,7 @@
     </div>
 
     <!-- Submit -->
-    <div class="border-t border-border px-4 py-2.5 flex justify-end gap-2">
+    <div class="border-t border-border px-3 py-2.5 flex justify-end gap-2">
       <Button
         variant="outline"
         size="sm"
@@ -197,7 +199,7 @@
 import { reactive, ref, toRaw, onMounted, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
+import { ContentEditableInput } from '@/components/ui/content-editable-input'
 import { Switch } from '@/components/ui/switch'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -257,7 +259,7 @@ const form = reactive<TaskFormData>({
 })
 
 const expanded = ref(false)
-const titleInputRef = ref<InstanceType<typeof Input> | null>(null)
+const titleInputRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
 
 const resetForm = () => {
   form.title = ''
@@ -278,8 +280,7 @@ const resetForm = () => {
 const handleCancel = () => {
   expanded.value = false
   resetForm()
-  const input = titleInputRef.value?.$el as HTMLInputElement | undefined
-  input?.blur()
+  titleInputRef.value?.el?.blur()
 }
 
 const handleKeydown = (e: KeyboardEvent) => {

@@ -4,30 +4,33 @@ description: Observed patterns, violations, and duplication hotspots in src/feat
 type: project
 ---
 
-## Well-structured parts
-- `model/types.ts` and `model/constants.ts` are clean: no framework deps, pure domain types.
-- `lib/formatters.ts`, `lib/priority.ts`, `lib/dateTime.ts` are clean pure-function utilities. Correctly imported by UI components.
-- `lib/urgency.ts` — getDueDateUrgency correctly extracted from UI. URGENCY_CLASSES map still leaks Tailwind strings into this layer (see open issue below).
-- `api/tasks-api.ts` properly sits at the infrastructure boundary.
-- Extracted sub-components (TagsEditor, PriorityPicker, DeadlinePicker, PomodoroSettings) eliminate the prior duplication. All have correct inward dependency direction.
+## Well-structured parts (confirmed 2026-03-18)
+- `model/types.ts` is clean: no framework deps, pure domain types, zero outward imports.
+- `model/constants.ts` clean except for Priority re-export (see open issues).
+- `lib/formatters.ts`, `lib/dateTime.ts` are clean pure-function utilities. No framework deps.
+- `lib/priority.ts` — clean aside from Tailwind strings in the constants (low severity).
+- `lib/urgency.ts` — getDueDateUrgency is correct. URGENCY_CLASSES is the only issue.
+- `api/tasks-api.ts` properly sits at the infrastructure boundary. No UI or model layer imports it directly. Only `views/TasksView.vue` uses useTasks().
+- Extracted sub-components (TagsEditor, PriorityPicker, DeadlinePicker, PomodoroSettings) all have correct inward dependency direction. No cross-feature coupling anywhere.
+- No UI component imports from the API layer directly (correct).
 
-## Open issues after extraction refactor
+## Open issues (confirmed 2026-03-18 review pass)
 
-### Runtime bug
-- `TaskForm.vue` line 296: `JSON.parse(JSON.stringify(form))` corrupts Date fields into strings despite `as Task` cast. Replace with `structuredClone(form)`.
+### Runtime bug (RESOLVED)
+- `TaskForm.vue` line 296: previously used `JSON.parse(JSON.stringify(form))`. Now fixed — uses `structuredClone(toRaw(form))` (line 309). Date fields preserved correctly.
 
-### Type placement
-- `Priority` type is exported from `model/constants.ts` (line 1) instead of `model/types.ts`. This forces types.ts to import from constants.ts, inverting the natural read order. Fix: move Priority to types.ts.
+### Type placement (CONFIRMED OPEN)
+- `Priority` is defined in `model/types.ts` (line 1) and re-exported from `model/constants.ts` (lines 1–3). Both paths are live. TaskDetailDialog imports Priority from constants.ts (line 381); other files import from types.ts. Fix: remove re-export from constants.ts, update all callers to import from types.ts.
 
-### Stale import
-- `TaskDetailDialog.vue` imports `getTimeString` from lib/dateTime (line 383) but no longer uses it directly after DeadlinePicker extraction. Remove it.
+### Stale import (RESOLVED)
+- `TaskDetailDialog.vue` no longer imports `getTimeString` directly. DeadlinePicker.vue owns that usage. Import removed.
 
-### Presentation concerns in non-UI layers
-- `PRIORITY_COLORS` and `PRIORITY_ICON_COLORS` in model/constants.ts are Tailwind class strings — presentational, not domain values. Should move to lib/priority.ts.
-- `URGENCY_CLASSES` in lib/urgency.ts maps to Tailwind strings. Should move to UI layer or a dedicated ui-helpers file.
+### Presentation concerns in non-UI layers (CONFIRMED OPEN)
+- `PRIORITY_COLORS` and `PRIORITY_ICON_COLORS` have been moved to `lib/priority.ts` (not constants.ts anymore). Still Tailwind strings in a lib file — acceptable for now, lower severity than urgency.
+- `URGENCY_CLASSES` in `lib/urgency.ts` lines 11–16 remains a Tailwind class map in a lib/domain file. Should move to UI layer.
 
-### PomodoroSettings default coupling
-- `PomodoroSettings.vue` imports `POMODORO_DEFAULTS` from model/constants to seed its prop defaults. The component should be a dumb renderer; parents (TaskForm, TaskDetailDialog) already seed defaults themselves. Remove the import and defaults from PomodoroSettings.
+### PomodoroSettings default coupling (CONFIRMED OPEN)
+- `PomodoroSettings.vue` still imports `POMODORO_DEFAULTS` from model/constants to seed prop defaults. Parents also seed defaults. The component is duplicating the defaults unnecessarily.
 
 ### checklistProgress on Task entity
 - `Task` in model/types.ts carries `checklistProgress: { total, completed, progress }` — a derived/view-model field, not a domain property. TaskDetailDialog recomputes it locally from localChecklist anyway. Decide: either remove the field from Task and always compute it, or use task.checklistProgress for display and stop recomputing.

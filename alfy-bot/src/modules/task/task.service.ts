@@ -4,6 +4,7 @@ import { TaskRepositoryPort } from './domain/task-repository.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
+import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 
 @Injectable()
 export class TaskService {
@@ -51,56 +52,28 @@ export class TaskService {
   }
 
   async update(userId: number, id: string, dto: UpdateTaskDto): Promise<Task> {
-    const {
-      isPomodoroTask,
-      pomodoroCount,
-      pomodoroDuration,
-      shortBreak,
-      longBreak,
-      longBreakInterval,
-      pomodoroCompleted,
-      dueDate,
-      deadline,
-      ...rest
-    } = dto;
+    const { dueDate, deadline, ...rest } = dto;
 
     const task = await this.taskRepo.findById(id, userId);
     if (!task) throw new NotFoundException(`Task #${id} not found`);
 
-    const updateData: Partial<Task> = { ...rest };
+    Object.assign(task, rest);
     if (dueDate !== undefined)
-      updateData.dueDate = dueDate ? new Date(dueDate) : null;
+      task.dueDate = dueDate ? new Date(dueDate) : null;
     if (deadline !== undefined)
-      updateData.deadline = deadline ? new Date(deadline) : null;
+      task.deadline = deadline ? new Date(deadline) : null;
 
-    if (isPomodoroTask === true && !task.pomodoroConfig) {
-      const config = new PomodoroConfig();
-      if (pomodoroCount !== undefined) config.pomodoroCount = pomodoroCount;
-      if (pomodoroDuration !== undefined)
-        config.pomodoroDuration = pomodoroDuration;
-      if (shortBreak !== undefined) config.shortBreak = shortBreak;
-      if (longBreak !== undefined) config.longBreak = longBreak;
-      if (longBreakInterval !== undefined)
-        config.longBreakInterval = longBreakInterval;
-      updateData.pomodoroConfig = config;
-    } else if (isPomodoroTask === false && task.pomodoroConfig) {
-      updateData.pomodoroConfig = null;
-    } else if (task.pomodoroConfig) {
-      if (pomodoroCount !== undefined)
-        task.pomodoroConfig.pomodoroCount = pomodoroCount;
-      if (pomodoroDuration !== undefined)
-        task.pomodoroConfig.pomodoroDuration = pomodoroDuration;
-      if (shortBreak !== undefined) task.pomodoroConfig.shortBreak = shortBreak;
-      if (longBreak !== undefined) task.pomodoroConfig.longBreak = longBreak;
-      if (longBreakInterval !== undefined)
-        task.pomodoroConfig.longBreakInterval = longBreakInterval;
-      if (pomodoroCompleted !== undefined)
-        task.pomodoroConfig.pomodoroCompleted = pomodoroCompleted;
-    }
+    return this.taskRepo.save(task);
+  }
 
-    const updated = await this.taskRepo.update(id, userId, updateData);
-    if (!updated) throw new NotFoundException(`Task #${id} not found`);
-    return updated;
+  async updatePomodoroConfig(
+    userId: number,
+    taskId: string,
+    dto: UpdatePomodoroConfigDto | null,
+  ): Promise<Task> {
+    const task = await this.taskRepo.findById(taskId, userId);
+    if (!task) throw new NotFoundException(`Task #${taskId} not found`);
+    return this.taskRepo.updatePomodoroConfig(task, dto);
   }
 
   async updateChecklist(

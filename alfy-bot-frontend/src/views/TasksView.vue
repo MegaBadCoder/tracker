@@ -49,6 +49,7 @@
     @delete="handleDeleteFromDialog"
     @update="handleUpdateTask"
     @update:checklist="handleUpdateChecklist"
+    @update:pomodoro-config="handleUpdatePomodoroConfig"
   />
   <Teleport to="body">
     <TimeBlock v-show="!isDetailOpen" />
@@ -85,6 +86,7 @@ const {
   deleteTask,
   incrementPomodoro,
   updateChecklist,
+  updatePomodoroConfig,
 } = useTasks()
 
 timerStore.onPomodoroIncrement = (taskId: string, increment: number) => {
@@ -145,6 +147,30 @@ const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => 
       selectedTask.value = { ...selectedTask.value, checklist: previousChecklist } as Task
     }
     console.error('Ошибка обновления чеклиста:', err)
+  }
+}
+
+const handleUpdatePomodoroConfig = async (taskId: string, config: Record<string, unknown>) => {
+  const index = tasks.value.findIndex(t => t.id === taskId)
+  const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
+
+  // Optimistic update
+  if (index !== -1) {
+    tasks.value[index] = { ...tasks.value[index], ...config } as Task
+  }
+  if (selectedTask.value?.id === taskId) {
+    selectedTask.value = { ...selectedTask.value, ...config } as Task
+  }
+
+  try {
+    await updatePomodoroConfig(taskId, config)
+  } catch (err) {
+    // Rollback
+    if (previous && index !== -1) {
+      tasks.value[index] = previous
+      selectedTask.value = previous
+    }
+    console.error('Ошибка обновления помодоро:', err)
   }
 }
 

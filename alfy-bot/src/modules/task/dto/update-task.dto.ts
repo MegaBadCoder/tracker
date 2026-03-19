@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, IsOptional } from 'class-validator';
+import { IsBoolean, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateTaskDto } from './create-task.dto';
 
@@ -9,11 +9,15 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @IsBoolean()
   completed?: boolean;
 
-  @ApiPropertyOptional({ example: 2 })
-  @IsOptional()
-  @IsNumber()
-  pomodoroCompleted?: number;
-
   // Explicitly exclude checklist — use PUT /tasks/:id/checklist instead
   checklist?: never;
+
+  // Use PUT/DELETE /tasks/:id/pomodoro-config instead
+  isPomodoroTask?: never;
+  pomodoroCount?: never;
+  pomodoroDuration?: never;
+  shortBreak?: never;
+  longBreak?: never;
+  longBreakInterval?: never;
+  pomodoroCompleted?: never;
 }

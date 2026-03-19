@@ -18,6 +18,7 @@ import { TimerSessionService } from './timer-session.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
+import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
 
 interface AuthRequest extends Request {
@@ -76,6 +77,25 @@ export class TaskController {
     @Body() dto: UpdateChecklistDto,
   ) {
     return this.taskService.updateChecklist(req.user.sub, id, dto);
+  }
+
+  @Put(':id/pomodoro-config')
+  @ApiOperation({ summary: 'Обновить/создать помодоро-конфигурацию' })
+  async updatePomodoroConfig(
+    @Request() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdatePomodoroConfigDto,
+  ) {
+    return this.taskService.updatePomodoroConfig(req.user.sub, id, dto);
+  }
+
+  @Delete(':id/pomodoro-config')
+  @ApiOperation({ summary: 'Удалить помодоро-конфигурацию' })
+  async deletePomodoroConfig(
+    @Request() req: AuthRequest,
+    @Param('id') id: string,
+  ) {
+    return this.taskService.updatePomodoroConfig(req.user.sub, id, null);
   }
 
   @Patch(':id')

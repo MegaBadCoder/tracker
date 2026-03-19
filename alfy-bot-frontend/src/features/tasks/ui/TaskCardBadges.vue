@@ -53,7 +53,7 @@ import {
   Timer
 } from 'lucide-vue-next'
 import { formatDate, formatPomodoro } from '../lib/formatters'
-import type { Priority } from '../model/constants'
+import type { Priority } from '../model/types'
 
 interface Props {
   dueDate?: Date

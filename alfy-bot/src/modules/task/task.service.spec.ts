@@ -51,6 +51,7 @@ describe('TaskService', () => {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockImplementation((data) => Promise.resolve(makeTask(data))),
+      save: jest.fn().mockImplementation((task) => Promise.resolve(task)),
       update: jest.fn().mockImplementation((id, _userId, data) =>
         Promise.resolve(makeTask({ id, ...data })),
       ),
@@ -59,6 +60,15 @@ describe('TaskService', () => {
       updateChecklist: jest.fn().mockImplementation((task, data) =>
         Promise.resolve(makeTask({ ...task, checklist: data })),
       ),
+      updatePomodoroConfig: jest.fn().mockImplementation((task, data) => {
+        if (data === null) {
+          return Promise.resolve(makeTask({ ...task, pomodoroConfig: null }));
+        }
+        const config = task.pomodoroConfig
+          ? makePomodoroConfig({ ...task.pomodoroConfig, ...data })
+          : makePomodoroConfig(data);
+        return Promise.resolve(makeTask({ ...task, pomodoroConfig: config }));
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -180,7 +190,7 @@ describe('TaskService', () => {
 
       await service.update(1, 'task-1', { title: 'Новое название' });
 
-      expect(repo.update).toHaveBeenCalledWith('task-1', 1, expect.objectContaining({
+      expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({
         title: 'Новое название',
       }));
     });
@@ -189,6 +199,47 @@ describe('TaskService', () => {
       repo.findById.mockResolvedValue(null);
 
       await expect(service.update(1, 'nope', { title: 'X' }))
+        .rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('updatePomodoroConfig', () => {
+    it('обновляет конфиг при существующем', async () => {
+      const config = makePomodoroConfig();
+      repo.findById.mockResolvedValue(makeTask({ pomodoroConfig: config }));
+
+      const result = await service.updatePomodoroConfig(1, 'task-1', {
+        pomodoroCount: 8,
+        pomodoroDuration: 50,
+      });
+
+      expect(repo.updatePomodoroConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'task-1' }),
+        { pomodoroCount: 8, pomodoroDuration: 50 },
+      );
+      expect(result.pomodoroConfig).toEqual(expect.objectContaining({
+        pomodoroCount: 8,
+        pomodoroDuration: 50,
+      }));
+    });
+
+    it('удаляет конфиг при null', async () => {
+      const config = makePomodoroConfig();
+      repo.findById.mockResolvedValue(makeTask({ pomodoroConfig: config }));
+
+      const result = await service.updatePomodoroConfig(1, 'task-1', null);
+
+      expect(repo.updatePomodoroConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'task-1' }),
+        null,
+      );
+      expect(result.pomodoroConfig).toBeNull();
+    });
+
+    it('бросает NotFoundException для несуществующей задачи', async () => {
+      repo.findById.mockResolvedValue(null);
+
+      await expect(service.updatePomodoroConfig(1, 'nope', { pomodoroCount: 4 }))
         .rejects.toThrow(NotFoundException);
     });
   });

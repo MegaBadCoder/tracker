@@ -45,32 +45,35 @@
         <!-- Main content -->
         <div class="flex-1 overflow-y-auto px-7 py-5 space-y-5">
           <!-- Title -->
-          <div
+          <ContentEditableInput
             ref="titleRef"
-            :contenteditable="editable"
+            v-model="localTitle"
+            :editable="editable"
+            placeholder="Без названия"
             :class="[
-              'text-xl font-semibold outline-none rounded-md transition-colors empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40',
+              'text-xl font-semibold rounded-md transition-colors',
               task.completed && 'line-through text-muted-foreground',
               editable && 'cursor-text',
             ]"
-            data-placeholder="Без названия"
-            @input="onTitleInput"
+            aria-label="Название задачи"
             @blur="commitTitle"
-            @keydown.enter.prevent="($event.target as HTMLElement).blur()"
+            @keydown.enter.prevent="titleRef?.el?.blur()"
             @keydown.escape="cancelEditTitle"
           />
 
           <!-- Description -->
-          <div
+          <ContentEditableInput
             ref="descriptionRef"
-            :contenteditable="editable"
+            v-model="localDescription"
+            :editable="editable"
+            multiline
+            placeholder="Добавить описание..."
             :class="[
-              'text-sm leading-relaxed outline-none rounded-md py-1 transition-colors whitespace-pre-wrap empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50 empty:before:italic',
+              'text-sm leading-relaxed rounded-md py-1 transition-colors empty:before:italic',
               localDescription ? 'text-foreground/80' : '',
               editable && 'cursor-text',
             ]"
-            data-placeholder="Добавить описание..."
-            @input="onDescriptionInput"
+            aria-label="Описание задачи"
             @blur="commitDescription"
             @keydown.escape="cancelEditDescription"
           />
@@ -348,7 +351,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import {
   X,
   EllipsisVertical,
@@ -365,6 +368,7 @@ import {
   Repeat,
 } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
+import { ContentEditableInput } from '@/components/ui/content-editable-input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -378,9 +382,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate, formatPomodoro } from '../lib/formatters'
-import { type Priority, PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
+import type { Priority } from '../model/types'
+import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
-import { getDueDateUrgency, URGENCY_CLASSES } from '../lib/urgency'
+import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
+import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
+
+const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
+  overdue: 'text-red-500',
+  soon: 'text-yellow-600 dark:text-yellow-500',
+  normal: '',
+  none: '',
+}
 import type { Task, ChecklistItem } from '../model/types'
 import TagsEditor from './TagsEditor.vue'
 import PriorityPicker from './PriorityPicker.vue'
@@ -400,11 +413,18 @@ const emit = defineEmits<{
   (e: 'delete', id: string): void
   (e: 'update', task: Task): void
   (e: 'update:checklist', taskId: string, items: ChecklistItem[]): void
+  (e: 'update:pomodoroConfig', taskId: string, config: {
+    pomodoroCount: number
+    pomodoroDuration: number
+    shortBreak: number
+    longBreak: number
+    longBreakInterval: number
+  }): void
 }>()
 
 // Contenteditable refs
-const titleRef = ref<HTMLElement | null>(null)
-const descriptionRef = ref<HTMLElement | null>(null)
+const titleRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
+const descriptionRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
 const localTitle = ref('')
 const localDescription = ref('')
 
@@ -431,14 +451,6 @@ watch(() => props.task, (task) => {
   if (task) {
     localTitle.value = task.title
     localDescription.value = task.description || ''
-    nextTick(() => {
-      if (titleRef.value && titleRef.value.textContent !== task.title) {
-        titleRef.value.textContent = task.title
-      }
-      if (descriptionRef.value && descriptionRef.value.textContent !== (task.description || '')) {
-        descriptionRef.value.textContent = task.description || ''
-      }
-    })
     localChecklist.value = task.checklist?.items
       ? task.checklist.items.map(item => ({ ...item }))
       : []
@@ -466,7 +478,8 @@ watch(localDeadline, (val) => {
 
 // Pomodoro
 function emitPomodoroUpdate() {
-  emitUpdate({
+  if (!props.task) return
+  emit('update:pomodoroConfig', props.task.id, {
     pomodoroCount: localPomodoroCount.value,
     pomodoroDuration: localPomodoroDuration.value,
     shortBreak: localShortBreak.value,
@@ -476,10 +489,6 @@ function emitPomodoroUpdate() {
 }
 
 // Title
-function onTitleInput(e: Event) {
-  localTitle.value = (e.target as HTMLElement).textContent || ''
-}
-
 function commitTitle() {
   if (props.task && localTitle.value !== props.task.title) {
     emitUpdate({ title: localTitle.value })
@@ -487,18 +496,11 @@ function commitTitle() {
 }
 
 function cancelEditTitle() {
-  if (titleRef.value) {
-    titleRef.value.textContent = props.task?.title || ''
-  }
   localTitle.value = props.task?.title || ''
-  titleRef.value?.blur()
+  titleRef.value?.el?.blur()
 }
 
 // Description
-function onDescriptionInput(e: Event) {
-  localDescription.value = (e.target as HTMLElement).textContent || ''
-}
-
 function commitDescription() {
   if (props.task && localDescription.value !== (props.task.description || '')) {
     emitUpdate({ description: localDescription.value })
@@ -506,11 +508,8 @@ function commitDescription() {
 }
 
 function cancelEditDescription() {
-  if (descriptionRef.value) {
-    descriptionRef.value.textContent = props.task?.description || ''
-  }
   localDescription.value = props.task?.description || ''
-  descriptionRef.value?.blur()
+  descriptionRef.value?.el?.blur()
 }
 
 // Checklist
@@ -518,15 +517,9 @@ const sortedChecklist = computed(() =>
   [...localChecklist.value].sort((a, b) => a.order - b.order)
 )
 
-const checklistCompleted = computed(() =>
-  localChecklist.value.filter(i => i.completed).length
-)
-
-const checklistProgress = computed(() =>
-  localChecklist.value.length === 0
-    ? 0
-    : (checklistCompleted.value / localChecklist.value.length) * 100
-)
+const checklistStats = computed(() => computeChecklistProgress(localChecklist.value))
+const checklistCompleted = computed(() => checklistStats.value.completed)
+const checklistProgress = computed(() => checklistStats.value.progress)
 
 function toggleChecklistItem(id: string) {
   const item = localChecklist.value.find(i => i.id === id)
@@ -553,13 +546,7 @@ function addChecklistItem() {
   const text = newChecklistItem.value.trim()
   if (!text) return
 
-  const maxOrder = localChecklist.value.reduce((max, i) => Math.max(max, i.order), -1)
-  localChecklist.value.push({
-    id: crypto.randomUUID(),
-    text,
-    completed: false,
-    order: maxOrder + 1,
-  })
+  localChecklist.value.push(createChecklistItem(text, localChecklist.value))
   newChecklistItem.value = ''
   emitChecklistUpdate()
 }

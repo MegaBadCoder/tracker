@@ -11,6 +11,7 @@
         class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         @update:model-value="$emit('update:count', Number($event))"
         @blur="$emit('blur')"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
       />
     </div>
     <div class="space-y-1">
@@ -24,6 +25,7 @@
         class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         @update:model-value="$emit('update:duration', Number($event))"
         @blur="$emit('blur')"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
       />
     </div>
     <div class="space-y-1">
@@ -37,6 +39,7 @@
         class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         @update:model-value="$emit('update:shortBreak', Number($event))"
         @blur="$emit('blur')"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
       />
     </div>
     <div class="space-y-1">
@@ -50,6 +53,7 @@
         class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         @update:model-value="$emit('update:longBreak', Number($event))"
         @blur="$emit('blur')"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
       />
     </div>
     <div class="space-y-1">
@@ -63,6 +67,7 @@
         class="h-7 text-xs px-2 text-left [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         @update:model-value="$emit('update:longBreakInterval', Number($event))"
         @blur="$emit('blur')"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
       />
     </div>
   </div>

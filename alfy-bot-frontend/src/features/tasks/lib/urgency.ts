@@ -7,10 +7,3 @@ export const getDueDateUrgency = (date?: Date): DueDateUrgency => {
   if (days <= 3) return 'soon'
   return 'normal'
 }
-
-export const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
-  overdue: 'text-red-500',
-  soon: 'text-yellow-600 dark:text-yellow-500',
-  normal: '',
-  none: '',
-}

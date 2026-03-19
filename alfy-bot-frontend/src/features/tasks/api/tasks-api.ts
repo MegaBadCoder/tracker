@@ -106,7 +106,12 @@ export function useTasks() {
     }
 
     try {
-      const { checklist, checklistProgress, ...rest } = updates as Record<string, unknown>
+      const {
+        checklist, checklistProgress,
+        isPomodoroTask, pomodoroCount, pomodoroDuration,
+        shortBreak, longBreak, longBreakInterval, pomodoroCompleted,
+        ...rest
+      } = updates as Record<string, unknown>
       const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(rest))
       const updatedTask = parseTask(data)
       const index = tasks.value.findIndex(t => t.id === taskId)
@@ -173,6 +178,31 @@ export function useTasks() {
     }
   }
 
+  const updatePomodoroConfig = async (taskId: string, config: Record<string, unknown> | null) => {
+    try {
+      const { data } = config === null
+        ? await api.delete(`/tasks/${taskId}/pomodoro-config`)
+        : await api.put(`/tasks/${taskId}/pomodoro-config`, config)
+      const updated = parseTask(data)
+      const index = tasks.value.findIndex(t => t.id === taskId)
+      if (index !== -1) {
+        tasks.value[index] = {
+          ...tasks.value[index],
+          isPomodoroTask: updated.isPomodoroTask,
+          pomodoroCount: updated.pomodoroCount,
+          pomodoroDuration: updated.pomodoroDuration,
+          shortBreak: updated.shortBreak,
+          longBreak: updated.longBreak,
+          longBreakInterval: updated.longBreakInterval,
+          pomodoroCompleted: updated.pomodoroCompleted,
+        }
+      }
+    } catch (err) {
+      console.error('Ошибка обновления помодоро:', err)
+      throw err
+    }
+  }
+
   const updateChecklist = async (taskId: string, items: ChecklistItem[]) => {
     try {
       const { data } = await api.put(`/tasks/${taskId}/checklist`, { items })
@@ -208,5 +238,6 @@ export function useTasks() {
     deleteTask,
     incrementPomodoro,
     updateChecklist,
+    updatePomodoroConfig,
   }
 }
