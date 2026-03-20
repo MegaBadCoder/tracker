@@ -186,15 +186,18 @@ export function useTasks() {
       const updated = parseTask(data)
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
-        tasks.value[index] = {
-          ...tasks.value[index],
-          isPomodoroTask: updated.isPomodoroTask,
-          pomodoroCount: updated.pomodoroCount,
-          pomodoroDuration: updated.pomodoroDuration,
-          shortBreak: updated.shortBreak,
-          longBreak: updated.longBreak,
-          longBreakInterval: updated.longBreakInterval,
-          pomodoroCompleted: updated.pomodoroCompleted,
+        const existing = tasks.value[index]
+        if (existing) {
+          tasks.value[index] = {
+            ...existing,
+            isPomodoroTask: updated.isPomodoroTask,
+            pomodoroCount: updated.pomodoroCount,
+            pomodoroDuration: updated.pomodoroDuration,
+            shortBreak: updated.shortBreak,
+            longBreak: updated.longBreak,
+            longBreakInterval: updated.longBreakInterval,
+            pomodoroCompleted: updated.pomodoroCompleted,
+          }
         }
       }
     } catch (err) {
@@ -210,7 +213,9 @@ export function useTasks() {
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
         const existing = tasks.value[index]
-        tasks.value[index] = { ...existing, checklist: updated.checklist } as Task
+        if (existing) {
+          tasks.value[index] = { ...existing, checklist: updated.checklist }
+        }
       }
     } catch (err) {
       console.error('Ошибка обновления чеклиста:', err)

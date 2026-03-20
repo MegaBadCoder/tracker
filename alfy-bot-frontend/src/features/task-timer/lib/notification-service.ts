@@ -23,18 +23,15 @@ class NotificationService {
   }
 
   async init(): Promise<void> {
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js')
-        this.sw = registration
-      } catch (error) {
-        console.error('Ошибка регистрации Service Worker:', error)
-      }
+    if (!('serviceWorker' in navigator)) return
+
+    try {
+      this.sw = await navigator.serviceWorker.ready
+    } catch (error) {
+      console.error('Ошибка ожидания Service Worker:', error)
     }
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', this.handleMessage.bind(this))
-    }
+    navigator.serviceWorker.addEventListener('message', this.handleMessage.bind(this))
   }
 
   async requestPermission(): Promise<boolean> {
