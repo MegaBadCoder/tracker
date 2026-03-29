@@ -58,12 +58,13 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed, inject } from 'vue'
+import { storeToRefs } from 'pinia'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import type { Task, ChecklistItem } from '@/features/tasks/model/types'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 import { TimeBlock, useTimerStore } from '@/features/task-timer'
-import { useTasks } from '@/features/tasks/api/tasks-api'
+import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useConfirm } from '@/composables/useConfirm'
 import PageContainer from '@/components/PageContainer.vue'
 import AppHeader from '@/components/AppHeader.vue'
@@ -75,23 +76,17 @@ const { startTask } = timerStore
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
 
+const taskStore = useTaskStore()
+const { tasks, loading, error } = storeToRefs(taskStore)
 const {
-  tasks,
-  loading,
-  error,
   fetchTasks,
   createTask,
   updateTask,
   toggleTask,
   deleteTask,
-  incrementPomodoro,
   updateChecklist,
   updatePomodoroConfig,
-} = useTasks()
-
-timerStore.onPomodoroIncrement = (taskId: string, increment: number) => {
-  incrementPomodoro(taskId, increment)
-}
+} = taskStore
 
 const { confirm } = useConfirm()
 

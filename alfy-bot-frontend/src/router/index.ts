@@ -24,6 +24,11 @@ const router = createRouter({
           component: () => import('../views/TasksView.vue'),
         },
         {
+          path: 'calendar',
+          name: 'calendar',
+          component: () => import('../views/CalendarView.vue'),
+        },
+        {
           path: 'goals/:id',
           name: 'goal',
           component: () => import('../views/GoalView.vue'),

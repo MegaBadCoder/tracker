@@ -89,6 +89,22 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
+self.addEventListener('push', (event: PushEvent) => {
+  const data = event.data?.json() ?? { title: 'Alfy', body: '' }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/pwa-192x192.png',
+      vibrate: [200, 100, 200],
+      tag: 'timer-push',
+      actions: [
+        { action: 'open', title: 'Открыть' },
+        { action: 'dismiss', title: 'Закрыть' },
+      ],
+    }),
+  )
+})
+
 self.addEventListener('install', () => {
   self.skipWaiting()
 })

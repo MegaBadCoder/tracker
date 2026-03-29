@@ -207,12 +207,21 @@
                   <span class="text-[11px] text-muted-foreground/60 font-medium">Срок</span>
                 </div>
                 <div :class="['text-[13px] truncate', URGENCY_CLASSES[getDueDateUrgency(localDueDate)] || (localDueDate ? '' : 'text-muted-foreground/40')]">
-                  {{ localDueDate ? formatDate(localDueDate, 'd MMM yyyy') : 'Не задано' }}
+                  {{ localDueDate ? formatDueDate(localDueDate) : 'Не задано' }}
                 </div>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent class="w-auto p-0" align="start">
-              <Calendar v-model="localDueDate as any" />
+              <div class="p-3 space-y-3">
+                <Calendar v-model="localDueDate as any" />
+                <Input
+                  v-model="localDueTime"
+                  type="time"
+                  class="w-full"
+                  placeholder="Время (необязательно)"
+                  @change="onDueTimeChange"
+                />
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -382,6 +391,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate, formatPomodoro } from '../lib/formatters'
+import { getTimeString, updateDeadlineTime } from '../lib/dateTime'
 import type { Priority } from '../model/types'
 import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
@@ -433,6 +443,7 @@ const localChecklist = ref<ChecklistItem[]>([])
 const newChecklistItem = ref('')
 
 // Sidebar field refs
+const localDueTime = ref('')
 const localDueDate = ref<Date | undefined>()
 const localDeadline = ref<Date | undefined>()
 const localPriority = ref<Priority | undefined>()
@@ -455,6 +466,7 @@ watch(() => props.task, (task) => {
       ? task.checklist.items.map(item => ({ ...item }))
       : []
     localDueDate.value = task.dueDate
+    localDueTime.value = task.dueDate ? getTimeString(task.dueDate) : ''
     localDeadline.value = task.deadline
     localPriority.value = task.priority
     localLocation.value = task.location || ''
@@ -466,6 +478,19 @@ watch(() => props.task, (task) => {
     localLongBreakInterval.value = task.longBreakInterval ?? POMODORO_DEFAULTS.longBreakInterval
   }
 }, { immediate: true })
+
+function formatDueDate(date: Date): string {
+  const h = date.getHours()
+  const m = date.getMinutes()
+  if (h === 0 && m === 0) return formatDate(date, 'd MMM yyyy')
+  return formatDate(date, 'd MMM yyyy, HH:mm')
+}
+
+function onDueTimeChange() {
+  if (localDueDate.value && localDueTime.value) {
+    localDueDate.value = updateDeadlineTime(localDueDate.value, localDueTime.value)
+  }
+}
 
 // Watch sidebar fields for auto-emit
 watch(localDueDate, (val) => {

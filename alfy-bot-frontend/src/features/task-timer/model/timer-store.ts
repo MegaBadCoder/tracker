@@ -119,9 +119,7 @@ export const useTimerStore = defineStore('timer', () => {
     syncToBackend()
   }
 
-  const onPomodoroIncrement = ref<((taskId: string, increment: number) => void) | null>(null)
-
-  function incrementPomodoro(): void {
+  async function incrementPomodoro(): Promise<void> {
     const taskId = currentSettings.value.taskId
     if (!taskId) return
 
@@ -131,7 +129,11 @@ export const useTimerStore = defineStore('timer', () => {
 
     if (fraction <= 0) return
 
-    onPomodoroIncrement.value?.(taskId, fraction)
+    try {
+      await api.patch(`/tasks/${taskId}/pomodoro`, { increment: fraction })
+    } catch (err) {
+      console.error('Ошибка сохранения помодоро:', err)
+    }
   }
 
   function calculateSeconds(minutes: number): number {
@@ -322,7 +324,6 @@ export const useTimerStore = defineStore('timer', () => {
     timeBlock,
     namePhase,
     timerInterval,
-    onPomodoroIncrement,
     startTimer,
     pauseTimer,
     nextPhase,

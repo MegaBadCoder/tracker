@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { getBotToken } from 'nestjs-telegraf';
 import { TimerSessionService } from './timer-session.service';
-import { UserService } from '../user/application/user.service';
+import { TimerSessionRepositoryPort } from './domain/timer-session-repository.port';
+import { NotificationPort } from './domain/notification.port';
 import { TimerSession, Task } from '../../shared/entities';
 
 function makeSession(overrides: Partial<TimerSession> = {}): TimerSession {
@@ -27,34 +26,26 @@ function makeSession(overrides: Partial<TimerSession> = {}): TimerSession {
 describe('TimerSessionService', () => {
   let service: TimerSessionService;
   let timerRepo: Record<string, jest.Mock>;
-  let userService: Record<string, jest.Mock>;
-  let bot: { telegram: { sendMessage: jest.Mock } };
+  let notification: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     timerRepo = {
-      findOne: jest.fn().mockResolvedValue(null),
-      find: jest.fn().mockResolvedValue([]),
+      findLatestByUser: jest.fn().mockResolvedValue(null),
+      findExpiredActive: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockImplementation((data) => makeSession(data)),
       save: jest.fn().mockImplementation((s) => Promise.resolve(s)),
       remove: jest.fn().mockResolvedValue(undefined),
     };
 
-    userService = {
-      getTelegramId: jest.fn().mockResolvedValue(999),
-    };
-
-    bot = {
-      telegram: {
-        sendMessage: jest.fn().mockResolvedValue(true),
-      },
+    notification = {
+      send: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TimerSessionService,
-        { provide: getRepositoryToken(TimerSession), useValue: timerRepo },
-        { provide: UserService, useValue: userService },
-        { provide: getBotToken(), useValue: bot },
+        { provide: TimerSessionRepositoryPort, useValue: timerRepo },
+        { provide: NotificationPort, useValue: notification },
       ],
     }).compile();
 
@@ -63,7 +54,7 @@ describe('TimerSessionService', () => {
 
   describe('upsert', () => {
     it('создаёт новую сессию, если нет существующей', async () => {
-      timerRepo.findOne.mockResolvedValue(null);
+      timerRepo.findLatestByUser.mockResolvedValue(null);
 
       const result = await service.upsert(1, {
         taskId: 'task-1',
@@ -81,7 +72,7 @@ describe('TimerSessionService', () => {
 
     it('обновляет существующую сессию', async () => {
       const existing = makeSession({ phase: 1, isActive: true });
-      timerRepo.findOne.mockResolvedValue(existing);
+      timerRepo.findLatestByUser.mockResolvedValue(existing);
 
       await service.upsert(1, {
         taskId: 'task-1',
@@ -99,7 +90,7 @@ describe('TimerSessionService', () => {
     });
 
     it('корректно парсит expiresAt в Date', async () => {
-      timerRepo.findOne.mockResolvedValue(null);
+      timerRepo.findLatestByUser.mockResolvedValue(null);
       const expires = '2026-03-10T12:00:00.000Z';
 
       const result = await service.upsert(1, {
@@ -117,54 +108,52 @@ describe('TimerSessionService', () => {
   describe('getLatest', () => {
     it('возвращает последнюю сессию с relations', async () => {
       const session = makeSession();
-      timerRepo.findOne.mockResolvedValue(session);
+      timerRepo.findLatestByUser.mockResolvedValue(session);
 
       const result = await service.getLatest(1);
 
       expect(result).toBe(session);
-      expect(timerRepo.findOne).toHaveBeenCalledWith({
-        where: { userId: 1 },
-        order: { updatedAt: 'DESC' },
-        relations: ['task', 'task.pomodoroConfig'],
-      });
+      expect(timerRepo.findLatestByUser).toHaveBeenCalledWith(1, [
+        'task',
+        'task.pomodoroConfig',
+      ]);
     });
 
     it('возвращает null если нет сессий', async () => {
-      timerRepo.findOne.mockResolvedValue(null);
+      timerRepo.findLatestByUser.mockResolvedValue(null);
       const result = await service.getLatest(1);
       expect(result).toBeNull();
     });
   });
 
   describe('deactivate', () => {
-    it('удаляет сессию и отправляет уведомление по telegramId', async () => {
+    it('удаляет сессию и отправляет уведомление', async () => {
       const session = makeSession({
         task: { id: 'task-1', title: 'Код ревью' } as Task,
       });
-      timerRepo.findOne.mockResolvedValue(session);
+      timerRepo.findLatestByUser.mockResolvedValue(session);
 
       await service.deactivate(1);
 
-      expect(userService.getTelegramId).toHaveBeenCalledWith(1);
-      expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
-        999,
+      expect(notification.send).toHaveBeenCalledWith(
+        1,
         '⏹ Таймер по задаче "Код ревью" остановлен',
       );
       expect(timerRepo.remove).toHaveBeenCalledWith(session);
     });
 
     it('ничего не делает если сессии нет', async () => {
-      timerRepo.findOne.mockResolvedValue(null);
+      timerRepo.findLatestByUser.mockResolvedValue(null);
 
       await service.deactivate(1);
 
       expect(timerRepo.remove).not.toHaveBeenCalled();
-      expect(bot.telegram.sendMessage).not.toHaveBeenCalled();
+      expect(notification.send).not.toHaveBeenCalled();
     });
   });
 
-  describe('handleExpiredTimers — крон', () => {
-    it('деактивирует истёкшие сессии и отправляет Telegram-сообщение по telegramId', async () => {
+  describe('processExpiredTimers', () => {
+    it('деактивирует истёкшие сессии и отправляет уведомление', async () => {
       const expired = makeSession({
         id: 'expired-1',
         userId: 1,
@@ -173,15 +162,14 @@ describe('TimerSessionService', () => {
         task: { id: 'task-1', title: 'Написать отчёт' } as Task,
       });
 
-      timerRepo.find.mockResolvedValue([expired]);
+      timerRepo.findExpiredActive.mockResolvedValue([expired]);
 
-      await service.handleExpiredTimers();
+      await service.processExpiredTimers();
 
       expect(expired.isActive).toBe(false);
       expect(timerRepo.save).toHaveBeenCalledWith(expired);
-      expect(userService.getTelegramId).toHaveBeenCalledWith(1);
-      expect(bot.telegram.sendMessage).toHaveBeenCalledWith(
-        999,
+      expect(notification.send).toHaveBeenCalledWith(
+        1,
         '⏰ Таймер по задаче "Написать отчёт" завершён!',
       );
     });
@@ -200,26 +188,26 @@ describe('TimerSessionService', () => {
         }),
       ];
 
-      timerRepo.find.mockResolvedValue(sessions);
+      timerRepo.findExpiredActive.mockResolvedValue(sessions);
 
-      await service.handleExpiredTimers();
+      await service.processExpiredTimers();
 
       expect(timerRepo.save).toHaveBeenCalledTimes(2);
-      expect(bot.telegram.sendMessage).toHaveBeenCalledTimes(2);
+      expect(notification.send).toHaveBeenCalledTimes(2);
       expect(sessions[0].isActive).toBe(false);
       expect(sessions[1].isActive).toBe(false);
     });
 
     it('не падает если нет истёкших сессий', async () => {
-      timerRepo.find.mockResolvedValue([]);
+      timerRepo.findExpiredActive.mockResolvedValue([]);
 
-      await service.handleExpiredTimers();
+      await service.processExpiredTimers();
 
       expect(timerRepo.save).not.toHaveBeenCalled();
-      expect(bot.telegram.sendMessage).not.toHaveBeenCalled();
+      expect(notification.send).not.toHaveBeenCalled();
     });
 
-    it('продолжает обработку если Telegram API упал', async () => {
+    it('вызывает notification.send для каждой истёкшей сессии', async () => {
       const s1 = makeSession({
         id: 'e1',
         userId: 1,
@@ -227,21 +215,22 @@ describe('TimerSessionService', () => {
       });
       const s2 = makeSession({
         id: 'e2',
-        userId: 1,
+        userId: 2,
         task: { id: 't2', title: 'Задача 2' } as Task,
       });
 
-      timerRepo.find.mockResolvedValue([s1, s2]);
-      bot.telegram.sendMessage
-        .mockRejectedValueOnce(new Error('Telegram API error'))
-        .mockResolvedValueOnce(true);
+      timerRepo.findExpiredActive.mockResolvedValue([s1, s2]);
 
-      await service.handleExpiredTimers();
+      await service.processExpiredTimers();
 
-      expect(s1.isActive).toBe(false);
-      expect(s2.isActive).toBe(false);
-      expect(timerRepo.save).toHaveBeenCalledTimes(2);
-      expect(bot.telegram.sendMessage).toHaveBeenCalledTimes(2);
+      expect(notification.send).toHaveBeenCalledWith(
+        1,
+        '⏰ Таймер по задаче "Задача 1" завершён!',
+      );
+      expect(notification.send).toHaveBeenCalledWith(
+        2,
+        '⏰ Таймер по задаче "Задача 2" завершён!',
+      );
     });
   });
 });

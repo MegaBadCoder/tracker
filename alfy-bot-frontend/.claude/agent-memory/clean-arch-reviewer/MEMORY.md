@@ -8,3 +8,4 @@
 
 ## Architectural Observations
 - [arch_task_feature.md](arch_task_feature.md) — Recurring patterns and violations in the tasks feature
+- [arch_calendar_feature.md](arch_calendar_feature.md) — Calendar feature layer structure, two-DnD-system coexistence, cross-day pointer DnD proposal

@@ -42,11 +42,20 @@
             :class="['gap-1.5 cursor-pointer transition-colors duration-150', form.dueDate && 'text-primary border-primary/30 bg-primary/5']"
           >
             <CalendarIcon :size="14" />
-            {{ form.dueDate ? formatDate(form.dueDate, 'MMM d') : 'Дата' }}
+            {{ form.dueDate ? formatDueDate(form.dueDate) : 'Дата' }}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-auto p-0" align="start">
-          <Calendar v-model="form.dueDate as any" />
+          <div class="p-3 space-y-3">
+            <Calendar v-model="form.dueDate as any" />
+            <Input
+              v-model="dueDateTime"
+              type="time"
+              class="w-full"
+              placeholder="Время (необязательно)"
+              @change="onDueDateTimeChange"
+            />
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -218,6 +227,7 @@ import {
 import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import type { Task } from '../model/types'
 import { formatDate } from '../lib/formatters'
+import { updateDeadlineTime } from '../lib/dateTime'
 import { getPriorityColor } from '../lib/priority'
 import TagsEditor from './TagsEditor.vue'
 import PriorityPicker from './PriorityPicker.vue'
@@ -258,6 +268,35 @@ const form = reactive<TaskFormData>({
   longBreakInterval: POMODORO_DEFAULTS.longBreakInterval,
 })
 
+const dueDateTime = ref('')
+
+function formatDueDate(value: unknown): string {
+  let date: Date
+  if (value instanceof Date) {
+    date = value
+  } else if (typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value) {
+    const v = value as { year: number; month: number; day: number; hour?: number; minute?: number }
+    date = new Date(v.year, v.month - 1, v.day, v.hour ?? 0, v.minute ?? 0)
+  } else {
+    return ''
+  }
+  const h = date.getHours()
+  const m = date.getMinutes()
+  if (h === 0 && m === 0) return formatDate(date, 'd MMM')
+  return formatDate(date, 'd MMM HH:mm')
+}
+
+function onDueDateTimeChange() {
+  if (!form.dueDate || !dueDateTime.value) return
+  const d = form.dueDate as any
+  if (typeof d === 'object' && 'set' in d) {
+    const parts = dueDateTime.value.split(':')
+    form.dueDate = d.set({ hour: parseInt(parts[0] ?? '0'), minute: parseInt(parts[1] ?? '0') })
+  } else {
+    form.dueDate = updateDeadlineTime(form.dueDate, dueDateTime.value)
+  }
+}
+
 const expanded = ref(false)
 const titleInputRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
 
@@ -265,6 +304,7 @@ const resetForm = () => {
   form.title = ''
   form.description = ''
   form.dueDate = undefined
+  dueDateTime.value = ''
   form.deadline = undefined
   form.priority = undefined
   form.tags = []

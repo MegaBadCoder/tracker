@@ -2,6 +2,7 @@ import { createPinia } from 'pinia'
 import { registerSW } from 'virtual:pwa-register'
 import { createApp } from 'vue'
 import { authorize } from './api/auth'
+import { initPushSubscription } from './composables/usePushSubscription'
 import App from './App.vue'
 import router from './router'
 import './style.css'
@@ -23,6 +24,8 @@ async function bootstrap() {
   }
 
   createApp(App).use(createPinia()).use(router).mount('#app')
+
+  initPushSubscription().catch(() => {})
 }
 
 bootstrap()

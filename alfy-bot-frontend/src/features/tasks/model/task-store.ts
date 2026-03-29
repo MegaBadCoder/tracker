@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { Task, ChecklistItem } from '../model/types'
+import type { Task, ChecklistItem } from './types'
 
 function serializeDate(value: unknown): string | undefined {
   if (!value) return undefined
@@ -49,7 +50,7 @@ function parseTask(raw: Record<string, unknown>): Task {
   } as Task
 }
 
-export function useTasks() {
+export const useTaskStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -116,7 +117,6 @@ export function useTasks() {
       const updatedTask = parseTask(data)
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
-        // Preserve local checklist state (managed via dedicated PUT endpoint)
         tasks.value[index] = { ...updatedTask, checklist: tasks.value[index]?.checklist }
       }
       return updatedTask
@@ -245,4 +245,4 @@ export function useTasks() {
     updateChecklist,
     updatePomodoroConfig,
   }
-}
+})
