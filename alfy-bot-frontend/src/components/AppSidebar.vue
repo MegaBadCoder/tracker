@@ -1,44 +1,26 @@
 <script setup lang="ts">
-import { Target, ListChecks, CheckSquare, CalendarDays } from 'lucide-vue-next'
-import { RouterLink, useRoute } from 'vue-router'
+import UserSection from './UserSection.vue'
+import SidebarNav from './SidebarNav.vue'
+import type { NavLink } from '@/types/navigation'
+import { navLinks } from '@/router/nav'
 
 defineProps<{
   open: boolean
+  links?: NavLink[]
 }>()
 
 const emit = defineEmits<{
   close: []
 }>()
-
-const route = useRoute()
-
-const links = [
-  { to: '/', label: 'Цели', icon: Target },
-  { to: '/habits', label: 'Привычки', icon: ListChecks },
-  { to: '/tasks', label: 'Задачи', icon: CheckSquare },
-  { to: '/calendar', label: 'Календарь', icon: CalendarDays },
-]
 </script>
 
 <template>
   <!-- Desktop sidebar -->
   <aside class="hidden sm:flex flex-col w-52 flex-shrink-0 border-r border-sidebar-border bg-sidebar h-screen sticky top-0">
     <div class="p-4 pt-5">
-      <nav class="flex flex-col gap-1">
-        <RouterLink
-          v-for="link in links"
-          :key="link.to"
-          :to="link.to"
-          class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="route.path === link.to
-            ? 'bg-sidebar-accent text-sidebar-primary'
-            : 'text-sidebar-foreground hover:bg-sidebar-accent/50'"
-        >
-          <component :is="link.icon" class="w-5 h-5" />
-          {{ link.label }}
-        </RouterLink>
-      </nav>
+      <UserSection :links="navLinks" />
     </div>
+    <SidebarNav v-if="links?.length" :links="links" />
   </aside>
 
   <!-- Mobile overlay -->
@@ -50,22 +32,9 @@ const links = [
         <!-- panel -->
         <aside class="absolute left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border shadow-lg">
           <div class="p-4 pt-5">
-            <nav class="flex flex-col gap-1">
-              <RouterLink
-                v-for="link in links"
-                :key="link.to"
-                :to="link.to"
-                class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                :class="route.path === link.to
-                  ? 'bg-sidebar-accent text-sidebar-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'"
-                @click="emit('close')"
-              >
-                <component :is="link.icon" class="w-5 h-5" />
-                {{ link.label }}
-              </RouterLink>
-            </nav>
+            <UserSection :links="navLinks" />
           </div>
+          <SidebarNav v-if="links?.length" :links="links" />
         </aside>
       </div>
     </Transition>

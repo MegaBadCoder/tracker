@@ -2,8 +2,10 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authorize, authorizeWithWidget } from '../api/auth'
+import { useUserStore } from '@/stores/user-store'
 
 const router = useRouter()
+const userStore = useUserStore()
 const error = ref<string | null>(null)
 const widgetContainer = ref<HTMLDivElement>()
 
@@ -15,7 +17,8 @@ onMounted(async () => {
   if (tg?.initData) {
     try {
       tg.ready()
-      await authorize()
+      const { user } = await authorize()
+      if (user) userStore.setUser(user)
       router.replace('/')
       return
     } catch {
@@ -23,9 +26,10 @@ onMounted(async () => {
     }
   }
 
-  window.onTelegramAuth = async (user: TelegramLoginWidgetUser) => {
+  window.onTelegramAuth = async (tgUser: TelegramLoginWidgetUser) => {
     try {
-      await authorizeWithWidget(user)
+      const { user } = await authorizeWithWidget(tgUser)
+      if (user) userStore.setUser(user)
       router.replace('/')
     } catch {
       error.value = 'Ошибка авторизации'

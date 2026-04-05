@@ -200,20 +200,30 @@
 
           <!-- Срок (dueDate) -->
           <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
-                <div class="flex items-center gap-2 mb-1">
-                  <CalendarIcon :size="13" class="text-muted-foreground/60" />
-                  <span class="text-[11px] text-muted-foreground/60 font-medium">Срок</span>
-                </div>
-                <div :class="['text-[13px] truncate', URGENCY_CLASSES[getDueDateUrgency(localDueDate)] || (localDueDate ? '' : 'text-muted-foreground/40')]">
-                  {{ localDueDate ? formatDueDate(localDueDate) : 'Не задано' }}
-                </div>
+            <div class="relative border-b border-border/40">
+              <DropdownMenuTrigger as-child>
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                  <div class="flex items-center gap-2 mb-1">
+                    <CalendarIcon :size="13" class="text-muted-foreground/60" />
+                    <span class="text-[11px] text-muted-foreground/60 font-medium">Срок</span>
+                  </div>
+                  <div :class="['text-[13px] truncate', URGENCY_CLASSES[getDueDateUrgency(localDueDate)] || (localDueDate ? '' : 'text-muted-foreground/40')]">
+                    {{ localDueDate ? formatDueDate(localDueDate, { includeYear: true }) : 'Не задано' }}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <button
+                v-if="editable && localDueDate"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Очистить дату"
+                @click.stop="localDueDate = undefined; localDueTime = ''"
+              >
+                <X :size="14" />
               </button>
-            </DropdownMenuTrigger>
+            </div>
             <DropdownMenuContent class="w-auto p-0" align="start">
               <div class="p-3 space-y-3">
-                <Calendar v-model="localDueDate as any" />
+                <Calendar :model-value="dueDateCalendarValue" @update:model-value="onDueDateCalendarChange" />
                 <Input
                   v-model="localDueTime"
                   type="time"
@@ -227,17 +237,27 @@
 
           <!-- Дедлайн -->
           <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
-                <div class="flex items-center gap-2 mb-1">
-                  <Clock :size="13" class="text-muted-foreground/60" />
-                  <span class="text-[11px] text-muted-foreground/60 font-medium">Дедлайн</span>
-                </div>
-                <div :class="['text-[13px] truncate', localDeadline ? '' : 'text-muted-foreground/40']">
-                  {{ localDeadline ? formatDate(localDeadline, 'd MMM, HH:mm') : 'Не задано' }}
-                </div>
+            <div class="relative border-b border-border/40">
+              <DropdownMenuTrigger as-child>
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                  <div class="flex items-center gap-2 mb-1">
+                    <Clock :size="13" class="text-muted-foreground/60" />
+                    <span class="text-[11px] text-muted-foreground/60 font-medium">Дедлайн</span>
+                  </div>
+                  <div :class="['text-[13px] truncate', localDeadline ? '' : 'text-muted-foreground/40']">
+                    {{ localDeadline ? formatDate(localDeadline, DATE_WITH_TIME) : 'Не задано' }}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <button
+                v-if="editable && localDeadline"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Очистить дедлайн"
+                @click.stop="localDeadline = undefined"
+              >
+                <X :size="14" />
               </button>
-            </DropdownMenuTrigger>
+            </div>
             <DeadlinePicker
               :model-value="localDeadline"
               @update:model-value="localDeadline = $event"
@@ -246,17 +266,27 @@
 
           <!-- Приоритет -->
           <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
-                <div class="flex items-center gap-2 mb-1">
-                  <Flag :size="13" :class="localPriority ? getPriorityColor(localPriority) : 'text-muted-foreground/60'" />
-                  <span class="text-[11px] text-muted-foreground/60 font-medium">Приоритет</span>
-                </div>
-                <div :class="['text-[13px] truncate', localPriority ? '' : 'text-muted-foreground/40']">
-                  {{ localPriority ? PRIORITY_LABELS[localPriority] : 'Не задано' }}
-                </div>
+            <div class="relative border-b border-border/40">
+              <DropdownMenuTrigger as-child>
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                  <div class="flex items-center gap-2 mb-1">
+                    <Flag :size="13" :class="localPriority ? getPriorityColor(localPriority) : 'text-muted-foreground/60'" />
+                    <span class="text-[11px] text-muted-foreground/60 font-medium">Приоритет</span>
+                  </div>
+                  <div :class="['text-[13px] truncate', localPriority ? '' : 'text-muted-foreground/40']">
+                    {{ localPriority ? PRIORITY_LABELS[localPriority] : 'Не задано' }}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <button
+                v-if="editable && localPriority"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Очистить приоритет"
+                @click.stop="localPriority = undefined; emitUpdate({ priority: undefined })"
+              >
+                <X :size="14" />
               </button>
-            </DropdownMenuTrigger>
+            </div>
             <PriorityPicker
               :model-value="localPriority"
               @update:model-value="localPriority = $event; emitUpdate({ priority: $event })"
@@ -265,17 +295,27 @@
 
           <!-- Место -->
           <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
-                <div class="flex items-center gap-2 mb-1">
-                  <MapPin :size="13" class="text-muted-foreground/60" />
-                  <span class="text-[11px] text-muted-foreground/60 font-medium">Место</span>
-                </div>
-                <div :class="['text-[13px] truncate', localLocation ? '' : 'text-muted-foreground/40']">
-                  {{ localLocation || 'Не задано' }}
-                </div>
+            <div class="relative border-b border-border/40">
+              <DropdownMenuTrigger as-child>
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                  <div class="flex items-center gap-2 mb-1">
+                    <MapPin :size="13" class="text-muted-foreground/60" />
+                    <span class="text-[11px] text-muted-foreground/60 font-medium">Место</span>
+                  </div>
+                  <div :class="['text-[13px] truncate', localLocation ? '' : 'text-muted-foreground/40']">
+                    {{ localLocation || 'Не задано' }}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <button
+                v-if="editable && localLocation"
+                class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Очистить место"
+                @click.stop="localLocation = ''; emitUpdate({ location: undefined })"
+              >
+                <X :size="14" />
               </button>
-            </DropdownMenuTrigger>
+            </div>
             <DropdownMenuContent class="w-56" align="start">
               <div class="p-3">
                 <Input
@@ -390,8 +430,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate, formatPomodoro } from '../lib/formatters'
-import { getTimeString, updateDeadlineTime } from '../lib/dateTime'
+import { formatDate, formatDueDate, formatPomodoro, DATE_WITH_TIME } from '../lib/formatters'
+import { toDate, toCalendarDateValue, getTimeString, updateDeadlineTime } from '../lib/dateTime'
 import type { Priority } from '../model/types'
 import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
@@ -479,11 +519,15 @@ watch(() => props.task, (task) => {
   }
 }, { immediate: true })
 
-function formatDueDate(date: Date): string {
-  const h = date.getHours()
-  const m = date.getMinutes()
-  if (h === 0 && m === 0) return formatDate(date, 'd MMM yyyy')
-  return formatDate(date, 'd MMM yyyy, HH:mm')
+const dueDateCalendarValue = computed(() => toCalendarDateValue(localDueDate.value))
+
+function onDueDateCalendarChange(val: any) {
+  const date = toDate(val)
+  if (date && localDueTime.value) {
+    localDueDate.value = updateDeadlineTime(date, localDueTime.value)
+  } else {
+    localDueDate.value = date
+  }
 }
 
 function onDueTimeChange() {

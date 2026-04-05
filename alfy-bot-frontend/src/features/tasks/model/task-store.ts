@@ -2,27 +2,12 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
 import type { Task, ChecklistItem } from './types'
+import { toDate } from '../lib/dateTime'
 
 function serializeDate(value: unknown): string | undefined {
-  if (!value) return undefined
-  if (value instanceof Date) return value.toISOString()
-  if (typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value) {
-    const v = value as { year: number; month: number; day: number; hour?: number; minute?: number }
-    const d = new Date(v.year, v.month - 1, v.day, v.hour ?? 0, v.minute ?? 0)
-    return d.toISOString()
-  }
+  const date = toDate(value)
+  if (date) return date.toISOString()
   if (typeof value === 'string') return value
-  return undefined
-}
-
-function parseDateValue(value: unknown): Date | undefined {
-  if (!value) return undefined
-  if (value instanceof Date) return value
-  if (typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value) {
-    const v = value as { year: number; month: number; day: number; hour?: number; minute?: number }
-    return new Date(v.year, v.month - 1, v.day, v.hour ?? 0, v.minute ?? 0)
-  }
-  if (typeof value === 'string') return new Date(value)
   return undefined
 }
 
@@ -77,8 +62,8 @@ export const useTaskStore = defineStore('tasks', () => {
       id: tempId,
       completed: false,
       pomodoroCompleted: 0,
-      dueDate: parseDateValue(taskData.dueDate),
-      deadline: parseDateValue(taskData.deadline),
+      dueDate: toDate(taskData.dueDate),
+      deadline: toDate(taskData.deadline),
     }
 
     tasks.value.unshift(tempTask)

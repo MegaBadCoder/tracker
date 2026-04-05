@@ -34,4 +34,18 @@ export abstract class TaskRepositoryPort {
     task: Task,
     data: Partial<PomodoroConfig> | null,
   ): Promise<Task>;
+  abstract findAllByProject(
+    userId: number,
+    projectId: string | null,
+  ): Promise<Task[]>;
+  abstract updatePosition(
+    taskId: string,
+    userId: number,
+    projectId: string | null,
+    columnId: string | null,
+    order: number,
+  ): Promise<Task | null>;
+  abstract reorderTasks(
+    updates: { id: string; order: number }[],
+  ): Promise<void>;
 }

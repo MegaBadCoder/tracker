@@ -1,7 +1,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { TimerSettings, TimerSession, PhaseInfo, SessionState, Task } from '../types'
+import type { TimerSettings, TimerSession, PhaseInfo, SessionState, Task, TimerSWMessage } from '../types'
 import { useSounds } from '@/composables/useSounds'
 
 const DEFAULT_SETTINGS = (): TimerSettings => ({
@@ -13,14 +13,23 @@ const DEFAULT_SETTINGS = (): TimerSettings => ({
   taskId: null
 })
 
+function sendToSW(message: TimerSWMessage): void {
+  if (!('serviceWorker' in navigator)) return
+  navigator.serviceWorker.ready.then(reg => {
+    reg.active?.postMessage(message)
+  })
+}
+
 export const useTimerStore = defineStore('timer', () => {
   const currentSettings: Ref<TimerSettings> = ref(DEFAULT_SETTINGS())
   const isActive = ref(false)
   const phase = ref(0)
   const timeBlock = ref(0)
   const namePhase = ref('')
+  const expiresAt: Ref<number | null> = ref(null)
   const timerInterval: Ref<ReturnType<typeof setInterval> | null> = ref(null)
   const { play: playSound } = useSounds()
+  let swListenerRegistered = false
 
   const checkPhase = {
     isWorkPhase: (phaseNumber: number): boolean => phaseNumber % 2 === 1,
@@ -80,22 +89,44 @@ export const useTimerStore = defineStore('timer', () => {
     if (isActive.value) return
 
     isActive.value = true
+    expiresAt.value = Date.now() + timeBlock.value * 1000
+
+    registerSWListener()
+    requestNotificationPermission()
+
+    const timerId = currentSettings.value.taskId || 'pomodoro'
+    sendToSW({
+      type: 'TIMER_START',
+      data: { id: timerId, expiresAt: expiresAt.value, phaseName: namePhase.value },
+    })
 
     timerInterval.value = setInterval(() => {
-      if (timeBlock.value <= 0) {
+      if (!expiresAt.value) return
+      const remaining = Math.ceil((expiresAt.value - Date.now()) / 1000)
+      if (remaining <= 0) {
         stopTimeBlock(true)
       } else {
-        timeBlock.value--
+        timeBlock.value = remaining
         updateTitle()
       }
     }, 1000)
   }
 
   function pauseTimer(): void {
+    if (expiresAt.value) {
+      timeBlock.value = Math.max(0, Math.ceil((expiresAt.value - Date.now()) / 1000))
+    }
+    expiresAt.value = null
     isActive.value = false
+
     if (timerInterval.value) {
       clearInterval(timerInterval.value)
+      timerInterval.value = null
     }
+
+    const timerId = currentSettings.value.taskId || 'pomodoro'
+    sendToSW({ type: 'TIMER_PAUSE', data: { id: timerId } })
+
     syncToBackend()
   }
 
@@ -105,6 +136,10 @@ export const useTimerStore = defineStore('timer', () => {
       timerInterval.value = null
     }
     isActive.value = false
+    expiresAt.value = null
+
+    const timerId = currentSettings.value.taskId || 'pomodoro'
+    sendToSW({ type: 'TIMER_STOP', data: { id: timerId } })
 
     if (shouldPlaySound) {
       const isWorkEnd = checkPhase.isWorkPhase(phase.value)
@@ -192,6 +227,8 @@ export const useTimerStore = defineStore('timer', () => {
   }
 
   async function restoreSession(): Promise<void> {
+    registerSWListener()
+
     try {
       const { data: session } = await api.get('/tasks/timer')
       if (!session) return
@@ -263,7 +300,7 @@ export const useTimerStore = defineStore('timer', () => {
     namePhase.value = getPhaseInfo(session.phase).name
     timeBlock.value = remainingTime
     updateTitle()
-    startTimer()
+    startTimer() // sets expiresAt and arms SW
   }
 
   function restoreExpiredSession(session: TimerSession): void {
@@ -287,7 +324,11 @@ export const useTimerStore = defineStore('timer', () => {
       timerInterval.value = null
     }
 
+    const timerId = currentSettings.value.taskId || 'pomodoro'
+    sendToSW({ type: 'TIMER_STOP', data: { id: timerId } })
+
     isActive.value = false
+    expiresAt.value = null
     phase.value = 0
     timeBlock.value = 0
     namePhase.value = ''
@@ -316,6 +357,43 @@ export const useTimerStore = defineStore('timer', () => {
     nextPhase()
   }
 
+  function registerSWListener(): void {
+    if (swListenerRegistered || !('serviceWorker' in navigator)) return
+    swListenerRegistered = true
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'TIMER_PHASE_END' && phase.value > 0 && isActive.value) {
+        stopTimeBlock(true)
+      }
+    })
+  }
+
+  function ensureSWTimer(): void {
+    if (!isActive.value || !expiresAt.value) return
+    const timerId = currentSettings.value.taskId || 'pomodoro'
+    sendToSW({
+      type: 'TIMER_START',
+      data: { id: timerId, expiresAt: expiresAt.value, phaseName: namePhase.value },
+    })
+  }
+
+  function recalcTimeBlock(): void {
+    if (!expiresAt.value) return
+    const remaining = Math.ceil((expiresAt.value - Date.now()) / 1000)
+    if (remaining <= 0) {
+      stopTimeBlock(true)
+    } else {
+      timeBlock.value = remaining
+      updateTitle()
+    }
+  }
+
+  function requestNotificationPermission(): void {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }
+
   const isBreakPhase = computed(() => checkPhase.isBreakPhase(phase.value))
 
   return {
@@ -338,6 +416,8 @@ export const useTimerStore = defineStore('timer', () => {
     startTask,
     formatTime,
     isBreakPhase,
-    checkPhase
+    checkPhase,
+    ensureSWTimer,
+    recalcTimeBlock,
   }
 })

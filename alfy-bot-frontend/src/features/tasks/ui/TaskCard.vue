@@ -43,7 +43,7 @@
           variant="outline"
           class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
         >
-          <Flag :size="11" :class="priorityIconColor" />
+          <Flag :size="11" :class="task.priority && getPriorityColor(task.priority)" />
           {{ PRIORITY_LABELS[task.priority] }}
         </Badge>
         <Badge
@@ -52,7 +52,7 @@
           class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
         >
           <CalendarIcon :size="11" />
-          {{ formatDate(task.dueDate, 'd MMM') }}
+          {{ formatDate(task.dueDate, DATE_SHORT) }}
         </Badge>
         <Badge
           v-if="task.deadline"
@@ -60,7 +60,7 @@
           class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
         >
           <Clock :size="11" />
-          {{ formatDate(task.deadline, 'd MMM, HH:mm') }}
+          {{ formatDate(task.deadline, DATE_WITH_TIME) }}
         </Badge>
         <Badge
           v-if="task.location"
@@ -117,22 +117,14 @@ import { computed } from 'vue'
 import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, MapPin, Timer, Trash2 } from 'lucide-vue-next'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import { Badge } from '@/components/ui/badge'
-import { formatDate, formatPomodoro } from '../lib/formatters'
+import { formatDate, formatPomodoro, DATE_SHORT, DATE_WITH_TIME } from '../lib/formatters'
 import { computeChecklistProgress } from '../lib/checklist'
+import { getPriorityColor } from '../lib/priority'
 import { PRIORITY_LABELS } from '../model/constants'
 import type { TaskCardProps, TaskCardEmits } from '../model/types'
 
 const props = defineProps<TaskCardProps>()
 defineEmits<TaskCardEmits>()
-
-const priorityIconColor = computed(() => {
-  const colors = {
-    high: 'text-red-500',
-    medium: 'text-yellow-500',
-    low: 'text-green-500',
-  }
-  return props.task.priority ? colors[props.task.priority] : ''
-})
 
 const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
 const checklistTotal = computed(() => checklistStats.value.total)

@@ -20,13 +20,20 @@ const router = createRouter({
         },
         {
           path: 'tasks',
-          name: 'tasks',
-          component: () => import('../views/TasksView.vue'),
-        },
-        {
-          path: 'calendar',
-          name: 'calendar',
-          component: () => import('../views/CalendarView.vue'),
+          component: () => import('../views/TasksLayout.vue'),
+          meta: { sectionNav: 'tasks' },
+          children: [
+            {
+              path: '',
+              name: 'tasks',
+              component: () => import('../views/TasksView.vue'),
+            },
+            {
+              path: 'calendar',
+              name: 'tasks-calendar',
+              component: () => import('../views/CalendarView.vue'),
+            },
+          ],
         },
         {
           path: 'goals/:id',

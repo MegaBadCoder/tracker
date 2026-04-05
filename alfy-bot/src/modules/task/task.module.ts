@@ -36,6 +36,6 @@ import { TaskController } from './task.controller';
     TimerSessionService,
     TimerExpiryScheduler,
   ],
-  exports: [TaskService],
+  exports: [TaskService, TaskRepositoryPort],
 })
 export class TaskModule {}

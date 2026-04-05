@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Task, PomodoroConfig } from '../../../shared/entities';
 import {
   TaskRepositoryPort,
@@ -95,5 +95,41 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
       task.pomodoroConfig = await this.pomodoroRepo.save(config);
     }
     return task;
+  }
+
+  async findAllByProject(
+    userId: number,
+    projectId: string | null,
+  ): Promise<Task[]> {
+    return this.taskRepo.find({
+      where: { userId, projectId: projectId === null ? IsNull() : projectId },
+      relations: ['pomodoroConfig'],
+      order: { order: 'ASC', createdAt: 'DESC' },
+    });
+  }
+
+  async updatePosition(
+    taskId: string,
+    userId: number,
+    projectId: string | null,
+    columnId: string | null,
+    order: number,
+  ): Promise<Task | null> {
+    const task = await this.findById(taskId, userId);
+    if (!task) return null;
+    task.projectId = projectId;
+    task.columnId = columnId;
+    task.order = order;
+    return this.taskRepo.save(task);
+  }
+
+  async reorderTasks(
+    updates: { id: string; order: number }[],
+  ): Promise<void> {
+    await Promise.all(
+      updates.map(({ id, order }) =>
+        this.taskRepo.update(id, { order }),
+      ),
+    );
   }
 }

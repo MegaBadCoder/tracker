@@ -61,6 +61,53 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
       timers.delete(id)
     }
   }
+
+  if (payload.type === 'TIMER_START' && payload.data) {
+    const { id, expiresAt, phaseName } = payload.data as {
+      id: string; expiresAt: number; phaseName: string
+    }
+    if (!id || !expiresAt) return
+
+    const existing = timers.get(id)
+    if (existing) clearTimeout(existing)
+
+    const delay = Math.max(0, expiresAt - Date.now())
+    const handle = setTimeout(async () => {
+      timers.delete(id)
+      void self.registration.showNotification(phaseName, {
+        body: 'Время вышло!',
+        tag: id,
+        icon: '/pwa-192x192.png',
+        vibrate: [200, 100, 200],
+        data: { id },
+        actions: [
+          { action: 'open', title: 'Открыть' },
+          { action: 'dismiss', title: 'Закрыть' },
+        ],
+      })
+      const clients = await self.clients.matchAll({ type: 'window' })
+      for (const client of clients) {
+        client.postMessage({ type: 'TIMER_PHASE_END', data: { id } })
+      }
+    }, delay)
+    timers.set(id, handle)
+  }
+
+  if (payload.type === 'TIMER_PAUSE' && payload.data?.id) {
+    const t = timers.get(payload.data.id)
+    if (t) {
+      clearTimeout(t)
+      timers.delete(payload.data.id)
+    }
+  }
+
+  if (payload.type === 'TIMER_STOP' && payload.data?.id) {
+    const t = timers.get(payload.data.id)
+    if (t) {
+      clearTimeout(t)
+      timers.delete(payload.data.id)
+    }
+  }
 })
 
 self.addEventListener('notificationclick', (event) => {

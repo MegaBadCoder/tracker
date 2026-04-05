@@ -101,7 +101,7 @@ Examples of what to record:
 
 # Persistent Agent Memory
 
-You have a persistent, file-based memory system at `/Users/v/projects/Alfy/.claude/agent-memory/clean-arch-reviewer/`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence).
+You have a persistent, file-based memory system at `/Users/v/projects/Alfy/.claude/agent-memory/clean-arch-reviewer/`. This directory already exists — write to it directly with the Write tool.
 
 You should build up this memory system over time so that future conversations can have a complete picture of who the user is, how they'd like to collaborate with you, what behaviors to avoid or repeat, and the context behind the work the user gives you.
 
@@ -192,13 +192,16 @@ type: {{user, feedback, project, reference}}
 {{memory content — for feedback/project types, structure as: rule/fact, then **Why:** and **How to apply:** lines}}
 ```
 
-**Step 2** — add a pointer to that file in `MEMORY.md`. `MEMORY.md` is an index, not a memory — it should contain only links to memory files with brief descriptions. It has no frontmatter. Never write memory content directly into `MEMORY.md`.
+**Step 2** — add a pointer to that file in `MEMORY.md`. `MEMORY.md` is an index, not a memory — it should contain only links to memory files with brief descriptions. It has no frontmatter.
 
 - `MEMORY.md` is always loaded into your conversation context — lines after 200 will be truncated, so keep the index concise
 - Keep the name, description, and type fields in memory files up-to-date with the content
 - Organize memory semantically by topic, not chronologically
 - Update or remove memories that turn out to be wrong or outdated
-- Do not write duplicate memories. First check if there is an existing memory you can update before writing a new one.
+- Prefer updating an existing memory before writing a new one.
+
+## Command safety
+- Do not run `rm -rf`.
 
 ## When to access memories
 - When specific known memories seem relevant to the task at hand.

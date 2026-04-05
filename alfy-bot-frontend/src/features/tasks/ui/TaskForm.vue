@@ -43,11 +43,20 @@
           >
             <CalendarIcon :size="14" />
             {{ form.dueDate ? formatDueDate(form.dueDate) : 'Дата' }}
+            <span
+              v-if="form.dueDate"
+              class="ml-1 shrink-0 p-0.5 rounded-sm opacity-60 hover:opacity-100 hover:bg-primary/10 transition-all cursor-pointer"
+              role="button"
+              aria-label="Очистить дату"
+              @click.stop.prevent="form.dueDate = undefined; dueDateTime = ''"
+            >
+              <X :size="14" />
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-auto p-0" align="start">
           <div class="p-3 space-y-3">
-            <Calendar v-model="form.dueDate as any" />
+            <Calendar :model-value="dueDateCalendarValue" @update:model-value="onDueDateCalendarChange" />
             <Input
               v-model="dueDateTime"
               type="time"
@@ -68,7 +77,16 @@
             :class="['gap-1.5 cursor-pointer transition-colors duration-150', form.deadline && 'text-orange-600 border-orange-300/50 bg-orange-50 dark:text-orange-400 dark:border-orange-500/30 dark:bg-orange-500/10']"
           >
             <Clock :size="14" />
-            {{ form.deadline ? formatDate(form.deadline, 'MMM d, HH:mm') : 'Дедлайн' }}
+            {{ form.deadline ? formatDate(form.deadline, DATE_WITH_TIME) : 'Дедлайн' }}
+            <span
+              v-if="form.deadline"
+              class="ml-1 shrink-0 p-0.5 rounded-sm opacity-60 hover:opacity-100 hover:bg-orange-500/10 transition-all cursor-pointer"
+              role="button"
+              aria-label="Очистить дедлайн"
+              @click.stop.prevent="form.deadline = undefined"
+            >
+              <X :size="14" />
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DeadlinePicker
@@ -87,6 +105,15 @@
           >
             <Flag :size="14" :class="form.priority && getPriorityColor(form.priority)" />
             {{ form.priority ? PRIORITY_LABELS[form.priority] : 'Приоритет' }}
+            <span
+              v-if="form.priority"
+              class="ml-1 shrink-0 p-0.5 rounded-sm opacity-60 hover:opacity-100 hover:bg-muted transition-all cursor-pointer"
+              role="button"
+              aria-label="Очистить приоритет"
+              @click.stop.prevent="form.priority = undefined"
+            >
+              <X :size="14" />
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <PriorityPicker
@@ -105,6 +132,15 @@
           >
             <Tag :size="14" />
             {{ form.tags.length > 0 ? `Теги (${form.tags.length})` : 'Теги' }}
+            <span
+              v-if="form.tags.length > 0"
+              class="ml-1 shrink-0 p-0.5 rounded-sm opacity-60 hover:opacity-100 hover:bg-violet-500/10 transition-all cursor-pointer"
+              role="button"
+              aria-label="Очистить теги"
+              @click.stop.prevent="form.tags = []"
+            >
+              <X :size="14" />
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-64" align="start">
@@ -125,6 +161,15 @@
           >
             <MapPin :size="14" />
             {{ form.location || 'Место' }}
+            <span
+              v-if="form.location"
+              class="ml-1 shrink-0 p-0.5 rounded-sm opacity-60 hover:opacity-100 hover:bg-emerald-500/10 transition-all cursor-pointer"
+              role="button"
+              aria-label="Очистить место"
+              @click.stop.prevent="form.location = ''"
+            >
+              <X :size="14" />
+            </span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-56" align="start">
@@ -205,7 +250,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, toRaw, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, computed, toRaw, onMounted, onUnmounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ContentEditableInput } from '@/components/ui/content-editable-input'
@@ -223,11 +268,12 @@ import {
   Tag,
   MapPin,
   Timer,
+  X,
 } from 'lucide-vue-next'
 import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import type { Task } from '../model/types'
-import { formatDate } from '../lib/formatters'
-import { updateDeadlineTime } from '../lib/dateTime'
+import { formatDate, formatDueDate, DATE_WITH_TIME } from '../lib/formatters'
+import { toDate, toCalendarDateValue, updateDeadlineTime } from '../lib/dateTime'
 import { getPriorityColor } from '../lib/priority'
 import TagsEditor from './TagsEditor.vue'
 import PriorityPicker from './PriorityPicker.vue'
@@ -270,31 +316,20 @@ const form = reactive<TaskFormData>({
 
 const dueDateTime = ref('')
 
-function formatDueDate(value: unknown): string {
-  let date: Date
-  if (value instanceof Date) {
-    date = value
-  } else if (typeof value === 'object' && value !== null && 'year' in value && 'month' in value && 'day' in value) {
-    const v = value as { year: number; month: number; day: number; hour?: number; minute?: number }
-    date = new Date(v.year, v.month - 1, v.day, v.hour ?? 0, v.minute ?? 0)
+const dueDateCalendarValue = computed(() => toCalendarDateValue(form.dueDate))
+
+function onDueDateCalendarChange(val: any) {
+  const date = toDate(val)
+  if (date && dueDateTime.value) {
+    form.dueDate = updateDeadlineTime(date, dueDateTime.value)
   } else {
-    return ''
+    form.dueDate = date
   }
-  const h = date.getHours()
-  const m = date.getMinutes()
-  if (h === 0 && m === 0) return formatDate(date, 'd MMM')
-  return formatDate(date, 'd MMM HH:mm')
 }
 
 function onDueDateTimeChange() {
   if (!form.dueDate || !dueDateTime.value) return
-  const d = form.dueDate as any
-  if (typeof d === 'object' && 'set' in d) {
-    const parts = dueDateTime.value.split(':')
-    form.dueDate = d.set({ hour: parseInt(parts[0] ?? '0'), minute: parseInt(parts[1] ?? '0') })
-  } else {
-    form.dueDate = updateDeadlineTime(form.dueDate, dueDateTime.value)
-  }
+  form.dueDate = updateDeadlineTime(form.dueDate, dueDateTime.value)
 }
 
 const expanded = ref(false)

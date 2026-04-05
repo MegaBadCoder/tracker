@@ -35,3 +35,22 @@ export interface Task {
   longBreakInterval: number
   pomodoroCount: number
 }
+
+// Service Worker message types
+
+export interface TimerStartMessage {
+  type: 'TIMER_START'
+  data: { id: string; expiresAt: number; phaseName: string }
+}
+
+export interface TimerPauseMessage {
+  type: 'TIMER_PAUSE'
+  data: { id: string }
+}
+
+export interface TimerStopMessage {
+  type: 'TIMER_STOP'
+  data: { id: string }
+}
+
+export type TimerSWMessage = TimerStartMessage | TimerPauseMessage | TimerStopMessage

@@ -41,8 +41,14 @@ watch(
 )
 
 document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && isFullscreen.value && store.phase > 0) {
-    await requestWakeLock()
+  if (document.visibilityState === 'visible') {
+    if (store.phase > 0) {
+      store.recalcTimeBlock()
+      store.ensureSWTimer()
+    }
+    if (isFullscreen.value && store.phase > 0) {
+      await requestWakeLock()
+    }
   }
 })
 

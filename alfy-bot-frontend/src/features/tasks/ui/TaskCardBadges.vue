@@ -2,12 +2,12 @@
   <div class="flex flex-wrap gap-2">
     <Badge v-if="dueDate" variant="outline" class="gap-1">
       <Calendar :size="12" />
-      {{ formatDate(dueDate, 'MMM d') }}
+      {{ formatDate(dueDate, DATE_SHORT) }}
     </Badge>
 
     <Badge v-if="deadline" variant="outline" class="gap-1">
       <Clock :size="12" />
-      {{ formatDate(deadline, 'MMM d, HH:mm') }}
+      {{ formatDate(deadline, DATE_WITH_TIME) }}
     </Badge>
 
     <Badge v-if="priority" variant="outline" class="gap-1">
@@ -52,7 +52,7 @@ import {
   Tag,
   Timer
 } from 'lucide-vue-next'
-import { formatDate, formatPomodoro } from '../lib/formatters'
+import { formatDate, formatPomodoro, DATE_SHORT, DATE_WITH_TIME } from '../lib/formatters'
 import type { Priority } from '../model/types'
 
 interface Props {

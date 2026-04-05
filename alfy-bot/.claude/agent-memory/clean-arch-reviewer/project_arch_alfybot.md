@@ -21,4 +21,12 @@ Alfy-bot backend is a NestJS monolith under `/Users/v/projects/Alfy/alfy-bot/src
 - `pomodoroRepo` is injected into `TypeOrmTaskRepository` but only used for the atomic `incrementPomodoroCompleted` operation (uses `Repository.increment` directly). All other PomodoroConfig mutations go through cascade on `taskRepo.save`.
 - Dedicated sub-resource endpoints exist for checklist (`PUT /tasks/:id/checklist`) and pomodoro increment (`PATCH /tasks/:id/pomodoro`), but pomodoro config settings (count, duration, breaks) are bundled into the general `PATCH /tasks/:id` endpoint.
 
+**Project module (added 2026-04-04):**
+- `ProjectModule` imports `TaskModule` (unidirectional — no reverse). `TaskModule` exports both `TaskService` and `TaskRepositoryPort`.
+- `ProjectTaskService` injects `TaskRepositoryPort` directly (correct — using the port, not the concrete repo).
+- Services (`ProjectService`, `ProjectColumnService`) define inline interface DTOs (e.g. `CreateProjectDto`, `UpdateProjectDto`) that duplicate the controller-layer DTO classes in `dto/`. This is a known smell: the service interface types and the class-validator DTO classes are parallel but disconnected.
+- `MoveTaskDto` and `ReorderTasksDto` are correctly class-validator DTO classes living in `dto/`.
+- `task.entity.ts` now imports `Project` and `ProjectColumn` entities from `shared/entities` — cross-entity coupling inside shared is acceptable.
+- Ports (`ProjectRepositoryPort`, `ProjectColumnRepositoryPort`) use the TypeORM entity as the domain type — same deliberate simplification as in `TaskRepositoryPort`.
+
 **Why:** Project is a pragmatic small app. Full entity/domain model separation was traded off for speed. The main tension is in the PomodoroConfig update path.

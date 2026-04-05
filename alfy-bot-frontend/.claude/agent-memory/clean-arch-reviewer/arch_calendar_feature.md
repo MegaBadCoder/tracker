@@ -27,6 +27,12 @@ type: project
 - WeeklyCalendar passes `dayOffset` as a prop to HourGrid (and down to DayColumn) — geometry is shared top-down.
 - `gridRef` is passed from WeeklyCalendar into HourGrid/DayColumn so children can compute scroll-adjusted Y positions.
 
+## Sidebar refactor (2026-04-04): Calendar moved to tasks sub-route
+
+- CalendarView is now at `/tasks/calendar` (nested under TasksLayout, which is a pass-through `<RouterView />`).
+- CalendarView imports AppHeader from `@/components/AppHeader.vue` — that file does not exist. Open build error.
+- AppLayout resolves section-specific nav links by checking `route.path.startsWith('/tasks')` and importing tasksNavLinks directly. Adding new sections requires editing AppLayout.
+
 ## Proposed cross-day pointer DnD
 
 - Proposed: CalendarEventBlock emits `grab`, HourGrid captures pointer + renders overlay.

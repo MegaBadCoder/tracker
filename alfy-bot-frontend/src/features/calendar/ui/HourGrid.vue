@@ -104,7 +104,7 @@ const emit = defineEmits<{
 
 const trackRef = ref<HTMLElement | null>(null)
 
-const { isDragging, showOverlay, draggedTaskId, draggedEvent, overlayStyle, overlayHeight, overlayTimeLabel, onGrab } = usePointerDnd({
+const { showOverlay, draggedTaskId, draggedEvent, overlayStyle, overlayHeight, overlayTimeLabel, onGrab } = usePointerDnd({
   trackEl: trackRef,
   dayOffset: (d: Date) => props.dayOffset(d),
   dateFromX: (x: number) => props.dateFromX(x),

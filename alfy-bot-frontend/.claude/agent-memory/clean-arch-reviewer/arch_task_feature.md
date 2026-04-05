@@ -38,6 +38,29 @@ type: project
 ### ChecklistItem ID generation in UI
 - `crypto.randomUUID()` called in TaskDetailDialog.vue (line 558) when creating ChecklistItem. ID generation is an application concern. Extract `createChecklistItem(text: string): ChecklistItem` to lib/ or model/.
 
+## Sidebar refactor (2026-04-04): new shared infrastructure files
+
+### src/stores/user-store.ts (Application layer)
+- Violation: accesses `window.Telegram?.WebApp?.initDataUnsafe?.user` at construction time — SDK reference at application layer.
+- Violation: reads/writes localStorage directly inside store methods — infrastructure concern not abstracted.
+- Fix direction: move Telegram bootstrap to main.ts/bootstrap.ts; pass profile in. Optionally abstract storage behind a port.
+
+### src/api/auth.ts (Infrastructure layer)
+- Violation: calls `useUserStore().setUser()` directly after login — infrastructure mutating application state.
+- Fix: return user profile data from authorize() functions; let the caller populate the store.
+
+### src/components/UserSection.vue (Presentation)
+- Imports navLinks from @/router/nav (infrastructure). Should receive links as a prop instead.
+
+### src/components/SidebarNav.vue (Presentation)
+- Imports NavLink type from @/router/nav. Should import from src/types/ once NavLink is moved there.
+
+### src/router/nav.ts + tasks-nav.ts
+- Icon components (Lucide) imported directly into routing infrastructure. Low severity — pragmatic pattern, but these arrays are really UI configuration, not routing rules.
+
+### src/components/AppLayout.vue
+- Hard-codes section-link resolution (`if route.path.startsWith('/tasks') return tasksNavLinks`). Consider route.meta.navLinks pattern as sections grow.
+
 ## Backend (alfy-bot) architectural notes
 
 ### Layer mapping

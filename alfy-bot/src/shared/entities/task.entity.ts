@@ -10,6 +10,8 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PomodoroConfig } from './pomodoro-config.entity';
+import { Project } from './project.entity';
+import { ProjectColumn } from './project-column.entity';
 import type { ChecklistData } from '../../modules/task/domain/task-repository.port';
 
 @Entity('tasks')
@@ -44,6 +46,15 @@ export class Task {
   @Column('simple-json', { nullable: true })
   tags: string[] | null;
 
+  @Column({ type: 'text', nullable: true })
+  projectId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  columnId: string | null;
+
+  @Column({ type: 'integer', default: 0 })
+  order: number;
+
   @Column('simple-json', { nullable: true })
   checklist: ChecklistData | null;
 
@@ -56,6 +67,20 @@ export class Task {
   @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @ManyToOne(() => Project, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'projectId' })
+  project: Project | null;
+
+  @ManyToOne(() => ProjectColumn, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'columnId' })
+  column: ProjectColumn | null;
 
   @OneToOne(() => PomodoroConfig, (config) => config.task, {
     cascade: true,

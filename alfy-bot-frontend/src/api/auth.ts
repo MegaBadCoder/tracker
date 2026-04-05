@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { UserProfile } from '@/types/user'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002'
 const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID
@@ -25,7 +26,12 @@ export function isAuthenticated(): boolean {
   return !!getToken()
 }
 
-export async function authorize(): Promise<string> {
+export interface AuthResult {
+  accessToken: string
+  user: UserProfile | null
+}
+
+export async function authorize(): Promise<AuthResult> {
   const tg = window.Telegram?.WebApp
   const isProd = tg && tg.initData
 
@@ -47,10 +53,18 @@ export async function authorize(): Promise<string> {
   )
 
   saveToken(data.accessToken)
-  return data.accessToken
+
+  const tgUser = tg?.initDataUnsafe?.user
+  const user: UserProfile | null = tgUser
+    ? { firstName: tgUser.first_name, lastName: tgUser.last_name }
+    : useDevId
+      ? { firstName: 'Dev' }
+      : null
+
+  return { accessToken: data.accessToken, user }
 }
 
-export async function authorizeWithWidget(user: TelegramLoginWidgetUser): Promise<string> {
+export async function authorizeWithWidget(user: TelegramLoginWidgetUser): Promise<AuthResult> {
   const { data } = await axios.post<{ accessToken: string }>(
     `${BASE_URL}/auth/telegram`,
     user,
@@ -58,5 +72,13 @@ export async function authorizeWithWidget(user: TelegramLoginWidgetUser): Promis
   )
 
   saveToken(data.accessToken)
-  return data.accessToken
+
+  return {
+    accessToken: data.accessToken,
+    user: {
+      firstName: user.first_name,
+      lastName: user.last_name,
+      photoUrl: user.photo_url,
+    },
+  }
 }
