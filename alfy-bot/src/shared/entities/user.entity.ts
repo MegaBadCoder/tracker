@@ -25,6 +25,9 @@ export class User {
     language: string;
   };
 
+  @Column({ nullable: true, default: 'UTC' })
+  timezone: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

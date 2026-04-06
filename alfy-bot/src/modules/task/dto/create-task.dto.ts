@@ -2,14 +2,48 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
+  IsInt,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { ChecklistData } from '../domain/task-repository.port';
+import type { RecurrenceFrequency } from '../../../shared/types/recurrence.types';
+
+export class RecurrenceRuleDto {
+  @IsIn(['daily', 'weekly', 'monthly', 'yearly'])
+  frequency: RecurrenceFrequency;
+
+  @IsInt()
+  @Min(1)
+  interval: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  daysOfWeek?: number[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  dayOfMonth?: number;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  endCount?: number;
+}
 
 export class CreateTaskDto {
   @ApiProperty({ example: 'Подготовить презентацию' })
@@ -60,6 +94,13 @@ export class CreateTaskDto {
   @IsOptional()
   @IsUUID()
   columnId?: string;
+
+  @ApiPropertyOptional({ description: 'Recurrence rule for repeating tasks' })
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => RecurrenceRuleDto)
+  recurrence?: RecurrenceRuleDto;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

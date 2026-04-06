@@ -33,6 +33,11 @@ const router = createRouter({
               name: 'tasks-calendar',
               component: () => import('../views/CalendarView.vue'),
             },
+            {
+              path: 'project/:projectId',
+              name: 'tasks-project',
+              component: () => import('../views/ProjectView.vue'),
+            },
           ],
         },
         {
@@ -44,6 +49,11 @@ const router = createRouter({
           path: 'questions/:id',
           name: 'questionReport',
           component: () => import('../views/QuestionReportView.vue'),
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../views/SettingsView.vue'),
         },
         {
           path: ':pathMatch(.*)*',

@@ -34,4 +34,16 @@ export class UserService {
       await this.userRepo.save(user);
     }
   }
+
+  async findById(id: number): Promise<User | null> {
+    return this.userRepo.findOneById(id);
+  }
+
+  async updateTimezone(userId: number, timezone: string): Promise<string> {
+    const user = await this.userRepo.findOneById(userId);
+    if (!user) return 'UTC';
+    user.timezone = timezone;
+    await this.userRepo.save(user);
+    return timezone;
+  }
 }

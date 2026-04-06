@@ -30,6 +30,11 @@
       {{ tag }}
     </Badge>
 
+    <Badge v-if="isRecurring" variant="outline" class="gap-1 text-blue-600 border-blue-300/50 dark:text-blue-400 dark:border-blue-500/30">
+      <Repeat :size="12" />
+      {{ recurrenceLabel }}
+    </Badge>
+
     <Badge
       v-if="isPomodoroTask"
       variant="outline"
@@ -50,9 +55,12 @@ import {
   MapPin,
   Flag,
   Tag,
-  Timer
+  Timer,
+  Repeat,
 } from 'lucide-vue-next'
 import { formatDate, formatPomodoro, DATE_SHORT, DATE_WITH_TIME } from '../lib/formatters'
+import { formatRecurrence } from '../model/recurrence'
+import type { RecurrenceRule } from '../model/recurrence'
 import type { Priority } from '../model/types'
 
 interface Props {
@@ -61,6 +69,7 @@ interface Props {
   priority?: Priority
   location?: string
   tags?: string[]
+  recurrence?: RecurrenceRule | null
   isPomodoroTask?: boolean
   pomodoroCompleted?: number
   pomodoroCount?: number
@@ -70,7 +79,11 @@ interface Emits {
   (e: 'showTimer'): void
 }
 
-defineProps<Props>()
+import { computed } from 'vue'
+
+const props = defineProps<Props>()
 defineEmits<Emits>()
 
+const isRecurring = computed(() => !!props.recurrence)
+const recurrenceLabel = computed(() => formatRecurrence(props.recurrence))
 </script>

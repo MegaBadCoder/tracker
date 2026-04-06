@@ -1,0 +1,28 @@
+export const PROJECT_ICON_LIST = [
+  'FolderOpen',
+  'Star',
+  'Briefcase',
+  'Home',
+  'Book',
+  'Code',
+  'Zap',
+  'Heart',
+  'Target',
+  'Rocket',
+  'Globe',
+  'Music',
+  'Camera',
+  'Coffee',
+  'Lightbulb',
+  'Shield',
+  'Users',
+  'Palette',
+  'Gamepad2',
+  'GraduationCap',
+  'Stethoscope',
+  'Wrench',
+  'ShoppingCart',
+  'Plane',
+] as const
+
+export type ProjectIcon = typeof PROJECT_ICON_LIST[number] | null

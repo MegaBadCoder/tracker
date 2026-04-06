@@ -21,6 +21,7 @@ const emit = defineEmits<{
       <UserSection :links="navLinks" />
     </div>
     <SidebarNav v-if="links?.length" :links="links" />
+    <slot name="section-extra" />
   </aside>
 
   <!-- Mobile overlay -->
@@ -35,6 +36,7 @@ const emit = defineEmits<{
             <UserSection :links="navLinks" />
           </div>
           <SidebarNav v-if="links?.length" :links="links" />
+          <slot name="section-extra" />
         </aside>
       </div>
     </Transition>

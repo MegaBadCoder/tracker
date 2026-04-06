@@ -1,29 +1,56 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { TelegramAuthDto } from './dto/telegram-auth.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { JwtPayload } from './strategies/jwt.strategy';
+import { UserService } from '../user/application/user.service';
+
+interface AuthRequest extends Request {
+  user: JwtPayload;
+}
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
-
-  private debugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-    fetch('http://127.0.0.1:7243/ingest/308101b5-8b60-49f8-bb00-4c26a74393b7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'8d0dd9'},body:JSON.stringify({sessionId:'8d0dd9',runId:'pre-fix',hypothesisId,location,message,data,timestamp:Date.now()})}).catch(()=>{})
-  }
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ) {}
 
   @Post('telegram')
-  login(@Body() dto: TelegramAuthDto, @Req() req: Request): Promise<{ accessToken: string }> {
-    // #region agent log
-    this.debugLog('H11', 'src/modules/auth/auth.controller.ts:18', 'auth endpoint hit', {
-      origin: req.headers.origin ?? null,
-      referer: req.headers.referer ?? null,
-      userAgent: req.headers['user-agent'] ?? null,
-      hasInitData: !!dto.initData,
-      hasWidgetId: typeof dto.id === 'number',
-      hasWidgetHash: !!dto.hash,
-      hasDevTelegramId: typeof dto.devTelegramId === 'number',
-    });
-    // #endregion
+  login(@Body() dto: TelegramAuthDto): Promise<{ accessToken: string }> {
     return this.authService.login(dto);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMe(@Request() req: AuthRequest) {
+    const user = await this.userService.findById(req.user.sub);
+    if (!user) return null;
+    return {
+      firstName: user.firstName,
+      username: user.username,
+      timezone: user.timezone ?? 'UTC',
+    };
+  }
+
+  @Patch('timezone')
+  @UseGuards(JwtAuthGuard)
+  async updateTimezone(
+    @Request() req: AuthRequest,
+    @Body() body: { timezone: string },
+  ) {
+    const timezone = await this.userService.updateTimezone(
+      req.user.sub,
+      body.timezone,
+    );
+    return { timezone };
   }
 }

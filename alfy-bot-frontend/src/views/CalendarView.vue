@@ -1,8 +1,10 @@
 <template>
-  <AppHeader title="Календарь" :on-menu-click="openSidebar" />
-  <main class="px-4 py-6">
-    <WeeklyCalendar />
-  </main>
+  <div class="flex flex-col h-[100dvh]">
+    <AppHeader title="Календарь" :on-menu-click="openSidebar" fluid />
+    <main class="flex-1 min-h-0 px-4 py-2 pb-4">
+      <WeeklyCalendar class="h-full" />
+    </main>
+  </div>
 </template>
 
 <script setup lang="ts">

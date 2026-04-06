@@ -1,3 +1,5 @@
+import type { RecurrenceRule } from './recurrence'
+
 export type Priority = 'high' | 'medium' | 'low'
 
 export interface ChecklistItem {
@@ -29,6 +31,13 @@ export interface Task {
   longBreak?: number
   longBreakInterval?: number
   checklist?: Checklist
+  recurrence?: RecurrenceRule | null
+  recurringParentId?: string | null
+  recurringCompletedCount?: number
+  isAutoCreated?: boolean
+  projectId?: string | null
+  columnId?: string | null
+  order?: number
   parentId?: string
   subtasks?: Task[]
   checklistProgress?: {
@@ -40,6 +49,8 @@ export interface Task {
 
 export interface TaskCardProps {
   task: Task
+  projectName?: string
+  variant?: 'default' | 'compact'
 }
 
 export interface TaskCardEmits {

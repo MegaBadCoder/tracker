@@ -1,67 +1,85 @@
 <template>
-  <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar">
-    <template #right>
-      <ViewModeToggle
-        v-if="project"
-        :model-value="project.viewMode"
-        @update:model-value="handleViewModeChange"
-      />
-    </template>
-  </AppHeader>
-  <PageContainer>
-    <div class="mb-6">
-      <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
-    </div>
-
-    <div v-if="loading" class="text-center py-8">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-      <p class="mt-2 text-muted-foreground">Загрузка задач...</p>
-    </div>
-
-    <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
-      <p class="text-destructive">{{ error }}</p>
-    </div>
-
-    <div v-else>
-      <!-- Board view -->
-      <BoardView
-        v-if="project?.viewMode === 'board'"
-        :project-id="projectId"
-        @toggle-task="handleToggleTask"
-        @open-task="handleOpenTask"
-      />
-
-      <!-- List with grouping (when columns exist) -->
-      <GroupedListView
-        v-else-if="columns.length > 0"
-        :columns="columns"
-        :tasks="filteredTasks"
-        @toggle-task="handleToggleTask"
-        @open-task="handleOpenTask"
-        @delete-task="handleDeleteTask"
-        @show-timer="handleShowTimer"
-      />
-
-      <!-- Simple list (no columns) -->
-      <template v-else>
-        <div v-if="filteredTasks.length === 0" class="p-6 text-center text-muted-foreground">
-          В этом проекте пока нет задач.
-        </div>
-
-        <div v-else role="list" class="divide-y divide-border">
-          <TaskCard
-            v-for="task in filteredTasks"
-            :key="task.id"
-            :task="task"
-            @toggle="handleToggleTask"
-            @show-timer="handleShowTimer"
-            @delete="handleDeleteTask"
-            @open="handleOpenTask"
-          />
-        </div>
+  <div class="flex flex-col h-[100dvh]">
+    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" :fluid="isBoardMode">
+      <template #right>
+        <ViewModeToggle
+          v-if="project"
+          :model-value="project.viewMode"
+          @update:model-value="handleViewModeChange"
+        />
       </template>
-    </div>
-  </PageContainer>
+    </AppHeader>
+
+    <!-- Board view — full page -->
+    <template v-if="isBoardMode">
+      <div class="px-4 py-3">
+        <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+      </div>
+
+      <div v-if="loading" class="text-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p class="mt-2 text-muted-foreground">Загрузка задач...</p>
+      </div>
+
+      <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4">
+        <p class="text-destructive">{{ error }}</p>
+      </div>
+
+      <main v-else class="flex-1 min-h-0 px-4 pb-4">
+        <BoardView
+          :project-id="projectId"
+          @toggle-task="handleToggleTask"
+          @open-task="handleOpenTask"
+        />
+      </main>
+    </template>
+
+    <!-- List view — constrained width -->
+    <PageContainer v-else>
+      <div class="mb-6">
+        <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+      </div>
+
+      <div v-if="loading" class="text-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p class="mt-2 text-muted-foreground">Загрузка задач...</p>
+      </div>
+
+      <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
+        <p class="text-destructive">{{ error }}</p>
+      </div>
+
+      <div v-else>
+        <GroupedListView
+          v-if="columns.length > 0"
+          :columns="columns"
+          :tasks="filteredTasks"
+          @toggle-task="handleToggleTask"
+          @open-task="handleOpenTask"
+          @delete-task="handleDeleteTask"
+          @show-timer="handleShowTimer"
+        />
+
+        <template v-else>
+          <div v-if="filteredTasks.length === 0" class="p-6 text-center text-muted-foreground">
+            В этом проекте пока нет задач.
+          </div>
+
+          <div v-else role="list" class="divide-y divide-border">
+            <TaskCard
+              v-for="task in filteredTasks"
+              :key="task.id"
+              :task="task"
+              @toggle="handleToggleTask"
+              @show-timer="handleShowTimer"
+              @delete="handleDeleteTask"
+              @open="handleOpenTask"
+            />
+          </div>
+        </template>
+      </div>
+    </PageContainer>
+  </div>
   <TaskDetailDialog
     :task="selectedTask"
     :open="isDetailOpen"
@@ -97,6 +115,7 @@ const projectId = computed(() => route.params.projectId as string)
 
 const projectStore = useProjectStore()
 const project = computed(() => projectStore.projectMap.get(projectId.value))
+const isBoardMode = computed(() => project.value?.viewMode === 'board')
 
 const columnStore = useColumnStore()
 const columns = computed(() => columnStore.columns)

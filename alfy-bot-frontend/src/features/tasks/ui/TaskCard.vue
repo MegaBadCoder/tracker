@@ -1,8 +1,10 @@
 <template>
   <div
     role="listitem"
+    :data-task-id="task.id"
     :class="[
-      'group flex items-center gap-3 px-4 py-3 min-h-[44px] cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm hover:pl-5',
+      'group flex items-center gap-3 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
+      isCompact ? 'px-3 py-2 min-h-[36px]' : 'px-4 py-3 min-h-[44px] hover:pl-5',
       task.completed && 'opacity-50'
     ]"
     @click="$emit('open', task)"
@@ -11,6 +13,7 @@
     <RoundCheckbox
       :model-value="task.completed"
       class="shrink-0"
+      @click.stop
       @update:model-value="$emit('toggle', task.id)"
     />
 
@@ -29,6 +32,14 @@
 
       <!-- Meta chips -->
       <div v-if="hasMeta" class="flex flex-wrap items-center gap-1.5 mt-1">
+        <Badge
+          v-if="projectName"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
+        >
+          <FolderOpen :size="11" />
+          {{ projectName }}
+        </Badge>
         <Badge
           v-if="task.isPomodoroTask"
           variant="outline"
@@ -71,6 +82,13 @@
           {{ task.location }}
         </Badge>
         <Badge
+          v-if="task.recurrence"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400"
+        >
+          <Repeat :size="11" />
+        </Badge>
+        <Badge
           v-if="checklistTotal > 0"
           variant="outline"
           :class="[
@@ -86,8 +104,8 @@
       </div>
     </div>
 
-    <!-- Tags (compact) -->
-    <div v-if="task.tags?.length" class="hidden sm:flex items-center gap-1 shrink-0">
+    <!-- Tags -->
+    <div v-if="!isCompact && task.tags?.length" class="hidden sm:flex items-center gap-1 shrink-0">
       <Badge
         v-for="tag in task.tags.slice(0, 2)"
         :key="tag"
@@ -103,6 +121,7 @@
 
     <!-- Delete -->
     <button
+      v-if="!isCompact"
       class="shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all duration-150 cursor-pointer"
       title="Удалить"
       @click.stop="$emit('delete', task.id)"
@@ -114,7 +133,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, MapPin, Timer, Trash2 } from 'lucide-vue-next'
+import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, MapPin, Repeat, Timer, Trash2 } from 'lucide-vue-next'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatPomodoro, DATE_SHORT, DATE_WITH_TIME } from '../lib/formatters'
@@ -126,12 +145,14 @@ import type { TaskCardProps, TaskCardEmits } from '../model/types'
 const props = defineProps<TaskCardProps>()
 defineEmits<TaskCardEmits>()
 
+const isCompact = computed(() => props.variant === 'compact')
+
 const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
 const checklistTotal = computed(() => checklistStats.value.total)
 const checklistDone = computed(() => checklistStats.value.completed)
 
 const hasMeta = computed(() =>
-  props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask || checklistTotal.value > 0
+  props.projectName || props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask || props.task.recurrence || checklistTotal.value > 0
 )
 
 </script>

@@ -182,6 +182,33 @@
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <!-- Recurrence -->
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button
+            variant="outline"
+            size="sm"
+            :class="['gap-1.5 cursor-pointer transition-colors duration-150', form.recurrence && 'text-blue-600 border-blue-300/50 bg-blue-50 dark:text-blue-400 dark:border-blue-500/30 dark:bg-blue-500/10']"
+          >
+            <Repeat :size="14" />
+            {{ form.recurrence ? formatRecurrence(form.recurrence) : 'Повтор' }}
+            <span
+              v-if="form.recurrence"
+              class="ml-1 shrink-0 p-0.5 rounded-sm opacity-60 hover:opacity-100 hover:bg-blue-500/10 transition-all cursor-pointer"
+              role="button"
+              aria-label="Убрать повторение"
+              @click.stop.prevent="form.recurrence = undefined"
+            >
+              <X :size="14" />
+            </span>
+          </Button>
+        </DropdownMenuTrigger>
+        <RecurrencePicker
+          :model-value="form.recurrence"
+          @update:model-value="form.recurrence = $event ?? undefined"
+        />
+      </DropdownMenu>
     </div>
 
     <!-- Pomodoro Section -->
@@ -268,6 +295,7 @@ import {
   Tag,
   MapPin,
   Timer,
+  Repeat,
   X,
 } from 'lucide-vue-next'
 import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
@@ -275,10 +303,13 @@ import type { Task } from '../model/types'
 import { formatDate, formatDueDate, DATE_WITH_TIME } from '../lib/formatters'
 import { toDate, toCalendarDateValue, updateDeadlineTime } from '../lib/dateTime'
 import { getPriorityColor } from '../lib/priority'
+import { formatRecurrence } from '../model/recurrence'
+import type { RecurrenceRule } from '../model/recurrence'
 import TagsEditor from './TagsEditor.vue'
 import PriorityPicker from './PriorityPicker.vue'
 import DeadlinePicker from './DeadlinePicker.vue'
 import PomodoroSettings from './PomodoroSettings.vue'
+import RecurrencePicker from './RecurrencePicker.vue'
 
 interface TaskFormData extends Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'> {
   tags: string[]
@@ -306,6 +337,7 @@ const form = reactive<TaskFormData>({
   priority: undefined,
   tags: [],
   location: '',
+  recurrence: undefined as RecurrenceRule | undefined,
   isPomodoroTask: false,
   pomodoroCount: POMODORO_DEFAULTS.count,
   pomodoroDuration: POMODORO_DEFAULTS.duration,
@@ -344,6 +376,7 @@ const resetForm = () => {
   form.priority = undefined
   form.tags = []
   form.location = ''
+  form.recurrence = undefined
   form.isPomodoroTask = false
   form.pomodoroCount = POMODORO_DEFAULTS.count
   form.pomodoroDuration = POMODORO_DEFAULTS.duration

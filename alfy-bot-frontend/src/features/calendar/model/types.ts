@@ -10,6 +10,8 @@ export interface CalendarEvent {
   task: Task
   priority?: Priority
   completed: boolean
+  isRecurring?: boolean
+  isVirtual?: boolean
 }
 
 export interface CalendarDropPayload {

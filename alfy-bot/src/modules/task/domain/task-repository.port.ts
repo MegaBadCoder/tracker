@@ -1,15 +1,8 @@
 import { Task, PomodoroConfig } from '../../../shared/entities';
+import type { ChecklistItem, ChecklistData } from '../../../shared/types/checklist.types';
 
-export interface ChecklistItem {
-  id: string;
-  text: string;
-  completed: boolean;
-  order: number;
-}
-
-export interface ChecklistData {
-  items: ChecklistItem[];
-}
+// Re-export for backward compatibility
+export type { ChecklistItem, ChecklistData };
 
 export abstract class TaskRepositoryPort {
   abstract findAllByUser(userId: number): Promise<Task[]>;
@@ -48,4 +41,13 @@ export abstract class TaskRepositoryPort {
   abstract reorderTasks(
     updates: { id: string; order: number }[],
   ): Promise<void>;
+  abstract findByParentId(
+    parentId: string,
+    onlyUncompleted: boolean,
+  ): Promise<Task[]>;
+  abstract deleteByParentId(
+    parentId: string,
+    onlyUncompleted: boolean,
+  ): Promise<void>;
+  abstract clearParentId(parentId: string): Promise<void>;
 }

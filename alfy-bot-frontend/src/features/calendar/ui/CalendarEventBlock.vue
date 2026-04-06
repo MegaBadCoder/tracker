@@ -2,16 +2,19 @@
   <div
     :class="[
       'absolute left-0.5 right-0.5 rounded-md px-2 py-1 text-xs overflow-hidden border',
-      hidden ? 'invisible' : 'cursor-grab',
+      hidden ? 'invisible' : isVirtual ? 'cursor-default' : 'cursor-grab',
       completed
-        ? 'opacity-50 bg-muted border-border'
-        : priorityClasses,
+        ? 'opacity-60 bg-green-500/15 border-green-500/30 text-green-600 dark:text-green-400'
+        : isVirtual
+          ? 'opacity-40 border-dashed border-border bg-muted/30'
+          : priorityClasses,
     ]"
     :style="blockStyle"
     style="touch-action: none"
     @pointerdown="onPointerDown"
   >
-    <div :class="['font-medium truncate', completed && 'line-through']">
+    <div :class="['font-medium truncate flex items-center gap-1', completed && 'line-through']">
+      <Repeat v-if="event.isRecurring" :size="10" class="shrink-0 opacity-60" />
       {{ event.title }}
     </div>
     <div class="text-[10px] opacity-70">
@@ -22,6 +25,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Repeat } from 'lucide-vue-next'
 import type { CalendarEvent } from '../model/types'
 import { getPriorityEventClasses } from '../lib/calendar-styles'
 
@@ -38,6 +42,7 @@ const emit = defineEmits<{
 }>()
 
 const completed = computed(() => props.event.completed)
+const isVirtual = computed(() => !!props.event.isVirtual)
 const priorityClasses = computed(() => getPriorityEventClasses(props.event.priority))
 
 const blockStyle = computed(() => {
@@ -62,7 +67,7 @@ function formatMinutes(m: number): string {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (e.button !== 0) return
+  if (e.button !== 0 || isVirtual.value) return
   emit('grab', props.event, e)
 }
 </script>

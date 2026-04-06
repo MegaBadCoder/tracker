@@ -9,9 +9,11 @@
     <!-- Single scroll container for both axes -->
     <div
       ref="gridRef"
-      class="flex-1 overflow-auto"
-      style="height: calc(100vh - 160px)"
+      :class="['flex-1 min-h-0 overflow-auto select-none', grabCursor]"
       @scroll="onScroll"
+      @mousedown="onGrabMouseDown"
+      @mousemove="onGrabMouseMove"
+      @mouseup="onGrabMouseUp"
     >
       <div :style="{ width: TRACK_WIDTH + GUTTER_WIDTH + 'px' }" class="relative">
 
@@ -78,6 +80,7 @@ import { tasksToCalendarEvents } from '../lib/calendar-events'
 import { isToday, formatDayHeader, formatDateRange } from '../lib/week'
 import { useCalendarDnd } from '../lib/use-calendar-dnd'
 import { useInfiniteDays, DAY_WIDTH, TRACK_WIDTH, GUTTER_WIDTH } from '../lib/use-infinite-days'
+import { useGrabScroll } from '../lib/use-grab-scroll'
 import type { CalendarDropPayload } from '../model/types'
 import CalendarHeader from './CalendarHeader.vue'
 import AllDaySection from './AllDaySection.vue'
@@ -88,6 +91,18 @@ const { startDrag } = useCalendarDnd()
 
 const gridRef = ref<HTMLElement | null>(null)
 const { visibleDays, dateRange, centerDate, dayOffset, dateFromX, scrollToDate, onScroll } = useInfiniteDays(gridRef)
+const {
+  grabbing, ctrlHeld,
+  onMouseDown: onGrabMouseDown,
+  onMouseMove: onGrabMouseMove,
+  onMouseUp: onGrabMouseUp,
+} = useGrabScroll(gridRef)
+
+const grabCursor = computed(() => {
+  if (grabbing.value) return 'cursor-grabbing'
+  if (ctrlHeld.value) return 'cursor-grab'
+  return ''
+})
 
 const rangeLabel = computed(() => formatDateRange(dateRange.value.start, dateRange.value.end))
 

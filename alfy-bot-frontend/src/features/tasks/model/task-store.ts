@@ -21,6 +21,7 @@ function serializeTaskDates<T extends Record<string, unknown>>(data: T): T {
 
 function parseTask(raw: Record<string, unknown>): Task {
   const config = raw.pomodoroConfig as Record<string, unknown> | null
+  const recurrence = (raw.recurrence as Task['recurrence']) ?? null
   return {
     ...raw,
     dueDate: raw.dueDate ? new Date(raw.dueDate as string) : undefined,
@@ -32,6 +33,10 @@ function parseTask(raw: Record<string, unknown>): Task {
     longBreak: config?.longBreak as number | undefined,
     longBreakInterval: config?.longBreakInterval as number | undefined,
     pomodoroCompleted: (config?.pomodoroCompleted as number) ?? 0,
+    recurrence,
+    recurringParentId: (raw.recurringParentId as string) ?? null,
+    recurringCompletedCount: (raw.recurringCompletedCount as number) ?? 0,
+    isAutoCreated: (raw.isAutoCreated as boolean) ?? false,
   } as Task
 }
 
@@ -96,14 +101,33 @@ export const useTaskStore = defineStore('tasks', () => {
         checklist, checklistProgress,
         isPomodoroTask, pomodoroCount, pomodoroDuration,
         shortBreak, longBreak, longBreakInterval, pomodoroCompleted,
+        recurringCompletedCount, isAutoCreated, recurringParentId,
         ...rest
       } = updates as Record<string, unknown>
       const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(rest))
-      const updatedTask = parseTask(data)
+
+      // Backend returns UpdateTaskResponse: { task, nextInstance?, deletedInstanceId? }
+      const response = data as Record<string, unknown>
+      const taskData = response.task ? response.task as Record<string, unknown> : response
+      const updatedTask = parseTask(taskData)
+
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
         tasks.value[index] = { ...updatedTask, checklist: tasks.value[index]?.checklist }
       }
+
+      // Handle recurring: add new instance to store
+      if (response.nextInstance) {
+        const nextInstance = parseTask(response.nextInstance as Record<string, unknown>)
+        tasks.value.unshift(nextInstance)
+      }
+
+      // Handle recurring: remove deleted instance from store
+      if (response.deletedInstanceId) {
+        const deletedId = response.deletedInstanceId as string
+        tasks.value = tasks.value.filter(t => t.id !== deletedId)
+      }
+
       return updatedTask
     } catch (err) {
       if (setLoading) {
@@ -208,6 +232,50 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
+  const moveTask = async (taskId: string, projectId: string, payload: { columnId?: string | null; order?: number }) => {
+    const task = tasks.value.find(t => t.id === taskId)
+    if (!task) return
+
+    const previous = { projectId: task.projectId, columnId: task.columnId, order: task.order }
+
+    task.projectId = projectId
+    if (payload.columnId !== undefined) task.columnId = payload.columnId
+    if (payload.order !== undefined) task.order = payload.order
+
+    try {
+      await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
+    } catch (err) {
+      task.projectId = previous.projectId
+      task.columnId = previous.columnId
+      task.order = previous.order
+      throw err
+    }
+  }
+
+  const reorderTasks = async (projectId: string, orderedIds: string[], columnId?: string) => {
+    const previousOrders = new Map(
+      orderedIds.map(id => {
+        const t = tasks.value.find(task => task.id === id)
+        return [id, t?.order] as [string, number | undefined]
+      }),
+    )
+
+    orderedIds.forEach((id, i) => {
+      const t = tasks.value.find(task => task.id === id)
+      if (t) t.order = i
+    })
+
+    try {
+      await api.patch(`/projects/${projectId}/tasks/reorder`, { orderedIds, columnId })
+    } catch (err) {
+      orderedIds.forEach(id => {
+        const t = tasks.value.find(task => task.id === id)
+        if (t) t.order = previousOrders.get(id)
+      })
+      throw err
+    }
+  }
+
   const completedTasks = computed(() => tasks.value.filter(t => t.completed))
   const pendingTasks = computed(() => tasks.value.filter(t => !t.completed))
   const pomodoroTasks = computed(() => tasks.value.filter(t => t.isPomodoroTask))
@@ -226,6 +294,8 @@ export const useTaskStore = defineStore('tasks', () => {
     updateTask,
     toggleTask,
     deleteTask,
+    moveTask,
+    reorderTasks,
     incrementPomodoro,
     updateChecklist,
     updatePomodoroConfig,

@@ -5,10 +5,28 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
+import {
+  computeNextDueDate,
+  buildNextInstance,
+} from './domain/recurrence.utils';
+import { UserSettingsPort } from './domain/user-settings.port';
+import {
+  shiftToUserWallClock,
+  shiftBackToUtc,
+} from './lib/timezone';
+
+export interface UpdateTaskResponse {
+  task: Task;
+  nextInstance?: Task;
+  deletedInstanceId?: string;
+}
 
 @Injectable()
 export class TaskService {
-  constructor(private readonly taskRepo: TaskRepositoryPort) {}
+  constructor(
+    private readonly taskRepo: TaskRepositoryPort,
+    private readonly userSettings: UserSettingsPort,
+  ) {}
 
   async getAll(userId: number): Promise<Task[]> {
     return this.taskRepo.findAllByUser(userId);
@@ -25,6 +43,7 @@ export class TaskService {
       dueDate,
       deadline,
       checklist,
+      recurrence,
       ...rest
     } = dto;
 
@@ -34,6 +53,7 @@ export class TaskService {
       dueDate: dueDate ? new Date(dueDate) : null,
       deadline: deadline ? new Date(deadline) : null,
       checklist: checklist ?? null,
+      recurrence: recurrence ?? null,
     };
 
     if (isPomodoroTask) {
@@ -51,19 +71,162 @@ export class TaskService {
     return this.taskRepo.create(taskData);
   }
 
-  async update(userId: number, id: string, dto: UpdateTaskDto): Promise<Task> {
-    const { dueDate, deadline, ...rest } = dto;
+  async update(
+    userId: number,
+    id: string,
+    dto: UpdateTaskDto,
+  ): Promise<UpdateTaskResponse> {
+    const { dueDate, deadline, recurrence, ...rest } = dto;
 
     const task = await this.taskRepo.findById(id, userId);
     if (!task) throw new NotFoundException(`Task #${id} not found`);
 
+    // Detect recurring complete/uncomplete transitions
+    const isCompletingRecurring =
+      dto.completed === true &&
+      !task.completed &&
+      task.recurrence;
+
+    const isUncompletingRecurring =
+      dto.completed === false &&
+      task.completed &&
+      task.recurrence;
+
+    // Apply scalar fields
     Object.assign(task, rest);
     if (dueDate !== undefined)
       task.dueDate = dueDate ? new Date(dueDate) : null;
     if (deadline !== undefined)
       task.deadline = deadline ? new Date(deadline) : null;
+    if (recurrence !== undefined)
+      task.recurrence = recurrence ?? null;
 
-    return this.taskRepo.save(task);
+    // Mark user-modified instances as not auto-created
+    if (task.recurringParentId && !dto.completed) {
+      task.isAutoCreated = false;
+    }
+
+    if (isCompletingRecurring) {
+      return this.completeRecurringTask(userId, task);
+    }
+
+    if (isUncompletingRecurring) {
+      return this.uncompleteRecurringTask(userId, task);
+    }
+
+    const saved = await this.taskRepo.save(task);
+    return { task: saved };
+  }
+
+  private async completeRecurringTask(
+    userId: number,
+    task: Task,
+  ): Promise<UpdateTaskResponse> {
+    const parentId = task.recurringParentId ?? task.id;
+
+    // Idempotency: check if next instance already exists
+    const uncompleted = await this.taskRepo.findByParentId(parentId, true);
+    const existingNext = uncompleted.find((t) => t.id !== task.id);
+
+    if (existingNext) {
+      task.completed = true;
+      const saved = await this.taskRepo.save(task);
+      return { task: saved, nextInstance: existingNext };
+    }
+
+    // Compute next due date
+    let nextInstance: Task | undefined;
+
+    if (task.dueDate && task.recurrence) {
+      const timezone = await this.userSettings.getTimezone(userId);
+
+      // Get the root task for completedCount
+      const rootTask = task.recurringParentId
+        ? await this.taskRepo.findById(parentId, userId)
+        : task;
+
+      const completedCount = rootTask?.recurringCompletedCount ?? 0;
+      const countAfterComplete = completedCount + 1;
+
+      // Shift to user's wall clock so domain sees correct calendar day
+      const zonedDue = shiftToUserWallClock(task.dueDate, timezone);
+      const nextZoned = computeNextDueDate(
+        zonedDue,
+        task.recurrence,
+        countAfterComplete,
+      );
+      const nextDate = nextZoned
+        ? shiftBackToUtc(nextZoned, timezone)
+        : null;
+
+      if (nextDate) {
+        const instanceData = buildNextInstance(task, nextDate, parentId);
+
+        // Copy pomodoroConfig (cascade entity, not a domain concern)
+        if (task.pomodoroConfig) {
+          const config = new PomodoroConfig();
+          config.pomodoroCount = task.pomodoroConfig.pomodoroCount;
+          config.pomodoroDuration = task.pomodoroConfig.pomodoroDuration;
+          config.shortBreak = task.pomodoroConfig.shortBreak;
+          config.longBreak = task.pomodoroConfig.longBreak;
+          config.longBreakInterval = task.pomodoroConfig.longBreakInterval;
+          config.pomodoroCompleted = 0;
+          (instanceData as any).pomodoroConfig = config;
+        }
+
+        nextInstance = await this.taskRepo.create(instanceData);
+      }
+
+      // Increment completed count on root
+      if (rootTask) {
+        rootTask.recurringCompletedCount = completedCount + 1;
+        if (rootTask.id !== task.id) {
+          await this.taskRepo.save(rootTask);
+        } else {
+          task.recurringCompletedCount = completedCount + 1;
+        }
+      }
+    }
+
+    task.completed = true;
+    const saved = await this.taskRepo.save(task);
+    return { task: saved, nextInstance };
+  }
+
+  private async uncompleteRecurringTask(
+    userId: number,
+    task: Task,
+  ): Promise<UpdateTaskResponse> {
+    const parentId = task.recurringParentId ?? task.id;
+
+    const uncompleted = await this.taskRepo.findByParentId(parentId, true);
+    const nextInstance = uncompleted.find((t) => t.id !== task.id);
+
+    let deletedInstanceId: string | undefined;
+
+    if (nextInstance?.isAutoCreated) {
+      await this.taskRepo.delete(nextInstance.id, userId);
+      deletedInstanceId = nextInstance.id;
+
+      // Decrement completed count on root
+      const rootTask = task.recurringParentId
+        ? await this.taskRepo.findById(parentId, userId)
+        : task;
+
+      if (rootTask) {
+        rootTask.recurringCompletedCount = Math.max(
+          0,
+          rootTask.recurringCompletedCount - 1,
+        );
+        if (rootTask.id !== task.id) {
+          await this.taskRepo.save(rootTask);
+        }
+      }
+    }
+
+    task.completed = false;
+    const saved = await this.taskRepo.save(task);
+    return { task: saved, deletedInstanceId };
   }
 
   async updatePomodoroConfig(
@@ -97,6 +260,14 @@ export class TaskService {
   }
 
   async delete(userId: number, id: string): Promise<void> {
+    const task = await this.taskRepo.findById(id, userId);
+
+    // Cascade for recurring root tasks
+    if (task?.recurrence && !task.recurringParentId) {
+      await this.taskRepo.deleteByParentId(task.id, true);
+      await this.taskRepo.clearParentId(task.id);
+    }
+
     const deleted = await this.taskRepo.delete(id, userId);
     if (!deleted) throw new NotFoundException(`Task #${id} not found`);
   }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 const props = defineProps<{
   title: string
   showBack?: boolean
+  fluid?: boolean
   onMenuClick?: () => void
 }>()
 
@@ -14,7 +15,7 @@ const router = useRouter()
 
 <template>
   <header class="sticky top-0 z-20 bg-background/80 backdrop-blur border-b border-border">
-    <div class="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+    <div :class="['px-4 h-14 flex items-center gap-3', !fluid && 'max-w-6xl mx-auto']">
       <!-- left -->
       <div class="flex items-center gap-2 min-w-0 flex-1">
         <Button

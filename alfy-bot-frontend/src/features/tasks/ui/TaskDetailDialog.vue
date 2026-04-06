@@ -12,7 +12,7 @@
           />
           <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <FolderOpen :size="11" />
-            Все входящие
+            {{ localProjectId ? projectStore.projectMap.get(localProjectId)?.title ?? 'Проект' : 'Все входящие' }}
           </span>
         </div>
         <div class="flex items-center gap-0.5">
@@ -182,21 +182,12 @@
 
         <!-- Sidebar -->
         <div class="sm:w-60 shrink-0 border-t sm:border-t-0 sm:border-l border-border/60 overflow-y-auto bg-muted/30">
-          <!-- Проект (mock) -->
-          <DropdownMenu>
-            <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
-                <div class="flex items-center gap-2 mb-1">
-                  <FolderOpen :size="13" class="text-muted-foreground/60" />
-                  <span class="text-[11px] text-muted-foreground/60 font-medium">Проект</span>
-                </div>
-                <div class="text-[13px] truncate">Все входящие</div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" class="w-48">
-              <div class="p-3 text-xs text-muted-foreground">Все входящие</div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <!-- Проект -->
+          <ProjectPicker
+            :model-value="localProjectId"
+            :disabled="!editable"
+            @update:model-value="onProjectChange"
+          />
 
           <!-- Срок (dueDate) -->
           <DropdownMenu>
@@ -361,20 +352,23 @@
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <!-- Повторение (mock) -->
+          <!-- Повторение -->
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
                 <div class="flex items-center gap-2 mb-1">
-                  <Repeat :size="13" class="text-muted-foreground/40" />
+                  <Repeat :size="13" :class="localRecurrence ? 'text-primary' : 'text-muted-foreground/40'" />
                   <span class="text-[11px] text-muted-foreground/60 font-medium">Повторение</span>
                 </div>
-                <div class="text-[13px] text-muted-foreground/40">Нет</div>
+                <div :class="['text-[13px]', localRecurrence ? 'text-foreground' : 'text-muted-foreground/40']">
+                  {{ formatRecurrence(localRecurrence) }}
+                </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" class="w-48">
-              <div class="p-3 text-xs text-muted-foreground">Скоро</div>
-            </DropdownMenuContent>
+            <RecurrencePicker
+              :model-value="localRecurrence"
+              @update:model-value="onRecurrenceChange"
+            />
           </DropdownMenu>
 
           <!-- Напоминание (mock) -->
@@ -445,10 +439,15 @@ const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
   none: '',
 }
 import type { Task, ChecklistItem } from '../model/types'
+import type { RecurrenceRule } from '../model/recurrence'
+import { formatRecurrence } from '../model/recurrence'
 import TagsEditor from './TagsEditor.vue'
+import RecurrencePicker from './RecurrencePicker.vue'
 import PriorityPicker from './PriorityPicker.vue'
 import DeadlinePicker from './DeadlinePicker.vue'
 import PomodoroSettings from './PomodoroSettings.vue'
+import ProjectPicker from '@/features/projects/ui/ProjectPicker.vue'
+import { useProjectStore } from '@/features/projects/model/project-store'
 
 const props = withDefaults(defineProps<{
   task: Task | null
@@ -490,6 +489,23 @@ const localPriority = ref<Priority | undefined>()
 const localLocation = ref('')
 const localTags = ref<string[]>([])
 
+// Recurrence
+const localRecurrence = ref<RecurrenceRule | null>(null)
+
+// Project
+const localProjectId = ref<string | null>(null)
+const projectStore = useProjectStore()
+
+function onProjectChange(value: string | null) {
+  localProjectId.value = value
+  emitUpdate({ projectId: value })
+}
+
+function onRecurrenceChange(value: RecurrenceRule | null) {
+  localRecurrence.value = value
+  emitUpdate({ recurrence: value })
+}
+
 // Pomodoro refs
 const localPomodoroCount = ref(POMODORO_DEFAULTS.count)
 const localPomodoroDuration = ref(POMODORO_DEFAULTS.duration)
@@ -511,6 +527,8 @@ watch(() => props.task, (task) => {
     localPriority.value = task.priority
     localLocation.value = task.location || ''
     localTags.value = task.tags ? [...task.tags] : []
+    localProjectId.value = task.projectId ?? null
+    localRecurrence.value = task.recurrence ?? null
     localPomodoroCount.value = task.pomodoroCount ?? POMODORO_DEFAULTS.count
     localPomodoroDuration.value = task.pomodoroDuration ?? POMODORO_DEFAULTS.duration
     localShortBreak.value = task.shortBreak ?? POMODORO_DEFAULTS.shortBreak

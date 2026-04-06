@@ -12,7 +12,8 @@ import { User } from './user.entity';
 import { PomodoroConfig } from './pomodoro-config.entity';
 import { Project } from './project.entity';
 import { ProjectColumn } from './project-column.entity';
-import type { ChecklistData } from '../../modules/task/domain/task-repository.port';
+import type { ChecklistData } from '../types/checklist.types';
+import type { RecurrenceRule } from '../types/recurrence.types';
 
 @Entity('tasks')
 export class Task {
@@ -58,6 +59,18 @@ export class Task {
   @Column('simple-json', { nullable: true })
   checklist: ChecklistData | null;
 
+  @Column('simple-json', { nullable: true })
+  recurrence: RecurrenceRule | null;
+
+  @Column({ type: 'integer', default: 0 })
+  recurringCompletedCount: number;
+
+  @Column({ nullable: true })
+  recurringParentId: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  isAutoCreated: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -81,6 +94,10 @@ export class Task {
   })
   @JoinColumn({ name: 'columnId' })
   column: ProjectColumn | null;
+
+  @ManyToOne(() => Task, { nullable: true })
+  @JoinColumn({ name: 'recurringParentId' })
+  recurringParent: Task | null;
 
   @OneToOne(() => PomodoroConfig, (config) => config.task, {
     cascade: true,

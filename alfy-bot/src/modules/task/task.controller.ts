@@ -13,7 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
-import { TaskService } from './task.service';
+import { TaskService, UpdateTaskResponse } from './task.service';
 import { TimerSessionService } from './timer-session.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -104,7 +104,7 @@ export class TaskController {
     @Request() req: AuthRequest,
     @Param('id') id: string,
     @Body() dto: UpdateTaskDto,
-  ) {
+  ): Promise<UpdateTaskResponse> {
     return this.taskService.update(req.user.sub, id, dto);
   }
 

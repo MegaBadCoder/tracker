@@ -132,4 +132,42 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
       ),
     );
   }
+
+  async findByParentId(
+    parentId: string,
+    onlyUncompleted: boolean,
+  ): Promise<Task[]> {
+    const where = onlyUncompleted
+      ? [
+          { recurringParentId: parentId, completed: false },
+          { id: parentId, completed: false },
+        ]
+      : [{ recurringParentId: parentId }, { id: parentId }];
+
+    return this.taskRepo.find({
+      where,
+      relations: ['pomodoroConfig'],
+    });
+  }
+
+  async deleteByParentId(
+    parentId: string,
+    onlyUncompleted: boolean,
+  ): Promise<void> {
+    if (onlyUncompleted) {
+      await this.taskRepo.delete({
+        recurringParentId: parentId,
+        completed: false,
+      });
+    } else {
+      await this.taskRepo.delete({ recurringParentId: parentId });
+    }
+  }
+
+  async clearParentId(parentId: string): Promise<void> {
+    await this.taskRepo.update(
+      { recurringParentId: parentId },
+      { recurringParentId: null },
+    );
+  }
 }
