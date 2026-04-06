@@ -61,7 +61,9 @@ export const useProjectStore = defineStore('projects', () => {
     const index = projects.value.findIndex(p => p.id === id)
     if (index === -1) return
 
-    const previous = { ...projects.value[index] }
+    const current = projects.value[index]
+    if (!current) return
+    const previous = { ...current }
     projects.value[index] = { ...previous, ...payload } as Project
 
     try {
@@ -104,6 +106,7 @@ export const useProjectStore = defineStore('projects', () => {
     if (index === -1) return
 
     const removed = projects.value.splice(index, 1)[0]
+    if (!removed) return
 
     try {
       await api.delete(`/projects/${id}`)

@@ -57,7 +57,9 @@ export const useColumnStore = defineStore('columns', () => {
     const index = columns.value.findIndex(c => c.id === columnId)
     if (index === -1) return
 
-    const previous = { ...columns.value[index] }
+    const current = columns.value[index]
+    if (!current) return
+    const previous = { ...current }
     columns.value[index] = { ...previous, ...payload } as ProjectColumn
 
     try {
@@ -75,6 +77,7 @@ export const useColumnStore = defineStore('columns', () => {
     if (index === -1) return
 
     const removed = columns.value.splice(index, 1)[0]
+    if (!removed) return
 
     try {
       await columnsApi.deleteColumn(projectId, columnId)
