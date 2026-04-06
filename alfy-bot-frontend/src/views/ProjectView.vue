@@ -1,46 +1,65 @@
 <template>
-  <AppHeader title="Задачи" :on-menu-click="openSidebar" />
+  <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar">
+    <template #right>
+      <ViewModeToggle
+        v-if="project"
+        :model-value="project.viewMode"
+        @update:model-value="handleViewModeChange"
+      />
+    </template>
+  </AppHeader>
   <PageContainer>
-    <!-- Форма добавления новой задачи -->
     <div class="mb-6">
-      <TaskForm ref="taskFormRef" :loading="isCreatingTask" @submit="handleAddTask as any" />
+      <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
     </div>
 
-    <!-- Загрузка -->
     <div v-if="loading" class="text-center py-8">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
       <p class="mt-2 text-muted-foreground">Загрузка задач...</p>
     </div>
 
-    <!-- Ошибка -->
     <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
       <p class="text-destructive">{{ error }}</p>
-      <button
-        @click="fetchTasks"
-        class="mt-2 px-3 py-1 bg-destructive/20 text-destructive rounded hover:bg-destructive/30"
-      >
-        Повторить
-      </button>
     </div>
 
-    <!-- Список задач -->
     <div v-else>
-      <div v-if="sortedTasks.length === 0" class="p-6 text-center text-muted-foreground">
-        Пока нет задач. Добавьте первую задачу выше.
-      </div>
+      <!-- Board view -->
+      <BoardView
+        v-if="project?.viewMode === 'board'"
+        :project-id="projectId"
+        @toggle-task="handleToggleTask"
+        @open-task="handleOpenTask"
+      />
 
-      <div v-else role="list" class="divide-y divide-border">
-        <TaskCard
-          v-for="task in sortedTasks"
-          :key="task.id"
-          :task="task"
-          :project-name="getProjectName(task)"
-          @toggle="handleToggleTask"
-          @show-timer="handleShowTimer"
-          @delete="handleDeleteTask"
-          @open="handleOpenTask"
-        />
-      </div>
+      <!-- List with grouping (when columns exist) -->
+      <GroupedListView
+        v-else-if="columns.length > 0"
+        :columns="columns"
+        :tasks="filteredTasks"
+        @toggle-task="handleToggleTask"
+        @open-task="handleOpenTask"
+        @delete-task="handleDeleteTask"
+        @show-timer="handleShowTimer"
+      />
+
+      <!-- Simple list (no columns) -->
+      <template v-else>
+        <div v-if="filteredTasks.length === 0" class="p-6 text-center text-muted-foreground">
+          В этом проекте пока нет задач.
+        </div>
+
+        <div v-else role="list" class="divide-y divide-border">
+          <TaskCard
+            v-for="task in filteredTasks"
+            :key="task.id"
+            :task="task"
+            @toggle="handleToggleTask"
+            @show-timer="handleShowTimer"
+            @delete="handleDeleteTask"
+            @open="handleOpenTask"
+          />
+        </div>
+      </template>
     </div>
   </PageContainer>
   <TaskDetailDialog
@@ -52,29 +71,36 @@
     @update:checklist="handleUpdateChecklist"
     @update:pomodoro-config="handleUpdatePomodoroConfig"
   />
-  <Teleport to="body">
-    <TimeBlock v-show="!isDetailOpen" />
-  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed, inject } from 'vue'
+import { onMounted, ref, computed, inject, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import type { Task, ChecklistItem } from '@/features/tasks/model/types'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
-import { TimeBlock, useTimerStore } from '@/features/task-timer'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useColumnStore } from '@/features/projects/model/column-store'
 import { useConfirm } from '@/composables/useConfirm'
 import PageContainer from '@/components/PageContainer.vue'
 import AppHeader from '@/components/AppHeader.vue'
+import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
+import BoardView from '@/features/projects/ui/BoardView.vue'
+import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 
 const openSidebar = inject<() => void>('openSidebar')
+const route = useRoute()
+const projectId = computed(() => route.params.projectId as string)
 
-const timerStore = useTimerStore()
-const { startTask } = timerStore
+const projectStore = useProjectStore()
+const project = computed(() => projectStore.projectMap.get(projectId.value))
+
+const columnStore = useColumnStore()
+const columns = computed(() => columnStore.columns)
+
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
 
@@ -90,50 +116,51 @@ const {
   updatePomodoroConfig,
 } = taskStore
 
-const projectStore = useProjectStore()
-
 const { confirm } = useConfirm()
-
-const getProjectName = (task: Task) => {
-  if (!task.projectId) return undefined
-  return projectStore.projectMap.get(task.projectId)?.title
-}
 
 const selectedTask = ref<Task | null>(null)
 const isDetailOpen = ref(false)
+
+const filteredTasks = computed(() => {
+  return tasks.value
+    .filter(t => t.projectId === projectId.value)
+    .sort((a, b) => {
+      if (a.completed === b.completed) return (a.order ?? 0) - (b.order ?? 0)
+      return a.completed ? 1 : -1
+    })
+})
 
 const handleOpenTask = (task: Task) => {
   selectedTask.value = task
   isDetailOpen.value = true
 }
 
+async function handleViewModeChange(mode: string) {
+  await projectStore.updateProject(projectId.value, { viewMode: mode as 'list' | 'board' })
+}
+
 const handleUpdateTask = async (updatedTask: Task) => {
   const index = tasks.value.findIndex(t => t.id === updatedTask.id)
   const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
 
-  // Optimistic update
   if (index !== -1) tasks.value[index] = updatedTask
   selectedTask.value = updatedTask
 
   try {
     await updateTask(updatedTask.id, updatedTask, false)
   } catch (err) {
-    // Rollback
     if (previous && index !== -1) {
       tasks.value[index] = previous
       selectedTask.value = previous
     }
-    console.error('Ошибка обновления задачи:', err)
   }
 }
 
 const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => {
-  // Optimistic update
   const index = tasks.value.findIndex(t => t.id === taskId)
   const previousChecklist = index !== -1 ? tasks.value[index]?.checklist : undefined
   if (index !== -1) {
-    const task = tasks.value[index]
-    tasks.value[index] = { ...task, checklist: { items } } as Task
+    tasks.value[index] = { ...tasks.value[index], checklist: { items } } as Task
   }
   if (selectedTask.value?.id === taskId) {
     selectedTask.value = { ...selectedTask.value, checklist: { items } } as Task
@@ -142,15 +169,12 @@ const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => 
   try {
     await updateChecklist(taskId, items)
   } catch (err) {
-    // Rollback
     if (index !== -1) {
-      const task = tasks.value[index]
-      tasks.value[index] = { ...task, checklist: previousChecklist } as Task
+      tasks.value[index] = { ...tasks.value[index], checklist: previousChecklist } as Task
     }
     if (selectedTask.value?.id === taskId) {
       selectedTask.value = { ...selectedTask.value, checklist: previousChecklist } as Task
     }
-    console.error('Ошибка обновления чеклиста:', err)
   }
 }
 
@@ -158,7 +182,6 @@ const handleUpdatePomodoroConfig = async (taskId: string, config: Record<string,
   const index = tasks.value.findIndex(t => t.id === taskId)
   const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
 
-  // Optimistic update
   if (index !== -1) {
     tasks.value[index] = { ...tasks.value[index], ...config } as Task
   }
@@ -169,12 +192,10 @@ const handleUpdatePomodoroConfig = async (taskId: string, config: Record<string,
   try {
     await updatePomodoroConfig(taskId, config)
   } catch (err) {
-    // Rollback
     if (previous && index !== -1) {
       tasks.value[index] = previous
       selectedTask.value = previous
     }
-    console.error('Ошибка обновления помодоро:', err)
   }
 }
 
@@ -184,19 +205,10 @@ const handleDeleteFromDialog = async (taskId: string) => {
   await handleDeleteTask(taskId)
 }
 
-const sortedTasks = computed(() => {
-  return [...tasks.value]
-    .filter(t => !t.projectId)
-    .sort((a, b) => {
-      if (a.completed === b.completed) return 0
-      return a.completed ? 1 : -1
-    })
-})
-
 const handleAddTask = async (taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) => {
   isCreatingTask.value = true
   try {
-    await createTask(taskData)
+    await createTask({ ...taskData, projectId: projectId.value })
     taskFormRef.value?.resetForm()
   } catch (err) {
     console.error('Ошибка добавления задачи:', err)
@@ -213,18 +225,8 @@ const handleToggleTask = async (taskId: string) => {
   }
 }
 
-const handleShowTimer = (taskId: string) => {
-  const task = tasks.value.find(t => t.id === taskId)
-  if (!task?.isPomodoroTask) return
-
-  startTask({
-    id: task.id,
-    pomodoroTime: task.pomodoroDuration || 25,
-    breakTime: task.shortBreak || 5,
-    longBreakTime: task.longBreak || 15,
-    longBreakInterval: task.longBreakInterval || 4,
-    pomodoroCount: task.pomodoroCount || 4
-  })
+const handleShowTimer = (_taskId: string) => {
+  // Timer integration if needed
 }
 
 const handleDeleteTask = async (taskId: string) => {
@@ -232,7 +234,7 @@ const handleDeleteTask = async (taskId: string) => {
     title: 'Удалить задачу?',
     message: 'Это действие нельзя отменить.',
     confirmText: 'Удалить',
-    cancelText: 'Отмена'
+    cancelText: 'Отмена',
   })
   if (confirmed) {
     try {
@@ -245,5 +247,10 @@ const handleDeleteTask = async (taskId: string) => {
 
 onMounted(() => {
   fetchTasks()
+  columnStore.fetchColumns(projectId.value)
+})
+
+watch(projectId, (id) => {
+  if (id) columnStore.fetchColumns(id)
 })
 </script>
