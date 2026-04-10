@@ -1,6 +1,11 @@
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="flex flex-col gap-0 p-0 max-w-3xl h-[95vh] overflow-hidden [&>button:last-child]:hidden">
+    <DialogContent :class="[
+      'flex flex-col gap-0 p-0 overflow-hidden [&>button:last-child]:hidden',
+      isMobile
+        ? 'inset-0 h-[100dvh] w-full max-w-none rounded-none translate-x-0 translate-y-0 left-0 top-0 border-0'
+        : 'max-w-3xl h-[95vh]',
+    ]">
       <!-- Header -->
       <div class="flex items-center justify-between px-5 py-3 border-b border-border/60">
         <div class="flex items-center gap-2.5">
@@ -180,8 +185,23 @@
           </div>
         </div>
 
-        <!-- Sidebar -->
-        <div class="sm:w-60 shrink-0 border-t sm:border-t-0 sm:border-l border-border/60 overflow-y-auto bg-muted/30">
+        <!-- Mobile: chip row at bottom -->
+        <div v-if="isMobile" class="shrink-0 border-t border-border/60 bg-background">
+          <TaskPropertyChips
+            :project-title="projectTitle"
+            :due-date="localDueDate"
+            :deadline="localDeadline"
+            :priority="localPriority"
+            :location="localLocation"
+            :tags="localTags"
+            :recurrence="localRecurrence"
+            :editable="editable"
+            @select="activeDrawer = $event"
+          />
+        </div>
+
+        <!-- Desktop: sidebar -->
+        <div v-if="!isMobile" class="sm:w-60 shrink-0 border-t sm:border-t-0 sm:border-l border-border/60 overflow-y-auto bg-muted/30">
           <!-- Проект -->
           <ProjectPicker
             :model-value="localProjectId"
@@ -391,10 +411,63 @@
       </div>
     </DialogContent>
   </Dialog>
+
+  <!-- Mobile bottom drawer -->
+  <Drawer v-if="isMobile" v-model:open="drawerOpen">
+    <DrawerContent class="max-h-[85dvh]">
+      <DrawerHeader>
+        <DrawerTitle>{{ drawerTitle }}</DrawerTitle>
+      </DrawerHeader>
+      <div class="px-4 pb-6 overflow-y-auto">
+        <ProjectPickerContent
+          v-if="activeDrawer === 'project'"
+          :model-value="localProjectId"
+          @update:model-value="onProjectChange"
+        />
+        <DueDatePickerContent
+          v-if="activeDrawer === 'dueDate'"
+          :model-value="localDueDate"
+          :time="localDueTime"
+          @update:model-value="onDueDateDrawerChange"
+          @update:time="localDueTime = $event"
+        />
+        <DeadlinePickerContent
+          v-if="activeDrawer === 'deadline'"
+          :model-value="localDeadline"
+          @update:model-value="localDeadline = $event"
+        />
+        <PriorityPickerContent
+          v-if="activeDrawer === 'priority'"
+          :model-value="localPriority"
+          @update:model-value="onPriorityDrawerChange"
+        />
+        <LocationPickerContent
+          v-if="activeDrawer === 'location'"
+          :model-value="localLocation"
+          @update:model-value="onLocationDrawerChange"
+        />
+        <TagsEditor
+          v-if="activeDrawer === 'tags'"
+          :model-value="localTags"
+          :editable="editable"
+          @update:model-value="localTags = $event; emitUpdate({ tags: [...$event] })"
+        />
+        <RecurrencePickerContent
+          v-if="activeDrawer === 'recurrence'"
+          :model-value="localRecurrence"
+          @update:model-value="onRecurrenceDrawerChange"
+        />
+        <div v-if="activeDrawer === 'reminder'" class="py-4 text-sm text-muted-foreground text-center">
+          Скоро
+        </div>
+      </div>
+    </DrawerContent>
+  </Drawer>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import {
   X,
   EllipsisVertical,
@@ -411,6 +484,7 @@ import {
   Repeat,
 } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { ContentEditableInput } from '@/components/ui/content-editable-input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -446,8 +520,39 @@ import RecurrencePicker from './RecurrencePicker.vue'
 import PriorityPicker from './PriorityPicker.vue'
 import DeadlinePicker from './DeadlinePicker.vue'
 import PomodoroSettings from './PomodoroSettings.vue'
+import TaskPropertyChips from './TaskPropertyChips.vue'
+import PriorityPickerContent from './PriorityPickerContent.vue'
+import RecurrencePickerContent from './RecurrencePickerContent.vue'
+import DeadlinePickerContent from './DeadlinePickerContent.vue'
+import DueDatePickerContent from './DueDatePickerContent.vue'
+import LocationPickerContent from './LocationPickerContent.vue'
 import ProjectPicker from '@/features/projects/ui/ProjectPicker.vue'
+import ProjectPickerContent from '@/features/projects/ui/ProjectPickerContent.vue'
 import { useProjectStore } from '@/features/projects/model/project-store'
+
+// Mobile detection
+const isDesktop = useMediaQuery('(min-width: 640px)')
+const isMobile = computed(() => !isDesktop.value)
+
+// Drawer state
+type DrawerField = 'project' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
+const activeDrawer = ref<DrawerField | null>(null)
+const drawerOpen = computed({
+  get: () => activeDrawer.value !== null,
+  set: (v) => { if (!v) activeDrawer.value = null },
+})
+
+const DRAWER_TITLES: Record<DrawerField, string> = {
+  project: 'Проект',
+  dueDate: 'Срок',
+  deadline: 'Дедлайн',
+  priority: 'Приоритет',
+  location: 'Место',
+  tags: 'Теги',
+  recurrence: 'Повторение',
+  reminder: 'Напоминание',
+}
+const drawerTitle = computed(() => activeDrawer.value ? DRAWER_TITLES[activeDrawer.value] : '')
 
 const props = withDefaults(defineProps<{
   task: Task | null
@@ -496,14 +601,44 @@ const localRecurrence = ref<RecurrenceRule | null>(null)
 const localProjectId = ref<string | null>(null)
 const projectStore = useProjectStore()
 
+const projectTitle = computed(() =>
+  localProjectId.value
+    ? projectStore.projectMap.get(localProjectId.value)?.title ?? null
+    : null,
+)
+
 function onProjectChange(value: string | null) {
   localProjectId.value = value
   emitUpdate({ projectId: value })
+  activeDrawer.value = null
 }
 
 function onRecurrenceChange(value: RecurrenceRule | null) {
   localRecurrence.value = value
   emitUpdate({ recurrence: value })
+}
+
+// Drawer-specific handlers (auto-close for single-select)
+function onPriorityDrawerChange(value: Priority | undefined) {
+  localPriority.value = value
+  emitUpdate({ priority: value })
+  activeDrawer.value = null
+}
+
+function onRecurrenceDrawerChange(value: RecurrenceRule | null) {
+  localRecurrence.value = value
+  emitUpdate({ recurrence: value })
+  activeDrawer.value = null
+}
+
+function onLocationDrawerChange(value: string | undefined) {
+  localLocation.value = value || ''
+  emitUpdate({ location: value })
+  activeDrawer.value = null
+}
+
+function onDueDateDrawerChange(val: Date | undefined) {
+  localDueDate.value = val
 }
 
 // Pomodoro refs

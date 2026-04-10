@@ -1,48 +1,23 @@
 <template>
   <DropdownMenuContent class="w-auto p-0" align="start">
-    <div class="p-3 space-y-3">
-      <Calendar :model-value="calendarValue" @update:model-value="onDateChange" />
-      <Input
-        v-model="deadlineTime"
-        type="time"
-        class="w-full"
-        @change="onTimeChange"
+    <div class="p-3">
+      <DeadlinePickerContent
+        :model-value="modelValue"
+        @update:model-value="$emit('update:modelValue', $event)"
       />
     </div>
   </DropdownMenuContent>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Input } from '@/components/ui/input'
-import { Calendar } from '@/components/ui/calendar'
 import { DropdownMenuContent } from '@/components/ui/dropdown-menu'
-import { toDate, toCalendarDateValue, getTimeString, updateDeadlineTime } from '../lib/dateTime'
+import DeadlinePickerContent from './DeadlinePickerContent.vue'
 
-const props = defineProps<{
+defineProps<{
   modelValue: Date | undefined
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'update:modelValue', value: Date | undefined): void
 }>()
-
-const deadlineTime = ref(props.modelValue ? getTimeString(props.modelValue) : '')
-
-const calendarValue = computed(() => toCalendarDateValue(props.modelValue))
-
-function onDateChange(val: any) {
-  const newDate = toDate(val)
-  if (newDate && deadlineTime.value) {
-    emit('update:modelValue', updateDeadlineTime(newDate, deadlineTime.value))
-  } else {
-    emit('update:modelValue', newDate)
-  }
-}
-
-function onTimeChange() {
-  if (props.modelValue) {
-    emit('update:modelValue', updateDeadlineTime(props.modelValue, deadlineTime.value))
-  }
-}
 </script>
