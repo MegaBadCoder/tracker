@@ -4,9 +4,9 @@
       'absolute left-0.5 right-0.5 rounded-md px-2 py-1 text-xs overflow-hidden border',
       hidden ? 'invisible' : isVirtual ? 'cursor-default' : 'cursor-grab',
       completed
-        ? 'opacity-60 bg-green-500/15 border-green-500/30 text-green-600 dark:text-green-400'
+        ? 'bg-emerald-500/25 border-emerald-500/40 text-white backdrop-blur-sm'
         : isVirtual
-          ? 'opacity-40 border-dashed border-border bg-muted/30'
+          ? 'border-dashed border-border/40 bg-muted/60 text-white backdrop-blur-sm'
           : priorityClasses,
     ]"
     :style="blockStyle"
@@ -14,18 +14,37 @@
     @pointerdown="onPointerDown"
   >
     <div :class="['font-medium truncate flex items-center gap-1', completed && 'line-through']">
-      <Repeat v-if="event.isRecurring" :size="10" class="shrink-0 opacity-60" />
+      <RoundCheckbox
+        v-if="!isVirtual"
+        :model-value="completed"
+        class="shrink-0 scale-75 origin-center calendar-checkbox"
+        @click.stop
+        @pointerdown.stop
+        @update:model-value="emit('toggle', event.taskId)"
+      />
+      <Repeat v-if="event.isRecurring" :size="10" class="shrink-0" />
       {{ event.title }}
     </div>
-    <div class="text-[10px] opacity-70">
+    <div class="text-[10px] opacity-80">
       {{ timeLabel }}
     </div>
+    <div v-if="event.pomodoroLabel" class="text-[10px] opacity-80 flex items-center gap-0.5">
+      <Timer :size="8" class="shrink-0" />
+      {{ event.pomodoroLabel }}
+    </div>
+    <div
+      v-if="event.resizable"
+      data-testid="resize-handle"
+      class="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-white/20 transition-colors"
+      @pointerdown.stop="onResizeDown"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Repeat } from 'lucide-vue-next'
+import { Repeat, Timer } from 'lucide-vue-next'
+import RoundCheckbox from '@/components/ui/roundCheckbox/RoundCheckbox.vue'
 import type { CalendarEvent } from '../model/types'
 import { getPriorityEventClasses } from '../lib/calendar-styles'
 
@@ -39,6 +58,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   grab: [event: CalendarEvent, pointerEvent: PointerEvent]
+  'resize-start': [event: CalendarEvent, pointerEvent: PointerEvent]
+  toggle: [taskId: string]
 }>()
 
 const completed = computed(() => props.event.completed)
@@ -70,4 +91,21 @@ function onPointerDown(e: PointerEvent) {
   if (e.button !== 0 || isVirtual.value) return
   emit('grab', props.event, e)
 }
+
+function onResizeDown(e: PointerEvent) {
+  if (e.button !== 0) return
+  emit('resize-start', props.event, e)
+}
 </script>
+
+<style scoped>
+.calendar-checkbox :deep(.round-checkbox__icon div) {
+  border-color: rgba(255, 255, 255, 0.6);
+  width: 1rem;
+  height: 1rem;
+}
+
+.calendar-checkbox:hover :deep(.round-checkbox__icon div) {
+  border-color: #fff;
+}
+</style>

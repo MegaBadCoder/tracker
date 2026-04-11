@@ -91,6 +91,11 @@ export const useTaskStore = defineStore('tasks', () => {
   }
 
   const updateTask = async (taskId: string, updates: Partial<Task>, setLoading = true) => {
+    if (taskId.includes('__virtual__')) {
+      console.warn('Attempted to update a virtual task instance, ignoring:', taskId)
+      return
+    }
+
     if (setLoading) {
       loading.value = true
       error.value = null
@@ -113,13 +118,17 @@ export const useTaskStore = defineStore('tasks', () => {
 
       const index = tasks.value.findIndex(t => t.id === taskId)
       if (index !== -1) {
-        tasks.value[index] = { ...updatedTask, checklist: tasks.value[index]?.checklist }
+        const existing = tasks.value[index]!
+        tasks.value[index] = { ...existing, ...updatedTask, checklist: existing.checklist }
       }
 
-      // Handle recurring: add new instance to store
+      // Handle recurring: add new instance to store (avoid duplicates)
       if (response.nextInstance) {
         const nextInstance = parseTask(response.nextInstance as Record<string, unknown>)
-        tasks.value.unshift(nextInstance)
+        const alreadyExists = tasks.value.some(t => t.id === nextInstance.id)
+        if (!alreadyExists) {
+          tasks.value.unshift(nextInstance)
+        }
       }
 
       // Handle recurring: remove deleted instance from store

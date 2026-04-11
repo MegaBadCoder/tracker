@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -76,6 +76,10 @@ export class TaskService {
     id: string,
     dto: UpdateTaskDto,
   ): Promise<UpdateTaskResponse> {
+    if (id.includes('__virtual__')) {
+      throw new BadRequestException('Virtual task instances cannot be modified directly.');
+    }
+
     const { dueDate, deadline, recurrence, ...rest } = dto;
 
     const task = await this.taskRepo.findById(id, userId);
@@ -92,8 +96,11 @@ export class TaskService {
       task.completed &&
       task.recurrence;
 
-    // Apply scalar fields
-    Object.assign(task, rest);
+    // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
+    const defined = Object.fromEntries(
+      Object.entries(rest).filter(([, v]) => v !== undefined),
+    );
+    Object.assign(task, defined);
     if (dueDate !== undefined)
       task.dueDate = dueDate ? new Date(dueDate) : null;
     if (deadline !== undefined)

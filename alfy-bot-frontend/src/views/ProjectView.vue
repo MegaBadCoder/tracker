@@ -96,13 +96,14 @@ import { onMounted, ref, computed, inject, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
-import type { Task, ChecklistItem } from '@/features/tasks/model/types'
+import type { Task } from '@/features/tasks/model/types'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useConfirm } from '@/composables/useConfirm'
+import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import PageContainer from '@/components/PageContainer.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
@@ -128,17 +129,21 @@ const { tasks, loading, error } = storeToRefs(taskStore)
 const {
   fetchTasks,
   createTask,
-  updateTask,
   toggleTask,
   deleteTask,
-  updateChecklist,
-  updatePomodoroConfig,
 } = taskStore
 
 const { confirm } = useConfirm()
 
-const selectedTask = ref<Task | null>(null)
-const isDetailOpen = ref(false)
+const {
+  selectedTask,
+  isDetailOpen,
+  handleOpenTask,
+  handleUpdateTask,
+  handleUpdateChecklist,
+  handleUpdatePomodoroConfig,
+  handleDeleteFromDialog,
+} = useTaskDetailHandlers(taskStore, confirm)
 
 const filteredTasks = computed(() => {
   return tasks.value
@@ -149,79 +154,8 @@ const filteredTasks = computed(() => {
     })
 })
 
-const handleOpenTask = (task: Task) => {
-  selectedTask.value = task
-  isDetailOpen.value = true
-}
-
 async function handleViewModeChange(mode: string) {
   await projectStore.updateProject(projectId.value, { viewMode: mode as 'list' | 'board' })
-}
-
-const handleUpdateTask = async (updatedTask: Task) => {
-  const index = tasks.value.findIndex(t => t.id === updatedTask.id)
-  const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
-
-  if (index !== -1) tasks.value[index] = updatedTask
-  selectedTask.value = updatedTask
-
-  try {
-    await updateTask(updatedTask.id, updatedTask, false)
-  } catch (err) {
-    if (previous && index !== -1) {
-      tasks.value[index] = previous
-      selectedTask.value = previous
-    }
-  }
-}
-
-const handleUpdateChecklist = async (taskId: string, items: ChecklistItem[]) => {
-  const index = tasks.value.findIndex(t => t.id === taskId)
-  const previousChecklist = index !== -1 ? tasks.value[index]?.checklist : undefined
-  if (index !== -1) {
-    tasks.value[index] = { ...tasks.value[index], checklist: { items } } as Task
-  }
-  if (selectedTask.value?.id === taskId) {
-    selectedTask.value = { ...selectedTask.value, checklist: { items } } as Task
-  }
-
-  try {
-    await updateChecklist(taskId, items)
-  } catch (err) {
-    if (index !== -1) {
-      tasks.value[index] = { ...tasks.value[index], checklist: previousChecklist } as Task
-    }
-    if (selectedTask.value?.id === taskId) {
-      selectedTask.value = { ...selectedTask.value, checklist: previousChecklist } as Task
-    }
-  }
-}
-
-const handleUpdatePomodoroConfig = async (taskId: string, config: Record<string, unknown>) => {
-  const index = tasks.value.findIndex(t => t.id === taskId)
-  const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
-
-  if (index !== -1) {
-    tasks.value[index] = { ...tasks.value[index], ...config } as Task
-  }
-  if (selectedTask.value?.id === taskId) {
-    selectedTask.value = { ...selectedTask.value, ...config } as Task
-  }
-
-  try {
-    await updatePomodoroConfig(taskId, config)
-  } catch (err) {
-    if (previous && index !== -1) {
-      tasks.value[index] = previous
-      selectedTask.value = previous
-    }
-  }
-}
-
-const handleDeleteFromDialog = async (taskId: string) => {
-  isDetailOpen.value = false
-  selectedTask.value = null
-  await handleDeleteTask(taskId)
 }
 
 const handleAddTask = async (taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) => {

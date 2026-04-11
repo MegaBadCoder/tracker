@@ -14,6 +14,8 @@
       :event="event"
       :hidden="event.taskId === draggedTaskId"
       @grab="(ev, pe) => $emit('grab', ev, pe)"
+      @resize-start="(ev, pe) => $emit('resize-start', ev, pe)"
+      @toggle="(taskId) => $emit('toggle', taskId)"
     />
   </div>
 </template>
@@ -33,6 +35,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   drop: [payload: CalendarDropPayload]
   grab: [event: CalendarEvent, pointerEvent: PointerEvent]
+  'resize-start': [event: CalendarEvent, pointerEvent: PointerEvent]
+  toggle: [taskId: string]
 }>()
 
 const isDragOver = ref(false)
@@ -42,8 +46,10 @@ function onDrop(e: DragEvent) {
   const taskId = e.dataTransfer?.getData('text/plain')
   if (!taskId) return
 
+  const isVirtual = taskId.includes('__virtual__')
+
   if (!props.gridElement) {
-    emit('drop', { taskId, newDate: props.day })
+    emit('drop', { taskId, newDate: props.day, isVirtual })
     return
   }
 
@@ -53,6 +59,6 @@ function onDrop(e: DragEvent) {
   const rawMinutes = Math.round((y / totalHeight) * 24 * 60)
   const startMinutes = Math.max(0, Math.min(Math.round(rawMinutes / 5) * 5, 23 * 60 + 55))
 
-  emit('drop', { taskId, newDate: props.day, startMinutes })
+  emit('drop', { taskId, newDate: props.day, startMinutes, isVirtual })
 }
 </script>

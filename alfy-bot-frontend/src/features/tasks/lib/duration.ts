@@ -2,7 +2,7 @@ import type { Task } from '../model/types'
 import { POMODORO_DEFAULTS } from '../model/constants'
 
 export function computeTaskDurationMinutes(task: Task): number {
-  if (!task.isPomodoroTask) return 60
+  if (!task.isPomodoroTask) return task.durationMinutes ?? 60
 
   const count = task.pomodoroCount ?? POMODORO_DEFAULTS.count
   const duration = task.pomodoroDuration ?? POMODORO_DEFAULTS.duration

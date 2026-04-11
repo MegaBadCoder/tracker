@@ -21,6 +21,10 @@ function taskToEvent(task: Task, date: Date, isVirtual = false): CalendarEvent {
     completed: isVirtual ? false : task.completed,
     isRecurring: !!task.recurrence,
     isVirtual,
+    resizable: !isVirtual && !task.isPomodoroTask && hasTime,
+    pomodoroLabel: task.isPomodoroTask
+      ? `${task.pomodoroCount ?? 4}x${task.pomodoroDuration ?? 25} мин`
+      : undefined,
   }
 }
 

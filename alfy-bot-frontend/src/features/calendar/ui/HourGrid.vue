@@ -60,6 +60,8 @@
         :style="{ position: 'absolute', top: '0', left: dayOffset(day) + 'px', width: dayWidth + 'px', height: '1440px' }"
         @drop="payload => $emit('drop', payload)"
         @grab="onGrab"
+        @resize-start="onResizeStart"
+        @toggle="(taskId) => $emit('toggle', taskId)"
       />
 
       <!-- Drag overlay ghost -->
@@ -96,20 +98,25 @@ const props = defineProps<{
   events: CalendarEvent[]
   gridRef: HTMLElement | null
   onTaskMoved: (taskId: string, newDate: Date, startMinutes: number) => Promise<void>
+  onTaskResized: (taskId: string, durationMinutes: number) => Promise<void>
 }>()
 
 const emit = defineEmits<{
   drop: [payload: CalendarDropPayload]
+  open: [event: CalendarEvent]
+  toggle: [taskId: string]
 }>()
 
 const trackRef = ref<HTMLElement | null>(null)
 
-const { showOverlay, draggedTaskId, draggedEvent, overlayStyle, overlayHeight, overlayTimeLabel, onGrab } = usePointerDnd({
+const { showOverlay, draggedTaskId, draggedEvent, overlayStyle, overlayHeight, overlayTimeLabel, onGrab, onResizeStart } = usePointerDnd({
   trackEl: trackRef,
   dayOffset: (d: Date) => props.dayOffset(d),
   dateFromX: (x: number) => props.dateFromX(x),
   dayWidth: props.dayWidth,
   onMoved: (taskId, newDate, startMinutes) => props.onTaskMoved(taskId, newDate, startMinutes),
+  onClicked: (event) => emit('open', event),
+  onResized: (taskId, durationMinutes) => props.onTaskResized(taskId, durationMinutes),
 })
 
 const ghostClasses = computed(() => {

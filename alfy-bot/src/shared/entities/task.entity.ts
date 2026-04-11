@@ -41,6 +41,9 @@ export class Task {
   @Column({ type: 'datetime', nullable: true })
   deadline: Date | null;
 
+  @Column({ type: 'integer', nullable: true })
+  durationMinutes: number | null;
+
   @Column({ type: 'text', nullable: true })
   location: string | null;
 

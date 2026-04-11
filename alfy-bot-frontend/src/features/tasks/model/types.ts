@@ -19,6 +19,7 @@ export interface Task {
   completed: boolean
   dueDate?: Date
   deadline?: Date
+  durationMinutes?: number
   priority?: Priority
   location?: string
   tags?: string[]

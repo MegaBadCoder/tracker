@@ -21,13 +21,17 @@
           v-for="event in getEventsForDay(day)"
           :key="event.taskId"
           :class="[
-            'text-[10px] px-1.5 py-0.5 rounded truncate max-w-full cursor-grab border',
+            'text-[10px] px-1.5 py-0.5 rounded truncate max-w-full border',
+            event.isVirtual ? 'cursor-default' : 'cursor-grab',
             event.completed
-              ? 'opacity-50 bg-muted border-border line-through'
-              : chipClasses(event),
+              ? 'bg-muted border-border line-through'
+              : event.isVirtual
+                ? 'border-dashed border-border/60 bg-muted'
+                : chipClasses(event),
           ]"
-          draggable="true"
-          @dragstart="onDragStart($event, event.taskId)"
+          :draggable="!event.isVirtual"
+          @dragstart="onDragStart($event, event)"
+          @click.stop="$emit('open', event)"
         >
           {{ event.title }}
         </div>
@@ -53,6 +57,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   drop: [payload: CalendarDropPayload]
   dragstart: [event: DragEvent, taskId: string]
+  open: [event: CalendarEvent]
 }>()
 
 const dragOverDay = ref<string | null>(null)
@@ -65,14 +70,19 @@ function chipClasses(event: CalendarEvent): string {
   return getPriorityEventClasses(event.priority)
 }
 
-function onDragStart(e: DragEvent, taskId: string) {
-  emit('dragstart', e, taskId)
+function onDragStart(e: DragEvent, event: CalendarEvent) {
+  if (event.isVirtual) {
+    e.preventDefault()
+    return
+  }
+  emit('dragstart', e, event.taskId)
 }
 
 function onDrop(e: DragEvent, day: Date) {
   dragOverDay.value = null
   const taskId = e.dataTransfer?.getData('text/plain')
   if (!taskId) return
-  emit('drop', { taskId, newDate: day })
+  const event = props.events.find(ev => ev.taskId === taskId)
+  emit('drop', { taskId, newDate: day, isVirtual: event?.isVirtual ?? false })
 }
 </script>

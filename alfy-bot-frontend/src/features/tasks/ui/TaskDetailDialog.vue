@@ -110,6 +110,21 @@
             />
           </div>
 
+          <!-- Mobile: property chips -->
+          <TaskPropertyChips
+            v-if="isMobile"
+            :project-title="projectTitle"
+            :due-date="localDueDate"
+            :deadline="localDeadline"
+            :priority="localPriority"
+            :location="localLocation"
+            :tags="localTags"
+            :recurrence="localRecurrence"
+            :editable="editable"
+            class="-mx-7 border-y border-border/40"
+            @select="activeDrawer = $event"
+          />
+
           <!-- Checklist -->
           <div class="space-y-2.5">
             <div class="flex items-center justify-between">
@@ -183,21 +198,6 @@
               />
             </div>
           </div>
-        </div>
-
-        <!-- Mobile: chip row at bottom -->
-        <div v-if="isMobile" class="shrink-0 border-t border-border/60 bg-background">
-          <TaskPropertyChips
-            :project-title="projectTitle"
-            :due-date="localDueDate"
-            :deadline="localDeadline"
-            :priority="localPriority"
-            :location="localLocation"
-            :tags="localTags"
-            :recurrence="localRecurrence"
-            :editable="editable"
-            @select="activeDrawer = $event"
-          />
         </div>
 
         <!-- Desktop: sidebar -->

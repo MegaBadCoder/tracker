@@ -12,10 +12,13 @@ export interface CalendarEvent {
   completed: boolean
   isRecurring?: boolean
   isVirtual?: boolean
+  resizable: boolean
+  pomodoroLabel?: string
 }
 
 export interface CalendarDropPayload {
   taskId: string
   newDate: Date
   startMinutes?: number
+  isVirtual?: boolean
 }

@@ -52,6 +52,7 @@
           :events="calendarEvents"
           @drop="onDrop"
           @dragstart="onDragStart"
+          @open="onEventOpen"
         />
 
         <!-- Hour grid -->
@@ -64,7 +65,10 @@
           :events="calendarEvents"
           :grid-ref="gridRef"
           :on-task-moved="onTaskMoved"
+          :on-task-resized="onTaskResized"
           @drop="onDrop"
+          @open="onEventOpen"
+          @toggle="onToggleTask"
         />
 
       </div>
@@ -81,10 +85,14 @@ import { isToday, formatDayHeader, formatDateRange } from '../lib/week'
 import { useCalendarDnd } from '../lib/use-calendar-dnd'
 import { useInfiniteDays, DAY_WIDTH, TRACK_WIDTH, GUTTER_WIDTH } from '../lib/use-infinite-days'
 import { useGrabScroll } from '../lib/use-grab-scroll'
-import type { CalendarDropPayload } from '../model/types'
+import type { CalendarEvent, CalendarDropPayload } from '../model/types'
 import CalendarHeader from './CalendarHeader.vue'
 import AllDaySection from './AllDaySection.vue'
 import HourGrid from './HourGrid.vue'
+
+const emit = defineEmits<{
+  'open-task': [task: import('@/features/tasks/model/types').Task]
+}>()
 
 const taskStore = useTaskStore()
 const { startDrag } = useCalendarDnd()
@@ -145,7 +153,30 @@ async function onTaskMoved(taskId: string, newDate: Date, startMinutes: number) 
   await applyTaskMove(taskId, newDate, startMinutes)
 }
 
+async function onTaskResized(taskId: string, durationMinutes: number) {
+  try {
+    await taskStore.updateTask(taskId, { durationMinutes }, false)
+  } catch (err) {
+    console.error('Ошибка изменения длительности:', err)
+  }
+}
+
+async function onToggleTask(taskId: string) {
+  try {
+    await taskStore.toggleTask(taskId)
+  } catch (err) {
+    console.error('Ошибка переключения задачи:', err)
+  }
+}
+
+function onEventOpen(event: CalendarEvent) {
+  if (!event.isVirtual) {
+    emit('open-task', event.task)
+  }
+}
+
 function onDrop(payload: CalendarDropPayload) {
+  if (payload.isVirtual) return
   applyTaskMove(payload.taskId, payload.newDate, payload.startMinutes)
 }
 

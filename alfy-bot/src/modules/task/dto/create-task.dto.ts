@@ -70,6 +70,12 @@ export class CreateTaskDto {
   @IsDateString()
   deadline?: string;
 
+  @ApiPropertyOptional({ example: 90 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  durationMinutes?: number;
+
   @ApiPropertyOptional({ example: 'Офис' })
   @IsOptional()
   @IsString()
