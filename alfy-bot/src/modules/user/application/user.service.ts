@@ -6,37 +6,31 @@ import { UserRepositoryPort } from '../domain/user-repository.port';
 export class UserService {
   constructor(private userRepo: UserRepositoryPort) {}
 
-  async getTelegramId(userId: number): Promise<number | null> {
-    const user = await this.userRepo.findOneById(userId);
-    return user?.telegramId ?? null;
+  async findById(id: number): Promise<User | null> {
+    return this.userRepo.findOneById(id);
   }
 
-  async findOrCreate(
-    telegramId: number,
-    userData: Partial<User>,
-  ): Promise<User> {
-    let user = await this.userRepo.findOneByTelegramId(telegramId);
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userRepo.findOneByEmail(email);
+  }
 
-    if (!user) {
-      user = await this.userRepo.create({ telegramId, ...userData });
-    }
+  async createUser(data: Partial<User>): Promise<User> {
+    return this.userRepo.create(data);
+  }
 
-    return user;
+  async save(user: User): Promise<User> {
+    return this.userRepo.save(user);
   }
 
   async updateSettings(
-    telegramId: number,
+    userId: number,
     settings: Partial<User['settings']>,
   ): Promise<void> {
-    const user = await this.userRepo.findOneByTelegramId(telegramId);
+    const user = await this.userRepo.findOneById(userId);
     if (user) {
       user.settings = { ...user.settings, ...settings };
       await this.userRepo.save(user);
     }
-  }
-
-  async findById(id: number): Promise<User | null> {
-    return this.userRepo.findOneById(id);
   }
 
   async updateTimezone(userId: number, timezone: string): Promise<string> {

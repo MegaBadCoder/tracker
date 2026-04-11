@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportService } from '../../report/application/report.service';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 import { ReportScene } from './report.scene';
 
 function makeQuestion(overrides: Record<string, any> = {}) {
@@ -50,7 +50,7 @@ describe('ReportScene', () => {
   let scene: ReportScene;
   let goalService: Record<string, jest.Mock>;
   let reportService: Record<string, jest.Mock>;
-  let userService: Record<string, jest.Mock>;
+  let authService: Record<string, jest.Mock>;
   let scheduleService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
@@ -66,8 +66,8 @@ describe('ReportScene', () => {
       findLastUnfilledDate: jest.fn().mockResolvedValue(null),
     };
 
-    userService = {
-      findOrCreate: jest.fn().mockResolvedValue({ id: 1 }),
+    authService = {
+      findOrCreateTelegramUser: jest.fn().mockResolvedValue({ id: 1 }),
     };
 
     scheduleService = {
@@ -79,7 +79,7 @@ describe('ReportScene', () => {
         ReportScene,
         { provide: GoalService, useValue: goalService },
         { provide: ReportService, useValue: reportService },
-        { provide: UserService, useValue: userService },
+        { provide: AuthService, useValue: authService },
         { provide: ScheduleService, useValue: scheduleService },
       ],
     }).compile();

@@ -4,7 +4,6 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 
 export interface JwtPayload {
-  telegramId: number;
   sub: number;
 }
 
@@ -19,6 +18,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): JwtPayload {
-    return { telegramId: payload.telegramId, sub: payload.sub };
+    return { sub: payload.sub };
   }
 }

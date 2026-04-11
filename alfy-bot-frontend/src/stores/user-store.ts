@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api/client'
+import { clearToken } from '@/api/auth'
 import type { UserProfile } from '@/types/user'
 
 const USER_KEY = 'user_profile'
@@ -43,12 +44,23 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem(USER_KEY)
   }
 
+  function logout() {
+    clearUser()
+    clearToken()
+  }
+
   async function fetchMe() {
     try {
       const { data } = await api.get('/auth/me')
-      if (data && user.value) {
-        user.value.timezone = data.timezone ?? 'UTC'
-        localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+      if (data) {
+        setUser({
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          photoUrl: data.photoUrl,
+          phone: data.phone,
+          timezone: data.timezone ?? 'UTC',
+        })
       }
     } catch {
       // ignore — user profile stays from login
@@ -79,6 +91,7 @@ export const useUserStore = defineStore('user', () => {
     setUser,
     loadUser,
     clearUser,
+    logout,
     fetchMe,
     updateTimezone,
   }

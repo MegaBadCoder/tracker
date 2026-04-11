@@ -22,6 +22,11 @@ function saveToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token)
 }
 
+export function clearToken(): void {
+  _token = null
+  localStorage.removeItem(TOKEN_KEY)
+}
+
 export function isAuthenticated(): boolean {
   return !!getToken()
 }
@@ -81,4 +86,31 @@ export async function authorizeWithWidget(user: TelegramLoginWidgetUser): Promis
       photoUrl: user.photo_url,
     },
   }
+}
+
+export async function loginWithEmail(email: string, password: string): Promise<AuthResult> {
+  const { data } = await axios.post<{ accessToken: string }>(
+    `${BASE_URL}/auth/login`,
+    { email, password },
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+
+  saveToken(data.accessToken)
+  return { accessToken: data.accessToken, user: null }
+}
+
+export async function register(
+  email: string,
+  password: string,
+  firstName: string,
+  lastName?: string,
+): Promise<AuthResult> {
+  const { data } = await axios.post<{ accessToken: string }>(
+    `${BASE_URL}/auth/register`,
+    { email, password, firstName, lastName },
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+
+  saveToken(data.accessToken)
+  return { accessToken: data.accessToken, user: null }
 }

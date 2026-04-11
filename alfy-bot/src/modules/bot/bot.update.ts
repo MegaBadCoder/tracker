@@ -7,7 +7,7 @@ import {
   GOALS_MENU_KEYBOARD,
   MAIN_MENU_KEYBOARD,
 } from '../../shared/constants/keyboards';
-import { UserService } from '../user/application/user.service';
+import { AuthService } from '../auth/auth.service';
 
 interface BotContext extends Context {
   scene: Scenes.SceneContextScene<BotContext>;
@@ -16,7 +16,7 @@ interface BotContext extends Context {
 @Update()
 export class BotUpdate implements OnModuleInit {
   constructor(
-    private readonly userService: UserService,
+    private readonly authService: AuthService,
     @InjectBot() private readonly bot: Telegraf,
   ) {}
 
@@ -57,10 +57,10 @@ export class BotUpdate implements OnModuleInit {
     const username = ctx.from.username;
     const firstName = ctx.from.first_name;
 
-    const user = await this.userService.findOrCreate(telegramId, {
-      username,
-      firstName,
-    });
+    const user = await this.authService.findOrCreateTelegramUser(
+      telegramId,
+      { username, firstName },
+    );
 
     await ctx.reply(
       `Привет, ${user.firstName || 'друг'}! Я Alfy бот 👋\n\nВыбери действие из меню ниже:`,

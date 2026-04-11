@@ -21,6 +21,7 @@ import {
   Schedule,
   ReportAnswer,
   User,
+  AuthMethod,
   Task,
   PomodoroConfig,
   TimerSession,
@@ -39,7 +40,7 @@ import { SharedModule } from './shared/shared.module';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'data/database.sqlite',
-      entities: [User, Goal, Question, ReportAnswer, Schedule, Task, PomodoroConfig, TimerSession, PushSubscription, Project, ProjectColumn],
+      entities: [User, AuthMethod, Goal, Question, ReportAnswer, Schedule, Task, PomodoroConfig, TimerSession, PushSubscription, Project, ProjectColumn],
       synchronize: true,
     }),
     TelegrafModule.forRoot({

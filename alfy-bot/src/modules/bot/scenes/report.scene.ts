@@ -9,7 +9,7 @@ import { Goal, Question } from '../../../shared/entities';
 import { GoalService } from '../../goal/application/goal.service';
 import { ReportService } from '../../report/application/report.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 
 function todayISO(): string {
   const d = new Date();
@@ -54,7 +54,7 @@ export class ReportScene {
   constructor(
     private goalService: GoalService,
     private reportService: ReportService,
-    private userService: UserService,
+    private authService: AuthService,
     private scheduleService: ScheduleService,
   ) {}
 
@@ -154,7 +154,7 @@ export class ReportScene {
   private async offerNextGoal(ctx: SceneContext) {
     if (!ctx.from) return;
 
-    const user = await this.userService.findOrCreate(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
     const allGoals = await this.goalService.findActiveByUser(user.id);
     const today = todayISO();
 
@@ -202,7 +202,7 @@ export class ReportScene {
 
     await ctx.reply('Создание отчета', Markup.removeKeyboard());
 
-    const user = await this.userService.findOrCreate(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
     ctx.session.userId = user.id;
 
     if (ctx.session.preselectedGoalId) {
@@ -345,7 +345,7 @@ export class ReportScene {
     }
 
     if (!ctx.session.userId) {
-      const user = await this.userService.findOrCreate(ctx.from.id, {});
+      const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
       ctx.session.userId = user.id;
     }
 

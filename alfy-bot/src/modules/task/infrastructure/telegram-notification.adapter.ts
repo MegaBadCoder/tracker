@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 import { NotificationPort } from '../domain/notification.port';
 
 @Injectable()
@@ -9,14 +9,14 @@ export class TelegramNotificationAdapter extends NotificationPort {
   private readonly logger = new Logger(TelegramNotificationAdapter.name);
 
   constructor(
-    private readonly userService: UserService,
+    private readonly authService: AuthService,
     @InjectBot() private readonly bot: Telegraf,
   ) {
     super();
   }
 
   async send(userId: number, message: string): Promise<void> {
-    const telegramId = await this.userService.getTelegramId(userId);
+    const telegramId = await this.authService.getTelegramId(userId);
     if (!telegramId) {
       this.logger.warn(`User ${userId} has no telegramId`);
       return;

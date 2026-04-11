@@ -1,4 +1,5 @@
 export { User } from './user.entity';
+export { AuthMethod } from './auth-method.entity';
 export { Goal } from './goal.entity';
 export { Question } from './question.entity';
 export { Schedule } from './schedule.entity';

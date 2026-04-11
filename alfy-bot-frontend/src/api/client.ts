@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { authorize, getToken } from './auth'
+import { clearToken, getToken } from './auth'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3002',
@@ -16,16 +16,14 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// On 401 — re-authorize and retry once
+// On 401 — clear auth state and redirect to login
 api.interceptors.response.use(
   r => r,
   async (error) => {
-    const original = error.config
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true
-      const token = await authorize()
-      original.headers['Authorization'] = `Bearer ${token}`
-      return api.request(original)
+    if (error.response?.status === 401) {
+      clearToken()
+      localStorage.removeItem('user_profile')
+      window.location.href = '/login'
     }
     return Promise.reject(error)
   },

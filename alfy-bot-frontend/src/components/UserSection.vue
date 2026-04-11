@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown, LogOut } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useUserStore } from '@/stores/user-store'
@@ -50,6 +51,11 @@ function isActive(to: string): boolean {
 function navigate(to: string) {
   router.push(to)
 }
+
+function handleLogout() {
+  userStore.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -77,6 +83,11 @@ function navigate(to: string) {
       >
         <component :is="link.icon" class="h-4 w-4" />
         {{ link.label }}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem @click="handleLogout">
+        <LogOut class="h-4 w-4" />
+        Выйти
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

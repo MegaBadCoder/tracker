@@ -24,7 +24,7 @@ import {
 } from '../../../shared/utils/date-ui.util';
 import { generateDayPickerKeyboard } from '../../../shared/utils/schedule-ui.util';
 import { GoalService } from '../../goal/application/goal.service';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 
 interface CreateGoalSessionData extends Scenes.SceneSessionData {
   messageId?: number;
@@ -68,7 +68,7 @@ export class CreateGoalScene {
   constructor(
     private dateParser: DateParserService,
     private goalService: GoalService,
-    private userService: UserService,
+    private authService: AuthService,
   ) {}
 
   @SceneEnter()
@@ -757,7 +757,7 @@ export class CreateGoalScene {
       return;
     }
 
-    const user = await this.userService.findOrCreate(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
 
     const goal = await this.goalService.create(user.id, {
       goal_name: ctx.session.goalName,

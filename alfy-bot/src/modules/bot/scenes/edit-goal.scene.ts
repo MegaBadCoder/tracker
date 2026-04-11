@@ -3,7 +3,7 @@ import { Context, Scenes, Markup } from 'telegraf';
 import { GOALS_MENU_KEYBOARD } from '../../../shared/constants/keyboards';
 import { Goal } from '../../../shared/entities';
 import { GoalService } from '../../goal/application/goal.service';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 
 interface SessionData extends Scenes.SceneSessionData {
   goalId?: number;
@@ -23,7 +23,7 @@ interface SceneContext extends Context {
 export class EditGoalScene {
   constructor(
     private goalService: GoalService,
-    private userService: UserService,
+    private authService: AuthService,
   ) {}
 
   @SceneEnter()
@@ -32,7 +32,7 @@ export class EditGoalScene {
 
     await ctx.reply('Редактирование цели', Markup.removeKeyboard());
 
-    const user = await this.userService.findOrCreate(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
     const goals = await this.goalService.findActiveByUser(user.id);
 
     if (goals.length === 0) {

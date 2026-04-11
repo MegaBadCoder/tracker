@@ -22,14 +22,17 @@ async function bootstrap() {
 
   const tg = window.Telegram?.WebApp
 
-  if (tg?.initData) {
-    tg.ready()
-    const { user } = await authorize()
-    if (user) useUserStore().setUser(user)
-  }
-  else if (DEV_TELEGRAM_ID && !DEV_USE_WIDGET) {
-    const { user } = await authorize()
-    if (user) useUserStore().setUser(user)
+  try {
+    if (tg?.initData) {
+      tg.ready()
+      const { user } = await authorize()
+      if (user) useUserStore().setUser(user)
+    } else if (DEV_TELEGRAM_ID && !DEV_USE_WIDGET) {
+      const { user } = await authorize()
+      if (user) useUserStore().setUser(user)
+    }
+  } catch {
+    // Auth failed — app will redirect to /login via router guard
   }
 
   app.mount('#app')

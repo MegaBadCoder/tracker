@@ -17,8 +17,8 @@ export class TypeOrmUserRepository extends UserRepositoryPort {
     return this.repo.findOne({ where: { id } });
   }
 
-  async findOneByTelegramId(telegramId: number): Promise<User | null> {
-    return this.repo.findOne({ where: { telegramId } });
+  async findOneByEmail(email: string): Promise<User | null> {
+    return this.repo.findOne({ where: { email } });
   }
 
   async create(data: Partial<User>): Promise<User> {

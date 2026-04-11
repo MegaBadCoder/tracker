@@ -9,9 +9,10 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { TelegramAuthDto } from './dto/telegram-auth.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LoginEmailDto } from './dto/login-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtPayload } from './strategies/jwt.strategy';
-import { UserService } from '../user/application/user.service';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -19,26 +20,33 @@ interface AuthRequest extends Request {
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly userService: UserService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('telegram')
-  login(@Body() dto: TelegramAuthDto): Promise<{ accessToken: string }> {
+  loginTelegram(
+    @Body() dto: TelegramAuthDto,
+  ): Promise<{ accessToken: string }> {
     return this.authService.login(dto);
+  }
+
+  @Post('register')
+  register(
+    @Body() dto: RegisterDto,
+  ): Promise<{ accessToken: string }> {
+    return this.authService.register(dto);
+  }
+
+  @Post('login')
+  loginEmail(
+    @Body() dto: LoginEmailDto,
+  ): Promise<{ accessToken: string }> {
+    return this.authService.loginWithEmail(dto);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getMe(@Request() req: AuthRequest) {
-    const user = await this.userService.findById(req.user.sub);
-    if (!user) return null;
-    return {
-      firstName: user.firstName,
-      username: user.username,
-      timezone: user.timezone ?? 'UTC',
-    };
+    return this.authService.getProfile(req.user.sub);
   }
 
   @Patch('timezone')
@@ -47,7 +55,7 @@ export class AuthController {
     @Request() req: AuthRequest,
     @Body() body: { timezone: string },
   ) {
-    const timezone = await this.userService.updateTimezone(
+    const timezone = await this.authService.updateTimezone(
       req.user.sub,
       body.timezone,
     );

@@ -11,7 +11,7 @@ import { formatDate } from '../../../shared/utils/date-ui.util';
 import { Goal } from '../../../shared/entities';
 import { GoalService } from '../../goal/application/goal.service';
 import { ReportService } from '../../report/application/report.service';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 
 interface ListGoalsSessionData extends Scenes.SceneSessionData {
   messageId?: number;
@@ -29,7 +29,7 @@ interface SceneContext extends Context {
 export class ListGoalsScene {
   constructor(
     private goalService: GoalService,
-    private userService: UserService,
+    private authService: AuthService,
     private reportService: ReportService,
   ) { }
 
@@ -202,7 +202,7 @@ export class ListGoalsScene {
   private async getFilteredGoals(@Ctx() ctx: SceneContext): Promise<Goal[]> {
     if (!ctx.from) return [];
 
-    const user = await this.userService.findOrCreate(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
 
     if (ctx.session.currentFilter === 'all') {
       return await this.goalService.findAllByUser(user.id);

@@ -2,14 +2,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { addDays, addWeeks, startOfDay } from 'date-fns';
 import { DateParserService } from '../../../shared/services/date-parser.service';
 import { GoalService } from '../../goal/application/goal.service';
-import { UserService } from '../../user/application/user.service';
+import { AuthService } from '../../auth/auth.service';
 import { CreateGoalScene } from './create-goal.scene';
 
 describe('CreateGoalScene - Simple Goal', () => {
   let scene: CreateGoalScene;
   let dateParser: jest.Mocked<DateParserService>;
   let goalService: jest.Mocked<GoalService>;
-  let userService: jest.Mocked<UserService>;
+  let authService: jest.Mocked<AuthService>;
   let mockCtx: any;
 
   beforeEach(async () => {
@@ -23,8 +23,8 @@ describe('CreateGoalScene - Simple Goal', () => {
       create: jest.fn(),
     };
 
-    const userServiceMock = {
-      findOrCreate: jest.fn(),
+    const authServiceMock = {
+      findOrCreateTelegramUser: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -32,14 +32,14 @@ describe('CreateGoalScene - Simple Goal', () => {
         CreateGoalScene,
         { provide: DateParserService, useValue: dateParserMock },
         { provide: GoalService, useValue: goalServiceMock },
-        { provide: UserService, useValue: userServiceMock },
+        { provide: AuthService, useValue: authServiceMock },
       ],
     }).compile();
 
     scene = module.get<CreateGoalScene>(CreateGoalScene);
     dateParser = module.get(DateParserService);
     goalService = module.get(GoalService);
-    userService = module.get(UserService);
+    authService = module.get(AuthService);
 
     mockCtx = {
       reply: jest.fn().mockResolvedValue({ message_id: 123 }),
@@ -193,7 +193,7 @@ describe('CreateGoalScene - Simple Goal', () => {
         messageId: 123,
       };
 
-      userService.findOrCreate.mockResolvedValue({
+      authService.findOrCreateTelegramUser.mockResolvedValue({
         id: 1,
         user_id: 456,
       } as any);
@@ -206,7 +206,7 @@ describe('CreateGoalScene - Simple Goal', () => {
       await scene.handlePointANo(mockCtx);
 
       expect(mockCtx.session.pointA).toBe(false);
-      expect(userService.findOrCreate).toHaveBeenCalledWith(456, {});
+      expect(authService.findOrCreateTelegramUser).toHaveBeenCalledWith(456, {});
       expect(goalService.create).toHaveBeenCalledWith(1, {
         goal_name: 'Моя цель',
         goal_start: expect.any(String),
@@ -235,7 +235,7 @@ describe('CreateGoalScene - Simple Goal', () => {
         messageId: 123,
       };
 
-      userService.findOrCreate.mockResolvedValue({
+      authService.findOrCreateTelegramUser.mockResolvedValue({
         id: 1,
         user_id: 456,
       } as any);
@@ -348,7 +348,7 @@ describe('CreateGoalScene - Simple Goal', () => {
       await scene.handleEndDate(mockCtx);
       expect(mockCtx.session.endDate).toBeDefined();
 
-      userService.findOrCreate.mockResolvedValue({
+      authService.findOrCreateTelegramUser.mockResolvedValue({
         id: 1,
         user_id: 456,
       } as any);
