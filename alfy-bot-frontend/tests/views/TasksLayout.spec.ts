@@ -12,6 +12,11 @@ vi.mock('@/features/projects/model/project-store', () => ({
   useProjectStore: () => mockStore,
 }))
 
+vi.mock('@/features/task-timer', () => ({
+  TimeBlock: { template: '<div />' },
+  useTimerStore: () => ({ phase: 0 }),
+}))
+
 describe('TasksLayout', () => {
   beforeEach(() => {
     mockStore.projects = []

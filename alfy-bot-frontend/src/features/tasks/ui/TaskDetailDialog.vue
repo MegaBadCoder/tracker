@@ -93,6 +93,14 @@
               <span class="ml-auto text-xs tabular-nums text-muted-foreground">
                 {{ formatPomodoro(task.pomodoroCompleted || 0) }}/{{ localPomodoroCount }}
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7 shrink-0"
+                @click="handleStartTimer"
+              >
+                <Play :size="14" class="text-red-500" />
+              </Button>
             </div>
             <PomodoroSettings
               :count="localPomodoroCount"
@@ -482,6 +490,7 @@ import {
   Plus,
   Bell,
   Repeat,
+  Play,
 } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
@@ -505,6 +514,7 @@ import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
 import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
 import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
+import { useTimerStore } from '@/features/task-timer'
 
 const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
   overdue: 'text-red-500',
@@ -596,6 +606,21 @@ const localTags = ref<string[]>([])
 
 // Recurrence
 const localRecurrence = ref<RecurrenceRule | null>(null)
+
+// Timer
+const timerStore = useTimerStore()
+
+function handleStartTimer() {
+  if (!props.task?.isPomodoroTask) return
+  timerStore.startTask({
+    id: props.task.id,
+    pomodoroTime: props.task.pomodoroDuration || 25,
+    breakTime: props.task.shortBreak || 5,
+    longBreakTime: props.task.longBreak || 15,
+    longBreakInterval: props.task.longBreakInterval || 4,
+    pomodoroCount: props.task.pomodoroCount || 4,
+  })
+}
 
 // Project
 const localProjectId = ref<string | null>(null)

@@ -52,9 +52,7 @@
     @update:checklist="handleUpdateChecklist"
     @update:pomodoro-config="handleUpdatePomodoroConfig"
   />
-  <Teleport to="body">
-    <TimeBlock v-show="!isDetailOpen" />
-  </Teleport>
+
 </template>
 
 <script setup lang="ts">
@@ -64,7 +62,7 @@ import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import type { Task } from '@/features/tasks/model/types'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
-import { TimeBlock, useTimerStore } from '@/features/task-timer'
+import { useTimerStore } from '@/features/task-timer'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useConfirm } from '@/composables/useConfirm'
