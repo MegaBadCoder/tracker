@@ -83,7 +83,7 @@ const chips = computed<ChipDef[]>(() => [
     icon: Flag,
     label: props.priority ? PRIORITY_LABELS[props.priority] : 'Приоритет',
     isSet: !!props.priority,
-    iconClass: props.priority ? getPriorityColor(props.priority) : undefined,
+    ...(props.priority ? { iconClass: getPriorityColor(props.priority) } : {}),
   },
   {
     key: 'location',
@@ -95,7 +95,7 @@ const chips = computed<ChipDef[]>(() => [
     key: 'tags',
     icon: Tag,
     label: props.tags.length > 0
-      ? (props.tags.length === 1 ? props.tags[0] : `${props.tags.length} тегов`)
+      ? (props.tags.length === 1 ? props.tags[0]! : `${props.tags.length} тегов`)
       : 'Теги',
     isSet: props.tags.length > 0,
   },

@@ -130,7 +130,7 @@
             :recurrence="localRecurrence"
             :editable="editable"
             class="-mx-7 border-y border-border/40"
-            @select="activeDrawer = $event"
+            @select="activeDrawer = ($event as DrawerField)"
           />
 
           <!-- Checklist -->

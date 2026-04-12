@@ -15,7 +15,7 @@
 import { ref, computed } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Calendar } from '@/components/ui/calendar'
-import { toDate, toCalendarDateValue, getTimeString, updateDeadlineTime } from '../lib/dateTime'
+import { toDate, toCalendarDateValue, updateDeadlineTime } from '../lib/dateTime'
 
 const props = defineProps<{
   modelValue: Date | undefined
