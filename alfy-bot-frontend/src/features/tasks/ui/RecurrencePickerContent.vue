@@ -31,6 +31,35 @@
       </button>
     </template>
 
+    <template v-if="modelValue">
+      <div class="h-px bg-border/40 my-1" />
+      <div class="px-3 py-2 space-y-1.5">
+        <label class="text-[11px] text-muted-foreground font-medium">Если пропущено</label>
+        <button
+          :class="[
+            'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm transition-colors',
+            (onMissed ?? 'shift') === 'shift'
+              ? 'bg-primary/15 text-foreground'
+              : 'hover:bg-muted/60 text-muted-foreground',
+          ]"
+          @click="$emit('update:onMissed', 'shift')"
+        >
+          На будущий день или сегодня
+        </button>
+        <button
+          :class="[
+            'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm transition-colors',
+            onMissed === 'freeze'
+              ? 'bg-primary/15 text-foreground'
+              : 'hover:bg-muted/60 text-muted-foreground',
+          ]"
+          @click="$emit('update:onMissed', 'freeze')"
+        >
+          Подсвечивать пропущенные
+        </button>
+      </div>
+    </template>
+
     <div v-if="showCustom" class="p-3 space-y-3 border-t border-border/40 mt-1">
       <div class="space-y-1.5">
         <label class="text-[11px] text-muted-foreground font-medium">Частота</label>
@@ -98,10 +127,12 @@ import type { RecurrenceRule, RecurrenceFrequency } from '../model/recurrence'
 
 defineProps<{
   modelValue: RecurrenceRule | null | undefined
+  onMissed?: 'shift' | 'freeze'
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: RecurrenceRule | null): void
+  (e: 'update:onMissed', value: 'shift' | 'freeze'): void
 }>()
 
 const showCustom = ref(false)

@@ -2,7 +2,9 @@
   <DropdownMenuContent class="w-56" align="start">
     <RecurrencePickerContent
       :model-value="modelValue"
+      :on-missed="onMissed"
       @update:model-value="$emit('update:modelValue', $event)"
+      @update:on-missed="$emit('update:onMissed', $event)"
     />
   </DropdownMenuContent>
 </template>
@@ -14,9 +16,11 @@ import RecurrencePickerContent from './RecurrencePickerContent.vue'
 
 defineProps<{
   modelValue: RecurrenceRule | null | undefined
+  onMissed?: 'shift' | 'freeze'
 }>()
 
 defineEmits<{
   (e: 'update:modelValue', value: RecurrenceRule | null): void
+  (e: 'update:onMissed', value: 'shift' | 'freeze'): void
 }>()
 </script>

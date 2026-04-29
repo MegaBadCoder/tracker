@@ -395,7 +395,9 @@
             </DropdownMenuTrigger>
             <RecurrencePicker
               :model-value="localRecurrence"
+              :on-missed="localOnMissed"
               @update:model-value="onRecurrenceChange"
+              @update:on-missed="onMissedChange"
             />
           </DropdownMenu>
 
@@ -463,7 +465,9 @@
         <RecurrencePickerContent
           v-if="activeDrawer === 'recurrence'"
           :model-value="localRecurrence"
+          :on-missed="localOnMissed"
           @update:model-value="onRecurrenceDrawerChange"
+          @update:on-missed="onMissedChange"
         />
         <div v-if="activeDrawer === 'reminder'" class="py-4 text-sm text-muted-foreground text-center">
           Скоро
@@ -608,6 +612,7 @@ const localTags = ref<string[]>([])
 
 // Recurrence
 const localRecurrence = ref<RecurrenceRule | null>(null)
+const localOnMissed = ref<'shift' | 'freeze'>('shift')
 
 // Timer
 const timerStore = useTimerStore()
@@ -643,6 +648,11 @@ function onProjectChange(value: string | null) {
 function onRecurrenceChange(value: RecurrenceRule | null) {
   localRecurrence.value = value
   emitUpdate({ recurrence: value })
+}
+
+function onMissedChange(value: 'shift' | 'freeze') {
+  localOnMissed.value = value
+  emitUpdate({ onMissed: value })
 }
 
 // Drawer-specific handlers (auto-close for single-select)
@@ -691,6 +701,7 @@ watch(() => props.task, (task) => {
     localTags.value = task.tags ? [...task.tags] : []
     localProjectId.value = task.projectId ?? null
     localRecurrence.value = task.recurrence ?? null
+    localOnMissed.value = task.onMissed ?? 'shift'
     localPomodoroCount.value = task.pomodoroCount ?? POMODORO_DEFAULTS.count
     localPomodoroDuration.value = task.pomodoroDuration ?? POMODORO_DEFAULTS.duration
     localShortBreak.value = task.shortBreak ?? POMODORO_DEFAULTS.shortBreak
