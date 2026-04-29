@@ -68,6 +68,42 @@ export function computeNextDueDate(
   return next
 }
 
+/**
+ * Find the first occurrence on or after `refDate` by iteratively advancing
+ * `currentDue` via `computeNextDueDate`. Returns null if the series ends before
+ * reaching `refDate`. Bounded at 500 iterations to avoid runaway loops.
+ *
+ * Mirror of the backend `findNextOccurrenceOnOrAfter` in
+ * `alfy-bot/src/modules/task/domain/recurrence.utils.ts` — keeps ghost
+ * projection symmetric with backend completion logic.
+ *
+ * @param completedCount — passed through to `computeNextDueDate` for endCount checks.
+ */
+export function findNextOccurrenceOnOrAfter(
+  currentDue: Date,
+  rule: RecurrenceRule,
+  refDate: Date,
+  completedCount = 0,
+): Date | null {
+  const MAX_ITERATIONS = 500
+  let cursor = currentDue
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const next = computeNextDueDate(cursor, rule, completedCount)
+    if (next === null) return null
+
+    if (next.getTime() >= refDate.getTime()) {
+      return next
+    }
+
+    cursor = next
+  }
+
+  throw new Error(
+    `findNextOccurrenceOnOrAfter exceeded ${MAX_ITERATIONS} iterations for frequency=${rule.frequency}`,
+  )
+}
+
 function computeRawNext(currentDue: Date, rule: RecurrenceRule): Date {
   const { frequency, interval } = rule
 

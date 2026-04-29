@@ -2,7 +2,10 @@ import { isSameDay } from 'date-fns'
 import type { Task } from '@/features/tasks/model/types'
 import type { CalendarEvent } from '../model/types'
 import { computeTaskDurationMinutes } from '@/features/tasks/lib/duration'
-import { computeNextDueDate } from '@/features/tasks/model/recurrence'
+import {
+  computeNextDueDate,
+  findNextOccurrenceOnOrAfter,
+} from '@/features/tasks/model/recurrence'
 
 function taskToEvent(task: Task, date: Date, isVirtual = false): CalendarEvent {
   const hours = date.getHours()
@@ -46,6 +49,25 @@ export function tasksToCalendarEvents(tasks: Task[], weekStart: Date, weekEnd: D
     if (isRecurring && !task.completed && task.recurrence) {
       let current = dueDate
       const completedCount = task.recurringCompletedCount ?? 0
+
+      // Skip-to-today: for past-due recurring tasks we must not project ghosts
+      // onto past dates between dueDate and today. Mirrors the backend
+      // findNextOccurrenceOnOrAfter logic in completeRecurringTask.
+      const startOfToday = new Date()
+      startOfToday.setHours(0, 0, 0, 0)
+      if (dueDate < startOfToday) {
+        const skipped = findNextOccurrenceOnOrAfter(
+          dueDate,
+          task.recurrence,
+          startOfToday,
+          completedCount,
+        )
+        if (!skipped) continue
+        current = skipped
+        if (skipped <= weekEnd && skipped >= weekStart && !isSameDay(skipped, dueDate)) {
+          events.push(taskToEvent(task, skipped, true))
+        }
+      }
 
       for (let i = 0; i < 52; i++) {
         const next = computeNextDueDate(current, task.recurrence, completedCount)
