@@ -11,9 +11,9 @@
         <div class="flex items-center gap-2.5">
           <RoundCheckbox
             :model-value="task?.completed"
-            :disabled="!editable"
+            :disabled="!effectiveEditable"
             class="shrink-0"
-            @update:model-value="editable && task && emitUpdate({ completed: !task.completed })"
+            @update:model-value="effectiveEditable && task && emitUpdate({ completed: !task.completed })"
           />
           <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <FolderOpen :size="11" />
@@ -21,7 +21,7 @@
           </span>
         </div>
         <div class="flex items-center gap-0.5">
-          <DropdownMenu v-if="editable">
+          <DropdownMenu v-if="effectiveEditable">
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground">
                 <EllipsisVertical :size="16" />
@@ -53,12 +53,12 @@
           <ContentEditableInput
             ref="titleRef"
             v-model="localTitle"
-            :editable="editable"
+            :editable="effectiveEditable"
             placeholder="Без названия"
             :class="[
               'text-xl font-semibold rounded-md transition-colors',
               task.completed && 'line-through text-muted-foreground',
-              editable && 'cursor-text',
+              effectiveEditable && 'cursor-text',
             ]"
             aria-label="Название задачи"
             @blur="commitTitle"
@@ -70,13 +70,13 @@
           <ContentEditableInput
             ref="descriptionRef"
             v-model="localDescription"
-            :editable="editable"
+            :editable="effectiveEditable"
             multiline
             placeholder="Добавить описание..."
             :class="[
               'text-sm leading-relaxed rounded-md py-1 transition-colors empty:before:italic',
               localDescription ? 'text-foreground/80' : '',
-              editable && 'cursor-text',
+              effectiveEditable && 'cursor-text',
             ]"
             aria-label="Описание задачи"
             @blur="commitDescription"
@@ -108,7 +108,7 @@
               :short-break="localShortBreak"
               :long-break="localLongBreak"
               :long-break-interval="localLongBreakInterval"
-              :editable="editable"
+              :editable="effectiveEditable"
               @update:count="localPomodoroCount = $event"
               @update:duration="localPomodoroDuration = $event"
               @update:short-break="localShortBreak = $event"
@@ -128,7 +128,7 @@
             :location="localLocation"
             :tags="localTags"
             :recurrence="localRecurrence"
-            :editable="editable"
+            :editable="effectiveEditable"
             class="-mx-7 border-y border-border/40"
             @select="activeDrawer = ($event as DrawerField)"
           />
@@ -162,12 +162,12 @@
               >
                 <Checkbox
                   :model-value="item.completed"
-                  :disabled="!editable"
+                  :disabled="!effectiveEditable"
                   class="shrink-0"
-                  @update:model-value="editable && toggleChecklistItem(item.id)"
+                  @update:model-value="effectiveEditable && toggleChecklistItem(item.id)"
                 />
                 <span
-                  v-if="!editable"
+                  v-if="!effectiveEditable"
                   :class="[
                     'text-sm flex-1 transition-colors',
                     item.completed && 'line-through text-muted-foreground'
@@ -186,7 +186,7 @@
                   @keydown.enter="($event.target as HTMLInputElement).blur()"
                 />
                 <button
-                  v-if="editable"
+                  v-if="effectiveEditable"
                   class="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground"
                   @click="removeChecklistItem(item.id)"
                 >
@@ -196,7 +196,7 @@
             </div>
 
             <!-- Add new item -->
-            <div v-if="editable" class="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors">
+            <div v-if="effectiveEditable" class="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors">
               <Plus :size="14" class="text-muted-foreground/60 shrink-0" />
               <input
                 v-model="newChecklistItem"
@@ -213,7 +213,7 @@
           <!-- Проект -->
           <ProjectPicker
             :model-value="localProjectId"
-            :disabled="!editable"
+            :disabled="!effectiveEditable"
             @update:model-value="onProjectChange"
           />
 
@@ -221,7 +221,7 @@
           <DropdownMenu>
             <div class="relative border-b border-border/40">
               <DropdownMenuTrigger as-child>
-                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                   <div class="flex items-center gap-2 mb-1">
                     <CalendarIcon :size="13" class="text-muted-foreground/60" />
                     <span class="text-[11px] text-muted-foreground/60 font-medium">Срок</span>
@@ -232,7 +232,7 @@
                 </button>
               </DropdownMenuTrigger>
               <button
-                v-if="editable && localDueDate"
+                v-if="effectiveEditable && localDueDate"
                 class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 aria-label="Очистить дату"
                 @click.stop="localDueDate = undefined; localDueTime = ''"
@@ -258,7 +258,7 @@
           <DropdownMenu>
             <div class="relative border-b border-border/40">
               <DropdownMenuTrigger as-child>
-                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                   <div class="flex items-center gap-2 mb-1">
                     <Clock :size="13" class="text-muted-foreground/60" />
                     <span class="text-[11px] text-muted-foreground/60 font-medium">Дедлайн</span>
@@ -269,7 +269,7 @@
                 </button>
               </DropdownMenuTrigger>
               <button
-                v-if="editable && localDeadline"
+                v-if="effectiveEditable && localDeadline"
                 class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 aria-label="Очистить дедлайн"
                 @click.stop="localDeadline = undefined"
@@ -287,7 +287,7 @@
           <DropdownMenu>
             <div class="relative border-b border-border/40">
               <DropdownMenuTrigger as-child>
-                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                   <div class="flex items-center gap-2 mb-1">
                     <Flag :size="13" :class="localPriority ? getPriorityColor(localPriority) : 'text-muted-foreground/60'" />
                     <span class="text-[11px] text-muted-foreground/60 font-medium">Приоритет</span>
@@ -298,7 +298,7 @@
                 </button>
               </DropdownMenuTrigger>
               <button
-                v-if="editable && localPriority"
+                v-if="effectiveEditable && localPriority"
                 class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 aria-label="Очистить приоритет"
                 @click.stop="localPriority = undefined; emitUpdate({ priority: undefined })"
@@ -316,7 +316,7 @@
           <DropdownMenu>
             <div class="relative border-b border-border/40">
               <DropdownMenuTrigger as-child>
-                <button :class="['w-full px-4 py-2.5 transition-colors text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+                <button :class="['w-full px-4 py-2.5 transition-colors text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                   <div class="flex items-center gap-2 mb-1">
                     <MapPin :size="13" class="text-muted-foreground/60" />
                     <span class="text-[11px] text-muted-foreground/60 font-medium">Место</span>
@@ -327,7 +327,7 @@
                 </button>
               </DropdownMenuTrigger>
               <button
-                v-if="editable && localLocation"
+                v-if="effectiveEditable && localLocation"
                 class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 aria-label="Очистить место"
                 @click.stop="localLocation = ''; emitUpdate({ location: undefined })"
@@ -351,7 +351,7 @@
           <!-- Теги -->
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                 <div class="flex items-center gap-2 mb-1">
                   <Tag :size="13" class="text-muted-foreground/60" />
                   <span class="text-[11px] text-muted-foreground/60 font-medium">Теги</span>
@@ -374,7 +374,7 @@
             <DropdownMenuContent class="w-64" align="start">
               <TagsEditor
                 :model-value="localTags"
-                :editable="editable"
+                :editable="effectiveEditable"
                 @update:model-value="localTags = $event; emitUpdate({ tags: [...$event] })"
               />
             </DropdownMenuContent>
@@ -383,7 +383,7 @@
           <!-- Повторение -->
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                 <div class="flex items-center gap-2 mb-1">
                   <Repeat :size="13" :class="localRecurrence ? 'text-primary' : 'text-muted-foreground/40'" />
                   <span class="text-[11px] text-muted-foreground/60 font-medium">Повторение</span>
@@ -402,7 +402,7 @@
           <!-- Напоминание (mock) -->
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
-              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', editable && 'cursor-pointer hover:bg-muted/50']" :disabled="!editable">
+              <button :class="['w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left', effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
                 <div class="flex items-center gap-2 mb-1">
                   <Bell :size="13" class="text-muted-foreground/40" />
                   <span class="text-[11px] text-muted-foreground/60 font-medium">Напоминание</span>
@@ -457,7 +457,7 @@
         <TagsEditor
           v-if="activeDrawer === 'tags'"
           :model-value="localTags"
-          :editable="editable"
+          :editable="effectiveEditable"
           @update:model-value="localTags = $event; emitUpdate({ tags: [...$event] })"
         />
         <RecurrencePickerContent
@@ -571,6 +571,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   editable: true,
 })
+
+const effectiveEditable = computed(() => props.editable && !props.task?.isOverdue)
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void

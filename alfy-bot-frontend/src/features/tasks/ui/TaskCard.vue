@@ -5,13 +5,16 @@
     :class="[
       'group flex items-center gap-3 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
       isCompact ? 'px-3 py-2 min-h-[36px]' : 'px-4 py-3 min-h-[44px] hover:pl-5',
-      task.completed && 'opacity-50'
+      task.isOverdue
+        ? 'border-l-2 border-red-500 bg-red-500/5'
+        : task.completed && 'opacity-50',
     ]"
     @click="$emit('open', task)"
   >
     <!-- Checkbox -->
     <RoundCheckbox
       :model-value="task.completed"
+      :disabled="task.isOverdue"
       class="shrink-0"
       @click.stop
       @update:model-value="$emit('toggle', task.id)"
@@ -23,7 +26,11 @@
         <span
           :class="[
             'text-sm truncate',
-            task.completed ? 'line-through text-muted-foreground' : 'text-foreground'
+            task.isOverdue
+              ? 'text-red-600 dark:text-red-400 font-medium'
+              : task.completed
+                ? 'line-through text-muted-foreground'
+                : 'text-foreground',
           ]"
         >
           {{ task.title }}

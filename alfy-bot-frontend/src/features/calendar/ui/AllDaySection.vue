@@ -22,14 +22,20 @@
           :key="event.taskId"
           :class="[
             'text-[10px] px-1.5 py-0.5 rounded truncate max-w-full border',
-            event.isVirtual ? 'cursor-default' : 'cursor-grab',
-            event.completed
-              ? 'bg-muted border-border line-through'
+            event.task.isOverdue
+              ? 'cursor-not-allowed'
               : event.isVirtual
-                ? 'border-dashed border-border/60 bg-muted'
-                : chipClasses(event),
+                ? 'cursor-default'
+                : 'cursor-grab',
+            event.task.isOverdue
+              ? OVERDUE_EVENT_CLASSES
+              : event.completed
+                ? 'bg-muted border-border line-through'
+                : event.isVirtual
+                  ? 'border-dashed border-border/60 bg-muted'
+                  : chipClasses(event),
           ]"
-          :draggable="!event.isVirtual"
+          :draggable="!event.isVirtual && !event.task.isOverdue"
           @dragstart="onDragStart($event, event)"
           @click.stop="$emit('open', event)"
         >
@@ -44,7 +50,7 @@
 import { ref } from 'vue'
 import { isSameDay } from 'date-fns'
 import type { CalendarEvent, CalendarDropPayload } from '../model/types'
-import { getPriorityEventClasses } from '../lib/calendar-styles'
+import { getPriorityEventClasses, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
 
 const props = defineProps<{
   visibleDays: Date[]
@@ -71,7 +77,7 @@ function chipClasses(event: CalendarEvent): string {
 }
 
 function onDragStart(e: DragEvent, event: CalendarEvent) {
-  if (event.isVirtual) {
+  if (event.isVirtual || event.task.isOverdue) {
     e.preventDefault()
     return
   }

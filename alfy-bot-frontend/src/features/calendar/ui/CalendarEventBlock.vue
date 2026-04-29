@@ -2,12 +2,14 @@
   <div
     :class="[
       'absolute left-0.5 right-0.5 rounded-md px-2 py-1 text-xs overflow-hidden border',
-      hidden ? 'invisible' : isVirtual ? 'cursor-default' : 'cursor-grab',
-      completed
-        ? 'bg-emerald-500/25 border-emerald-500/40 text-white backdrop-blur-sm'
-        : isVirtual
-          ? 'border-dashed border-border/40 bg-muted/60 text-white backdrop-blur-sm'
-          : priorityClasses,
+      hidden ? 'invisible' : isOverdue ? 'cursor-not-allowed' : isVirtual ? 'cursor-default' : 'cursor-grab',
+      isOverdue
+        ? OVERDUE_EVENT_CLASSES
+        : completed
+          ? 'bg-emerald-500/25 border-emerald-500/40 text-white backdrop-blur-sm'
+          : isVirtual
+            ? 'border-dashed border-border/40 bg-muted/60 text-white backdrop-blur-sm'
+            : priorityClasses,
     ]"
     :style="blockStyle"
     style="touch-action: none"
@@ -15,7 +17,7 @@
   >
     <div :class="['font-medium truncate flex items-center gap-1', completed && 'line-through']">
       <RoundCheckbox
-        v-if="!isVirtual"
+        v-if="!isVirtual && !isOverdue"
         :model-value="completed"
         class="shrink-0 scale-75 origin-center calendar-checkbox"
         @click.stop
@@ -33,7 +35,7 @@
       {{ event.pomodoroLabel }}
     </div>
     <div
-      v-if="event.resizable"
+      v-if="event.resizable && !isOverdue"
       data-testid="resize-handle"
       class="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-white/20 transition-colors"
       @pointerdown.stop="onResizeDown"
@@ -46,7 +48,7 @@ import { computed } from 'vue'
 import { Repeat, Timer } from 'lucide-vue-next'
 import RoundCheckbox from '@/components/ui/roundCheckbox/RoundCheckbox.vue'
 import type { CalendarEvent } from '../model/types'
-import { getPriorityEventClasses } from '../lib/calendar-styles'
+import { getPriorityEventClasses, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
 
 const HOUR_HEIGHT = 60
 const TOTAL_MINUTES = 24 * 60
@@ -65,6 +67,7 @@ const emit = defineEmits<{
 const completed = computed(() => props.event.completed)
 const isVirtual = computed(() => !!props.event.isVirtual)
 const priorityClasses = computed(() => getPriorityEventClasses(props.event.priority))
+const isOverdue = computed(() => !!props.event.task.isOverdue)
 
 const blockStyle = computed(() => {
   const top = (props.event.startMinutes / TOTAL_MINUTES) * HOUR_HEIGHT * 24
@@ -88,7 +91,7 @@ function formatMinutes(m: number): string {
 }
 
 function onPointerDown(e: PointerEvent) {
-  if (e.button !== 0 || isVirtual.value) return
+  if (e.button !== 0 || isVirtual.value || isOverdue.value) return
   emit('grab', props.event, e)
 }
 

@@ -37,6 +37,8 @@ function parseTask(raw: Record<string, unknown>): Task {
     recurringParentId: (raw.recurringParentId as string) ?? null,
     recurringCompletedCount: (raw.recurringCompletedCount as number) ?? 0,
     isAutoCreated: (raw.isAutoCreated as boolean) ?? false,
+    isOverdue: (raw.isOverdue as boolean) ?? false,
+    onMissed: (raw.onMissed as 'shift' | 'freeze') ?? 'shift',
   } as Task
 }
 
@@ -93,6 +95,12 @@ export const useTaskStore = defineStore('tasks', () => {
   const updateTask = async (taskId: string, updates: Partial<Task>, setLoading = true) => {
     if (taskId.includes('__virtual__')) {
       console.warn('Attempted to update a virtual task instance, ignoring:', taskId)
+      return
+    }
+
+    const localTask = tasks.value.find(t => t.id === taskId)
+    if (localTask?.isOverdue) {
+      console.warn('Attempt to update overdue task ignored:', taskId)
       return
     }
 

@@ -36,6 +36,8 @@ export interface Task {
   recurringParentId?: string | null
   recurringCompletedCount?: number
   isAutoCreated?: boolean
+  isOverdue?: boolean
+  onMissed?: 'shift' | 'freeze'
   projectId?: string | null
   columnId?: string | null
   order?: number
