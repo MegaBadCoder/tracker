@@ -54,13 +54,10 @@ export class OverdueRecurringService {
       if (task.onMissed === 'freeze') {
         const nextZoned = computeNextDueDate(zonedDue, rule, completedCount);
         const nextDate = nextZoned ? shiftBackToUtc(nextZoned, tz) : null;
-
-        await this.taskRepo.markOverdue(task.id);
-
-        if (nextDate) {
-          const instanceData = buildNextInstance(task, nextDate, parentId);
-          await this.taskRepo.create(instanceData);
-        }
+        const successorData = nextDate
+          ? buildNextInstance(task, nextDate, parentId)
+          : null;
+        await this.taskRepo.freezeAndCreateNext(task.id, successorData);
       } else {
         // 'shift'
         const nextZoned = findNextOccurrenceOnOrAfter(

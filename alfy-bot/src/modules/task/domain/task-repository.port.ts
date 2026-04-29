@@ -54,5 +54,8 @@ export abstract class TaskRepositoryPort {
     userId: number,
     dueBeforeUtc: Date,
   ): Promise<Task[]>;
-  abstract markOverdue(taskId: string): Promise<void>;
+  abstract freezeAndCreateNext(
+    oldTaskId: string,
+    nextInstance: Partial<Task> | null,
+  ): Promise<Task | null>;
 }

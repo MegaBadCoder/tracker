@@ -187,10 +187,18 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     });
   }
 
-  async markOverdue(taskId: string): Promise<void> {
-    await this.taskRepo.update(taskId, {
-      isOverdue: true,
-      recurrence: null,
+  async freezeAndCreateNext(
+    oldTaskId: string,
+    nextInstance: Partial<Task> | null,
+  ): Promise<Task | null> {
+    return this.taskRepo.manager.transaction(async (tx) => {
+      await tx.update(Task, oldTaskId, {
+        isOverdue: true,
+        recurrence: null,
+      });
+      if (!nextInstance) return null;
+      const created = tx.create(Task, nextInstance);
+      return tx.save(created);
     });
   }
 }

@@ -62,7 +62,11 @@ describe('OverdueRecurringService', () => {
       deleteByParentId: jest.fn().mockResolvedValue(undefined),
       clearParentId: jest.fn().mockResolvedValue(undefined),
       findOverdueRecurringCandidates: jest.fn().mockResolvedValue([]),
-      markOverdue: jest.fn().mockResolvedValue(undefined),
+      freezeAndCreateNext: jest
+        .fn()
+        .mockImplementation((_id: string, data: Partial<Task> | null) =>
+          Promise.resolve(data ? makeTask(data) : null),
+        ),
     };
 
     userSettings = {
@@ -98,21 +102,25 @@ describe('OverdueRecurringService', () => {
 
       await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
 
-      expect(repo.markOverdue).toHaveBeenCalledTimes(1);
-      expect(repo.markOverdue).toHaveBeenCalledWith('t1');
+      expect(repo.freezeAndCreateNext).toHaveBeenCalledTimes(1);
+      const [oldId, successor] = repo.freezeAndCreateNext.mock.calls[0];
+      expect(oldId).toBe('t1');
+      expect(successor.dueDate.getTime()).toBe(
+        new Date('2026-04-29T09:00:00.000Z').getTime(),
+      );
+      expect(successor.recurrence).toEqual(
+        expect.objectContaining({ frequency: 'daily' }),
+      );
+      expect(successor.onMissed).toBe('freeze');
+      expect(successor.isAutoCreated).toBe(true);
+      expect(successor.recurringParentId).toBe('t1');
 
-      expect(repo.create).toHaveBeenCalledTimes(1);
-      const arg = repo.create.mock.calls[0][0];
-      expect(arg.dueDate.getTime()).toBe(new Date('2026-04-29T09:00:00.000Z').getTime());
-      expect(arg.recurrence).toEqual(expect.objectContaining({ frequency: 'daily' }));
-      expect(arg.onMissed).toBe('freeze');
-      expect(arg.isAutoCreated).toBe(true);
-      expect(arg.recurringParentId).toBe('t1');
+      expect(repo.create).not.toHaveBeenCalled();
     });
   });
 
   describe('processForUser — shift branch', () => {
-    it('сдвигает dueDate, не вызывает markOverdue / create', async () => {
+    it('сдвигает dueDate, не вызывает freezeAndCreateNext / create', async () => {
       const candidate = makeTask({
         id: 't1',
         userId: 1,
@@ -128,7 +136,7 @@ describe('OverdueRecurringService', () => {
 
       await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
 
-      expect(repo.markOverdue).not.toHaveBeenCalled();
+      expect(repo.freezeAndCreateNext).not.toHaveBeenCalled();
       expect(repo.create).not.toHaveBeenCalled();
 
       expect(repo.save).toHaveBeenCalledTimes(1);
@@ -153,7 +161,7 @@ describe('OverdueRecurringService', () => {
 
       await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
 
-      expect(repo.markOverdue).not.toHaveBeenCalled();
+      expect(repo.freezeAndCreateNext).not.toHaveBeenCalled();
       expect(repo.save).toHaveBeenCalledTimes(1);
       const saved = repo.save.mock.calls[0][0];
       expect(saved.recurrence).toBeNull();
@@ -167,7 +175,7 @@ describe('OverdueRecurringService', () => {
 
       await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
 
-      expect(repo.markOverdue).not.toHaveBeenCalled();
+      expect(repo.freezeAndCreateNext).not.toHaveBeenCalled();
       expect(repo.create).not.toHaveBeenCalled();
       expect(repo.save).not.toHaveBeenCalled();
     });
