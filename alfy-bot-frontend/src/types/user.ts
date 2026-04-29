@@ -5,4 +5,5 @@ export interface UserProfile {
   photoUrl?: string
   phone?: string
   timezone?: string
+  hasEmailAuth?: boolean
 }

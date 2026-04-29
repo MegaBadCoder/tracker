@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api/client'
-import { clearToken } from '@/api/auth'
+import { clearToken } from '@/api/tokenStorage'
 import type { UserProfile } from '@/types/user'
 
 const USER_KEY = 'user_profile'
@@ -60,6 +60,7 @@ export const useUserStore = defineStore('user', () => {
           photoUrl: data.photoUrl,
           phone: data.phone,
           timezone: data.timezone ?? 'UTC',
+          hasEmailAuth: data.hasEmailAuth ?? false,
         })
       }
     } catch {

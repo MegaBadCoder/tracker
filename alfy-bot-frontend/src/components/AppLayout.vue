@@ -42,8 +42,8 @@ provide('openSidebar', openSidebar)
 </script>
 
 <template>
-  <div class="flex min-h-screen">
-    <AppSidebar :open="sidebarOpen" :links="sectionLinks" @close="closeSidebar">
+  <div class="flex min-h-[100dvh]">
+    <AppSidebar :open="sidebarOpen" :links="sectionLinks" @close="closeSidebar" @open="openSidebar">
       <template v-if="sectionExtra" #section-extra>
         <component :is="sectionExtra" />
       </template>

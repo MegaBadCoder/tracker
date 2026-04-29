@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -15,6 +16,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { TaskService, UpdateTaskResponse } from './task.service';
 import { TimerSessionService } from './timer-session.service';
+import { OverdueRecurringService } from './overdue-recurring.service';
+import { UserSettingsPort } from './domain/user-settings.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
@@ -33,6 +36,8 @@ export class TaskController {
   constructor(
     private readonly taskService: TaskService,
     private readonly timerService: TimerSessionService,
+    private readonly overdueService: OverdueRecurringService,
+    private readonly userSettings: UserSettingsPort,
   ) {}
 
   @Get()
@@ -45,6 +50,19 @@ export class TaskController {
   @ApiOperation({ summary: 'Создать задачу' })
   async create(@Request() req: AuthRequest, @Body() dto: CreateTaskDto) {
     return this.taskService.create(req.user.sub, dto);
+  }
+
+  // Dev-only: trigger overdue-recurring cron for current user immediately
+  @Post('_dev/process-overdue')
+  @ApiOperation({ summary: 'DEV: запустить overdue-recurring обработку прямо сейчас' })
+  async processOverdueDev(@Request() req: AuthRequest) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Dev-only endpoint');
+    }
+    const userId = req.user.sub;
+    const tz = await this.userSettings.getTimezone(userId);
+    await this.overdueService.processForUser(userId, tz, new Date());
+    return { ok: true, userId, tz };
   }
 
   // Timer routes must be before :id routes to avoid route conflicts

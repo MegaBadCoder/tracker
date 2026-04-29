@@ -22,42 +22,48 @@
 
     <template v-if="modelValue">
       <div class="h-px bg-border/40 my-1" />
+      <div class="px-3 pb-1 pt-1.5">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[11px] text-muted-foreground font-medium">Если пропущено</span>
+        </div>
+        <div class="flex gap-0.5 p-0.5 bg-muted/50 rounded-md">
+          <button
+            type="button"
+            title="Сдвинуть dueDate на сегодня или ближайший валидный день по правилу"
+            :class="[
+              'flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer',
+              (onMissed ?? 'shift') === 'shift'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click="$emit('update:onMissed', 'shift')"
+          >
+            <CalendarClock :size="11" />
+            Сдвинуть
+          </button>
+          <button
+            type="button"
+            title="Оставить пропущенную как просроченную и подсветить красным; нельзя редактировать"
+            :class="[
+              'flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[11px] transition-colors cursor-pointer',
+              onMissed === 'freeze'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click="$emit('update:onMissed', 'freeze')"
+          >
+            <AlertCircle :size="11" />
+            Подсветить
+          </button>
+        </div>
+      </div>
       <button
-        class="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-muted/60 transition-colors cursor-pointer"
+        class="flex items-center gap-2.5 w-full px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-muted/60 transition-colors cursor-pointer"
         @click="$emit('update:modelValue', null)"
       >
         <X :size="14" />
         Убрать
       </button>
-    </template>
-
-    <template v-if="modelValue">
-      <div class="h-px bg-border/40 my-1" />
-      <div class="px-3 py-2 space-y-1.5">
-        <label class="text-[11px] text-muted-foreground font-medium">Если пропущено</label>
-        <button
-          :class="[
-            'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm transition-colors',
-            (onMissed ?? 'shift') === 'shift'
-              ? 'bg-primary/15 text-foreground'
-              : 'hover:bg-muted/60 text-muted-foreground',
-          ]"
-          @click="$emit('update:onMissed', 'shift')"
-        >
-          На будущий день или сегодня
-        </button>
-        <button
-          :class="[
-            'flex items-center gap-2.5 w-full px-2 py-1.5 rounded-md text-sm transition-colors',
-            onMissed === 'freeze'
-              ? 'bg-primary/15 text-foreground'
-              : 'hover:bg-muted/60 text-muted-foreground',
-          ]"
-          @click="$emit('update:onMissed', 'freeze')"
-        >
-          Подсвечивать пропущенные
-        </button>
-      </div>
     </template>
 
     <div v-if="showCustom" class="p-3 space-y-3 border-t border-border/40 mt-1">
@@ -122,7 +128,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Repeat, Settings2, X } from 'lucide-vue-next'
+import { AlertCircle, CalendarClock, Repeat, Settings2, X } from 'lucide-vue-next'
 import type { RecurrenceRule, RecurrenceFrequency } from '../model/recurrence'
 
 defineProps<{

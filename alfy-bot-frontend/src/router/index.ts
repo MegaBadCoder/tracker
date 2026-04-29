@@ -1,5 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import { isAuthenticated } from '../api/auth'
+import { createRouter, createWebHistory, START_LOCATION } from 'vue-router'
+import { isAuthenticated } from '../api/tokenStorage'
+import { useNavigationStore } from '@/stores/navigation-store'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -68,13 +69,34 @@ const router = createRouter({
       component: () => import('../views/LoginView.vue'),
       meta: { public: true },
     },
+    {
+      path: '/verify-email',
+      name: 'verify-email',
+      component: () => import('../views/VerifyEmailView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('../views/ResetPasswordView.vue'),
+      meta: { public: true },
+    },
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach((to, from) => {
   if (!to.meta.public && !isAuthenticated()) {
     return { name: 'login' }
   }
+  if (from === START_LOCATION && to.path === '/') {
+    const last = useNavigationStore().lastSection
+    if (last && last !== '/') return { path: last }
+  }
+})
+
+router.afterEach((to) => {
+  if (to.meta.public) return
+  useNavigationStore().rememberSection(to.path)
 })
 
 export default router

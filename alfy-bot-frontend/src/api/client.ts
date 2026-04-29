@@ -1,5 +1,7 @@
 import axios from 'axios'
-import { clearToken, getToken } from './auth'
+import { clearToken, getToken } from './tokenStorage'
+
+const USER_PROFILE_KEY = 'user_profile'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3002',
@@ -22,7 +24,7 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.status === 401) {
       clearToken()
-      localStorage.removeItem('user_profile')
+      localStorage.removeItem(USER_PROFILE_KEY)
       window.location.href = '/login'
     }
     return Promise.reject(error)

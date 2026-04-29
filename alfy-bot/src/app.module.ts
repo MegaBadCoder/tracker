@@ -31,6 +31,7 @@ import {
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
+import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
 import { SharedModule } from './shared/shared.module';
 
 @Module({
@@ -59,6 +60,6 @@ import { SharedModule } from './shared/shared.module';
     BotModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ScheduleMigrationService, QuestionMigrationService],
+  providers: [AppService, ScheduleMigrationService, QuestionMigrationService, AuthMethodMigrationService],
 })
 export class AppModule { }

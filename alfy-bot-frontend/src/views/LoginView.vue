@@ -12,6 +12,7 @@ const userStore = useUserStore()
 const mode = ref<'login' | 'register'>('login')
 const email = ref('')
 const password = ref('')
+const confirmPassword = ref('')
 const firstName = ref('')
 const lastName = ref('')
 const error = ref<string | null>(null)
@@ -24,17 +25,27 @@ async function handleEmailSubmit() {
   error.value = null
   loading.value = true
   try {
-    if (mode.value === 'login') {
-      await loginWithEmail(email.value, password.value)
-    } else {
-      await register(email.value, password.value, firstName.value, lastName.value || undefined)
+    if (mode.value === 'register') {
+      if (password.value !== confirmPassword.value) {
+        error.value = 'Пароли не совпадают'
+        loading.value = false
+        return
+      }
+      const result = await register(email.value, password.value, confirmPassword.value, firstName.value, lastName.value || undefined)
+      router.push({ name: 'verify-email', query: { email: result.email } })
+      return
     }
+    await loginWithEmail(email.value, password.value)
     await userStore.fetchMe()
     router.replace('/')
   } catch (err: any) {
     const status = err?.response?.status
+    const msg = err?.response?.data?.message
     if (mode.value === 'register' && status === 409) {
       error.value = 'Этот email уже зарегистрирован'
+    } else if (mode.value === 'login' && status === 401 && msg === 'Email not verified') {
+      router.push({ name: 'verify-email', query: { email: email.value } })
+      return
     } else if (mode.value === 'login' && status === 401) {
       error.value = 'Неверный email или пароль'
     } else {
@@ -137,7 +148,18 @@ onMounted(async () => {
             placeholder="Пароль"
             required
             :minlength="6"
-            autocomplete="current-password"
+            :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
+          />
+        </div>
+
+        <div v-if="mode === 'register'" class="space-y-2">
+          <Input
+            v-model="confirmPassword"
+            type="password"
+            placeholder="Подтвердите пароль"
+            required
+            :minlength="6"
+            autocomplete="new-password"
           />
         </div>
 
@@ -146,6 +168,16 @@ onMounted(async () => {
         <Button type="submit" class="w-full" :disabled="loading">
           {{ loading ? '...' : mode === 'login' ? 'Войти' : 'Зарегистрироваться' }}
         </Button>
+
+        <div v-if="mode === 'login'" class="text-right">
+          <button
+            type="button"
+            class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            @click="router.push('/reset-password')"
+          >
+            Забыли пароль?
+          </button>
+        </div>
       </form>
 
       <div class="text-center">

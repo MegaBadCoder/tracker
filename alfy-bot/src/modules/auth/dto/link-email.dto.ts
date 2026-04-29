@@ -1,7 +1,7 @@
-import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength } from 'class-validator';
 import { Match } from '../../../shared/validators/match.decorator';
 
-export class RegisterDto {
+export class LinkEmailDto {
   @IsEmail()
   email: string;
 
@@ -12,11 +12,4 @@ export class RegisterDto {
   @IsString()
   @Match('password')
   confirmPassword: string;
-
-  @IsString()
-  firstName: string;
-
-  @IsOptional()
-  @IsString()
-  lastName?: string;
 }

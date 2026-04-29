@@ -27,4 +27,13 @@ export class AuthMethod {
 
   @Column({ nullable: true })
   passwordHash: string;
+
+  @Column({ default: false })
+  emailVerified: boolean;
+
+  @Column({ nullable: true })
+  verificationCode: string;
+
+  @Column({ nullable: true })
+  verificationCodeExpiresAt: Date;
 }

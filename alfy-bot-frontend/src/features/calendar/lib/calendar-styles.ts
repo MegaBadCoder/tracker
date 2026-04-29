@@ -7,4 +7,4 @@ export function getPriorityEventClasses(priority?: string): string {
   }
 }
 
-export const OVERDUE_EVENT_CLASSES = 'bg-red-500/40 border-red-500/70 text-white backdrop-blur-sm'
+export const OVERDUE_EVENT_CLASSES = 'bg-red-500/65 border-red-500 text-white backdrop-blur-sm shadow-[0_0_0_1px_rgba(239,68,68,0.35)]'

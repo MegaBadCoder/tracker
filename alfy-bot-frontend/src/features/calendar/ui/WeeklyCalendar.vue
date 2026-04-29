@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col bg-card rounded-xl border border-border overflow-hidden">
+  <div class="flex flex-col bg-card overflow-hidden">
     <CalendarHeader
       :label="rangeLabel"
       @navigate="onNavigate"
@@ -78,10 +78,9 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { addDays } from 'date-fns'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { tasksToCalendarEvents } from '../lib/calendar-events'
-import { isToday, formatDayHeader, formatDateRange } from '../lib/week'
+import { isToday, formatDayHeader, formatDateRange, getWeekStart, navigateWeek } from '../lib/week'
 import { useCalendarDnd } from '../lib/use-calendar-dnd'
 import { useInfiniteDays, DAY_WIDTH, TRACK_WIDTH, GUTTER_WIDTH } from '../lib/use-infinite-days'
 import { useGrabScroll } from '../lib/use-grab-scroll'
@@ -98,7 +97,7 @@ const taskStore = useTaskStore()
 const { startDrag } = useCalendarDnd()
 
 const gridRef = ref<HTMLElement | null>(null)
-const { visibleDays, dateRange, centerDate, dayOffset, dateFromX, scrollToDate, onScroll } = useInfiniteDays(gridRef)
+const { visibleDays, dateRange, dayOffset, dateFromX, scrollToDate, onScroll } = useInfiniteDays(gridRef)
 const {
   grabbing, ctrlHeld,
   onMouseDown: onGrabMouseDown,
@@ -124,7 +123,8 @@ const calendarEvents = computed(() => {
 })
 
 function onNavigate(direction: number) {
-  scrollToDate(addDays(centerDate.value, direction * 7), true)
+  const currentWeekStart = getWeekStart(dateRange.value.start)
+  scrollToDate(navigateWeek(currentWeekStart, direction), true)
 }
 
 function onToday() {

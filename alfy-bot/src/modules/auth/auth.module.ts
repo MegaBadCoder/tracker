@@ -8,9 +8,14 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthMethodRepositoryPort } from './domain/auth-method-repository.port';
+import { EmailNotificationPort } from './domain/email-notification.port';
+import { TokenIssuerPort } from './domain/token-issuer.port';
 import { TypeOrmAuthMethodRepository } from './infrastructure/typeorm-auth-method.repository';
+import { JwtTokenIssuer } from './infrastructure/jwt-token-issuer';
 import { AuthMethod } from '../../shared/entities';
 import { UserModule } from '../user/user.module';
+import { EmailModule } from '../email/email.module';
+import { EmailService } from '../email/email.service';
 
 @Module({
   imports: [
@@ -26,6 +31,7 @@ import { UserModule } from '../user/user.module';
       }),
     }),
     UserModule,
+    EmailModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -35,6 +41,14 @@ import { UserModule } from '../user/user.module';
     {
       provide: AuthMethodRepositoryPort,
       useClass: TypeOrmAuthMethodRepository,
+    },
+    {
+      provide: EmailNotificationPort,
+      useClass: EmailService,
+    },
+    {
+      provide: TokenIssuerPort,
+      useClass: JwtTokenIssuer,
     },
   ],
   exports: [JwtAuthGuard, AuthService, AuthMethodRepositoryPort],

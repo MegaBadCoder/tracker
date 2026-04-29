@@ -6,33 +6,58 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { TelegramAuthDto } from './dto/telegram-auth.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginEmailDto } from './dto/login-email.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ResendCodeDto } from './dto/resend-code.dto';
+import { LinkEmailDto } from './dto/link-email.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UserService } from '../user/application/user.service';
 import { AuthMethodRepositoryPort } from './domain/auth-method-repository.port';
+import { EmailNotificationPort } from './domain/email-notification.port';
+import { TokenIssuerPort } from './domain/token-issuer.port';
 
 const AUTH_DATE_MAX_AGE_SEC = 86400; // 24h
+const CODE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+interface TelegramUserData {
+  id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  photo_url?: string;
+}
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
+  private readonly botToken: string;
+  private readonly nodeEnv: string;
+
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
+    private readonly tokenIssuer: TokenIssuerPort,
     private readonly userService: UserService,
     private readonly authMethodRepo: AuthMethodRepositoryPort,
-  ) {}
+    private readonly emailNotification: EmailNotificationPort,
+    configService: ConfigService,
+  ) {
+    this.botToken = configService.getOrThrow<string>('BOT_TOKEN');
+    this.nodeEnv = configService.get<string>('NODE_ENV', 'production');
+  }
 
   // ──────────────────────────────────────────────
   // Email auth
   // ──────────────────────────────────────────────
 
-  async register(dto: RegisterDto): Promise<{ accessToken: string }> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ message: string; email: string }> {
     const existing = await this.userService.findByEmail(dto.email);
     if (existing) {
       throw new ConflictException('Email already registered');
@@ -46,15 +71,20 @@ export class AuthService {
       email: dto.email,
     });
 
+    const code = this.generateVerificationCode();
+
     await this.authMethodRepo.create({
       userId: user.id,
       provider: 'email',
       providerUserId: dto.email,
       passwordHash,
+      verificationCode: code,
+      verificationCodeExpiresAt: new Date(Date.now() + CODE_EXPIRY_MS),
     });
 
-    const accessToken = this.jwtService.sign({ sub: user.id });
-    return { accessToken };
+    await this.emailNotification.sendVerificationCode(dto.email, code);
+
+    return { message: 'Verification code sent', email: dto.email };
   }
 
   async loginWithEmail(
@@ -73,8 +103,186 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const accessToken = this.jwtService.sign({ sub: method.userId });
+    if (!method.emailVerified) {
+      throw new UnauthorizedException('Email not verified');
+    }
+
+    const accessToken = this.tokenIssuer.sign({ sub: method.userId });
     return { accessToken };
+  }
+
+  async verifyEmail(
+    dto: VerifyEmailDto,
+  ): Promise<{ accessToken: string }> {
+    const method = await this.authMethodRepo.findByProvider(
+      'email',
+      dto.email,
+    );
+    if (!method) {
+      throw new BadRequestException('User not found');
+    }
+    if (method.emailVerified) {
+      throw new BadRequestException('Already verified');
+    }
+    if (!method.verificationCode || method.verificationCode !== dto.code) {
+      throw new BadRequestException('Invalid code');
+    }
+    if (
+      method.verificationCodeExpiresAt &&
+      new Date() > method.verificationCodeExpiresAt
+    ) {
+      throw new BadRequestException('Code expired');
+    }
+
+    method.emailVerified = true;
+    method.verificationCode = null as any;
+    method.verificationCodeExpiresAt = null as any;
+    await this.authMethodRepo.save(method);
+
+    const accessToken = this.tokenIssuer.sign({ sub: method.userId });
+    return { accessToken };
+  }
+
+  async resendCode(
+    dto: ResendCodeDto,
+  ): Promise<{ message: string }> {
+    const method = await this.authMethodRepo.findByProvider(
+      'email',
+      dto.email,
+    );
+    if (!method) {
+      throw new BadRequestException('User not found');
+    }
+    if (method.emailVerified) {
+      throw new BadRequestException('Already verified');
+    }
+
+    const code = this.generateVerificationCode();
+    method.verificationCode = code;
+    method.verificationCodeExpiresAt = new Date(
+      Date.now() + 10 * 60 * 1000,
+    );
+    await this.authMethodRepo.save(method);
+
+    await this.emailNotification.sendVerificationCode(dto.email, code);
+
+    return { message: 'Code resent' };
+  }
+
+  async linkEmail(
+    userId: number,
+    dto: LinkEmailDto,
+  ): Promise<{ message: string; email: string }> {
+    const existing = await this.authMethodRepo.findByUserIdAndProvider(
+      userId,
+      'email',
+    );
+    if (existing) {
+      throw new ConflictException('Email already linked');
+    }
+
+    const taken = await this.userService.findByEmail(dto.email);
+    if (taken) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const code = this.generateVerificationCode();
+
+    const method = await this.authMethodRepo.create({
+      userId,
+      provider: 'email',
+      providerUserId: dto.email,
+      passwordHash,
+      emailVerified: false,
+      verificationCode: code,
+      verificationCodeExpiresAt: new Date(Date.now() + CODE_EXPIRY_MS),
+    });
+
+    await this.userService.updateEmail(userId, dto.email);
+    await this.emailNotification.sendVerificationCode(dto.email, code);
+
+    return { message: 'Verification code sent', email: dto.email };
+  }
+
+  async changePassword(
+    userId: number,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const method = await this.authMethodRepo.findByUserIdAndProvider(
+      userId,
+      'email',
+    );
+    if (!method) {
+      throw new BadRequestException('No email auth linked');
+    }
+
+    const valid = await bcrypt.compare(dto.oldPassword, method.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid old password');
+    }
+
+    method.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await this.authMethodRepo.save(method);
+
+    return { message: 'Password changed' };
+  }
+
+  async forgotPassword(
+    dto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    const method = await this.authMethodRepo.findByProvider(
+      'email',
+      dto.email,
+    );
+    if (!method) {
+      // Don't reveal whether email exists
+      return { message: 'If this email is registered, a code has been sent' };
+    }
+
+    const code = this.generateVerificationCode();
+    method.verificationCode = code;
+    method.verificationCodeExpiresAt = new Date(
+      Date.now() + 10 * 60 * 1000,
+    );
+    await this.authMethodRepo.save(method);
+
+    await this.emailNotification.sendVerificationCode(dto.email, code);
+
+    return { message: 'If this email is registered, a code has been sent' };
+  }
+
+  async resetPassword(
+    dto: ResetPasswordDto,
+  ): Promise<{ accessToken: string }> {
+    const method = await this.authMethodRepo.findByProvider(
+      'email',
+      dto.email,
+    );
+    if (!method) {
+      throw new BadRequestException('Invalid code');
+    }
+    if (!method.verificationCode || method.verificationCode !== dto.code) {
+      throw new BadRequestException('Invalid code');
+    }
+    if (
+      method.verificationCodeExpiresAt &&
+      new Date() > method.verificationCodeExpiresAt
+    ) {
+      throw new BadRequestException('Code expired');
+    }
+
+    method.passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    method.verificationCode = null as any;
+    method.verificationCodeExpiresAt = null as any;
+    await this.authMethodRepo.save(method);
+
+    const accessToken = this.tokenIssuer.sign({ sub: method.userId });
+    return { accessToken };
+  }
+
+  private generateVerificationCode(): string {
+    return String(crypto.randomInt(100000, 999999));
   }
 
   // ──────────────────────────────────────────────
@@ -95,7 +303,7 @@ export class AuthService {
       .map(([key, value]) => `${key}=${value}`)
       .join('\n');
 
-    const botToken = this.configService.getOrThrow<string>('BOT_TOKEN');
+    const botToken = this.botToken;
     const secretKey = crypto
       .createHmac('sha256', 'WebAppData')
       .update(botToken)
@@ -163,7 +371,7 @@ export class AuthService {
       .map((key) => `${key}=${fields[key]}`)
       .join('\n');
 
-    const botToken = this.configService.getOrThrow<string>('BOT_TOKEN');
+    const botToken = this.botToken;
     const secretKey = crypto
       .createHash('sha256')
       .update(botToken)
@@ -190,7 +398,7 @@ export class AuthService {
   async login(dto: TelegramAuthDto): Promise<{ accessToken: string }> {
     // --- Dev flow ---
     if (dto.devTelegramId !== undefined) {
-      if (this.configService.get<string>('NODE_ENV') !== 'development') {
+      if (this.nodeEnv !== 'development') {
         throw new BadRequestException(
           'Dev login is only available in development mode',
         );
@@ -199,7 +407,7 @@ export class AuthService {
         dto.devTelegramId,
         {},
       );
-      const accessToken = this.jwtService.sign({ sub: user.id });
+      const accessToken = this.tokenIssuer.sign({ sub: user.id });
       return { accessToken };
     }
 
@@ -207,15 +415,7 @@ export class AuthService {
     if (dto.initData) {
       const data = this.validateInitData(dto.initData);
 
-      interface TelegramUser {
-        id: number;
-        username?: string;
-        first_name?: string;
-        last_name?: string;
-        photo_url?: string;
-      }
-
-      const userRaw = JSON.parse(data.user) as TelegramUser;
+      const userRaw = JSON.parse(data.user) as TelegramUserData;
 
       const user = await this.findOrCreateTelegramUser(userRaw.id, {
         username: userRaw.username,
@@ -224,7 +424,7 @@ export class AuthService {
         photoUrl: userRaw.photo_url,
       });
 
-      const accessToken = this.jwtService.sign({ sub: user.id });
+      const accessToken = this.tokenIssuer.sign({ sub: user.id });
       return { accessToken };
     }
 
@@ -239,7 +439,7 @@ export class AuthService {
         photoUrl: widgetUser.photo_url,
       });
 
-      const accessToken = this.jwtService.sign({ sub: user.id });
+      const accessToken = this.tokenIssuer.sign({ sub: user.id });
       return { accessToken };
     }
 
@@ -255,6 +455,12 @@ export class AuthService {
   async getProfile(userId: number) {
     const user = await this.userService.findById(userId);
     if (!user) return null;
+
+    const emailMethod = await this.authMethodRepo.findByUserIdAndProvider(
+      userId,
+      'email',
+    );
+
     return {
       firstName: user.firstName,
       lastName: user.lastName,
@@ -263,6 +469,7 @@ export class AuthService {
       phone: user.phone,
       username: user.username,
       timezone: user.timezone ?? 'UTC',
+      hasEmailAuth: !!emailMethod?.emailVerified,
     };
   }
 

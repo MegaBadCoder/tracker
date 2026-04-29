@@ -1,39 +1,124 @@
-# UI conventions
+# CLAUDE.md
 
-## shadcn-vue
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-When working on Vue UI in this repository, especially in `alfy-bot-frontend`, use `https://www.shadcn-vue.com/` as the primary source of truth for component APIs, composition patterns, and installation choices.
+# Repository layout
 
-Do not default to React shadcn docs for Vue work.
+Монорепо из двух приложений + общая инфраструктура:
 
-Before creating a new UI component:
+- `alfy-bot/` — NestJS-бэкенд (порт 3002): REST API под `/api`, Swagger на `/api/docs`, Telegram-бот (telegraf), TypeORM + SQLite (`data/database.sqlite`, `synchronize: true`), JWT-аутентификация, web-push.
+- `alfy-bot-frontend/` — Vue 3 + Vite + TS + Tailwind v4 + Pinia + vue-router. PWA (`vite-plugin-pwa`, кастомный `sw.ts`). Запускается как обычный SPA и как Telegram WebApp.
+- `docker-compose.yml` + `Caddyfile` — прод: Caddy на 80/443 раздаёт `tracker.rocketup.tech`, проксирует `/api/*` на backend, остальное на frontend (nginx).
+- `scripts/tunnels.sh` — Cloudflare Quick Tunnels для dev (см. README).
 
-1. Check whether it already exists in `alfy-bot-frontend/src/components/ui`.
-2. Reuse or extend the existing component when possible.
-3. If the component is missing, implement it in the `shadcn-vue` style used by this repo.
+Бэк и фронт деплоятся независимо в Docker-реестр (`REGISTRY_URL` в `.env`).
 
-Project context:
+# Commands
 
-- `alfy-bot-frontend/components.json` is the canonical shadcn config.
-- UI components live in `alfy-bot-frontend/src/components/ui`.
-- Use `@/lib/utils` and `cn` for class merging when appropriate.
-- Follow the existing Vue 3 + TypeScript + Tailwind conventions.
-- Do not add branding comments or AI-generated markers.
+## Backend (`alfy-bot/`)
+
+```bash
+npm run start:dev           # nest start --watch (порт 3002)
+npm run build               # nest build → dist/
+npm run lint                # eslint --fix
+npm run test                # jest (все *.spec.ts)
+npm run test:watch
+npm run test:cov
+npm run test:e2e            # jest --config ./test/jest-e2e.json
+npx jest path/to/file.spec.ts                   # один файл
+npx jest -t "имя теста"                          # один тест по имени
+```
+
+Jest сконфигурирован в `package.json` (`rootDir: src`, `testRegex: .*\.spec\.ts$`, `ts-jest`).
+
+## Frontend (`alfy-bot-frontend/`)
+
+```bash
+npm run dev                 # vite (порт 5173)
+npm run build               # vue-tsc -b && vite build
+npm run lint                # eslint .
+npm run test                # vitest (watch)
+npm run test:run            # vitest run (CI)
+npx vitest run path/to/file.spec.ts             # один файл
+npx vitest -t "имя теста"                        # один тест
+npx vue-tsc --noEmit -p tsconfig.app.json       # тип-чек без билда
+```
+
+Тесты лежат в `alfy-bot-frontend/tests/` (зеркалят структуру `src/`), env — `happy-dom`, MSW для моков сети.
+
+## Dev (Telegram WebApp через публичные URL)
+
+```bash
+./scripts/tunnels.sh        # cloudflared, обновляет alfy-bot/.env (WEBAPP_URL) и alfy-bot-frontend/.env (VITE_API_URL)
+```
+
+Перед запуском должны быть подняты vite (5173) и nest (3002). После — перезапустить бот и фронт.
+
+# Backend architecture (Clean Architecture per module)
+
+Каждый бизнес-модуль в `alfy-bot/src/modules/<name>/` следует трёхслойной структуре:
+
+- `domain/` — порты (абстрактные классы как DI-токены: `*Port`), чистые утилиты без зависимостей фреймворка. Пример: `task/domain/task-repository.port.ts`, `task/domain/recurrence.utils.ts`.
+- `infrastructure/` — реализации портов (TypeORM-репозитории, адаптеры внешних сервисов, schedulers). Пример: `task/infrastructure/typeorm-task.repository.ts`, `composite-notification.adapter.ts`.
+- `application/` или модульные сервисы (`task.service.ts`) — оркестрация, зависят только от портов.
+- `dto/` — class-validator DTO для контроллеров.
+- Корень модуля: `*.controller.ts`, `*.module.ts`, `*.service.ts`.
+
+Биндинги портов делаются в `*.module.ts` через `{ provide: SomePort, useClass: SomeAdapter }` — см. [alfy-bot/src/modules/task/task.module.ts](alfy-bot/src/modules/task/task.module.ts). Сервисы запрашивают `*Port` в конструкторе, а не конкретные классы.
+
+Сущности TypeORM собраны в `alfy-bot/src/shared/entities/` (один общий barrel `index.ts`) и регистрируются разом в `app.module.ts`. Миграции данных — отдельные `*MigrationService` в `shared/database/`, подключаются как providers в `AppModule`.
+
+`shared/` — кросс-модульный код (entities, validators, services, утилиты). `SharedModule` экспортирует общие провайдеры.
+
+Глобально включены: `ValidationPipe({ whitelist: true, transform: true })`, префикс `/api`, CORS только для `localhost`, Swagger Bearer auth.
+
+# Frontend architecture (FSD-like)
+
+`alfy-bot-frontend/src/` устроен как feature-sliced:
+
+- `features/<name>/{api,lib,model,ui}/` — самодостаточные фичи: `tasks`, `calendar`, `projects`, `task-timer`. `model/` обычно содержит Pinia-стор и типы, `lib/` — чистые утилиты, `ui/` — Vue-компоненты, `api/` — HTTP-клиенты для бэка.
+- `components/ui/` — shadcn-vue примитивы (см. ниже).
+- `components/` (корень) — общие layout/виджеты (`AppLayout`, `AppHeader`, `AppSidebar`, чарты).
+- `views/` — страницы, подключённые в `router/index.ts`.
+- `stores/` — глобальные Pinia-сторы (`user-store`).
+- `api/` — общий HTTP-клиент: `api/client.ts` (axios инстанс с JWT-интерцептором и редиректом на `/login` по 401), `api/auth.ts`, `api/tokenStorage.ts`.
+- `composables/` — реюзабельные composables (`useCooldown`, `usePushSubscription`, ...).
+- `mocks/` — MSW-моки для тестов.
+- `sw.ts` — кастомный service worker (workbox).
+
+Авторизация: при старте `main.ts` пробует `authorize()` если есть `Telegram.WebApp.initData` или dev-флаг `VITE_DEV_TELEGRAM_ID`. Router guard в `router/index.ts` редиректит на `/login` любой не-public маршрут при отсутствии токена. Public-маршруты помечены `meta: { public: true }`.
+
+# UI conventions — shadcn-vue
+
+При работе с Vue UI (особенно `alfy-bot-frontend`) источник истины — `https://www.shadcn-vue.com/`, **не React-докс**.
+
+Перед созданием нового UI-компонента:
+
+1. Проверить `alfy-bot-frontend/src/components/ui/` — возможно уже есть.
+2. Переиспользовать или расширить существующий.
+3. Если нет — реализовать в стиле shadcn-vue репозитория.
+
+Контекст:
+
+- `alfy-bot-frontend/components.json` — каноничный shadcn config (`style: new-york`, `baseColor: neutral`, `iconLibrary: lucide`).
+- Алиасы: `@/components`, `@/lib/utils` (`cn` для merge классов), `@/components/ui`, `@/lib`.
+- Стек: Vue 3 `<script setup>` + TS + Tailwind v4 + reka-ui (примитивы под капотом shadcn-vue).
+- Не добавлять брендинг-комментарии и AI-маркеры.
 
 # Timezone conventions
 
-All date/time operations must respect the user's timezone stored in `User.timezone` (IANA format, e.g. `"Europe/Moscow"`).
+Все операции с датой/временем уважают `User.timezone` (IANA, например `"Europe/Moscow"`).
 
 ## Backend (`alfy-bot`)
 
-- Dates are stored in the database as **UTC**.
-- Domain functions (`recurrence.utils.ts`) operate on UTC fields (`getUTCDay`, `setUTCDate` etc.) and must remain timezone-agnostic.
-- Before passing dates to domain functions, shift them from UTC to the user's wall clock using `shiftToUserWallClock(date, timezone)` from `modules/task/lib/timezone.ts`.
-- After getting results from domain, shift back using `shiftBackToUtc(date, timezone)`.
-- Obtain the user's timezone via `UserSettingsPort.getTimezone(userId)` — a narrow port injected into services.
+- В БД даты хранятся как **UTC**.
+- Доменные функции (`recurrence.utils.ts`) работают с UTC-методами (`getUTCDay`, `setUTCDate`) и должны оставаться timezone-agnostic.
+- Перед вызовом доменных функций — сдвинуть UTC к wall clock пользователя через `shiftToUserWallClock(date, timezone)` из [alfy-bot/src/modules/task/lib/timezone.ts](alfy-bot/src/modules/task/lib/timezone.ts).
+- После — обратно через `shiftBackToUtc(date, timezone)`.
+- Таймзону получать через `UserSettingsPort.getTimezone(userId)` — узкий порт, инжектится в сервисы.
 
 ## Frontend (`alfy-bot-frontend`)
 
-- The browser's local time is assumed to match the user's timezone.
-- Frontend date utilities (`recurrence.ts`, `dateTime.ts`) use local time methods (`getDay`, `setDate` etc.), not UTC.
-- Calendar events and virtual projections are computed in local time — no explicit timezone conversion needed on frontend.
+- Локальное время браузера = таймзона пользователя.
+- Утилиты дат (`recurrence.ts`, `dateTime.ts`) используют локальные методы (`getDay`, `setDate`), не UTC.
+- Календарь и виртуальные проекции считаются в локальном времени — никаких явных конверсий.

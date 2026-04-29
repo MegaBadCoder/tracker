@@ -9,7 +9,13 @@ async function bootstrap() {
   (app.getHttpAdapter().getInstance() as Application).set('etag', false);
 
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
     credentials: true,
   });
 

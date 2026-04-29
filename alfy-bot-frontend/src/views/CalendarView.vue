@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col h-[100dvh]">
     <AppHeader title="Календарь" :on-menu-click="openSidebar" fluid />
-    <main class="flex-1 min-h-0 px-4 py-2 pb-4">
+    <main class="flex-1 min-h-0">
       <WeeklyCalendar class="h-full" @open-task="handleOpenTask" />
     </main>
   </div>

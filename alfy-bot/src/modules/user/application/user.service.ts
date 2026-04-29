@@ -33,6 +33,13 @@ export class UserService {
     }
   }
 
+  async updateEmail(userId: number, email: string): Promise<void> {
+    const user = await this.userRepo.findOneById(userId);
+    if (!user) return;
+    user.email = email;
+    await this.userRepo.save(user);
+  }
+
   async updateTimezone(userId: number, timezone: string): Promise<string> {
     const user = await this.userRepo.findOneById(userId);
     if (!user) return 'UTC';

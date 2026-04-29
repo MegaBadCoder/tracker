@@ -67,21 +67,45 @@
           />
 
           <!-- Description -->
-          <ContentEditableInput
-            ref="descriptionRef"
-            v-model="localDescription"
-            :editable="effectiveEditable"
-            multiline
-            placeholder="Добавить описание..."
-            :class="[
-              'text-sm leading-relaxed rounded-md py-1 transition-colors empty:before:italic',
-              localDescription ? 'text-foreground/80' : '',
-              effectiveEditable && 'cursor-text',
-            ]"
-            aria-label="Описание задачи"
-            @blur="commitDescription"
-            @keydown.escape="cancelEditDescription"
-          />
+          <div class="space-y-1.5">
+            <div
+              :class="[
+                'relative overflow-hidden transition-[max-height] duration-200',
+                !descriptionExpanded && !descriptionFocused && descriptionOverflows
+                  ? 'max-h-[calc(0.875rem*1.625*10+0.5rem)]'
+                  : 'max-h-none',
+              ]"
+            >
+              <ContentEditableInput
+                ref="descriptionRef"
+                v-model="localDescription"
+                :editable="effectiveEditable"
+                multiline
+                placeholder="Добавить описание..."
+                :class="[
+                  'text-sm leading-relaxed rounded-md py-1 transition-colors empty:before:italic',
+                  localDescription ? 'text-foreground/80' : '',
+                  effectiveEditable && 'cursor-text',
+                ]"
+                aria-label="Описание задачи"
+                @focus="descriptionFocused = true"
+                @blur="onDescriptionBlur"
+                @keydown.escape="cancelEditDescription"
+              />
+              <div
+                v-if="!descriptionExpanded && !descriptionFocused && descriptionOverflows"
+                class="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent"
+              />
+            </div>
+            <button
+              v-if="descriptionOverflows && !descriptionFocused"
+              type="button"
+              class="text-xs text-primary hover:underline cursor-pointer"
+              @click="descriptionExpanded = !descriptionExpanded"
+            >
+              {{ descriptionExpanded ? 'Свернуть' : 'Подробнее' }}
+            </button>
+          </div>
 
           <!-- Pomodoro section -->
           <div v-if="task.isPomodoroTask" class="space-y-3">
@@ -158,36 +182,39 @@
               <div
                 v-for="item in sortedChecklist"
                 :key="item.id"
-                class="group flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors"
+                class="group flex items-start gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors"
               >
                 <Checkbox
                   :model-value="item.completed"
                   :disabled="!effectiveEditable"
-                  class="shrink-0"
+                  class="shrink-0 mt-0.5"
                   @update:model-value="effectiveEditable && toggleChecklistItem(item.id)"
                 />
                 <span
                   v-if="!effectiveEditable"
                   :class="[
-                    'text-sm flex-1 transition-colors',
+                    'text-sm flex-1 min-w-0 break-words whitespace-pre-wrap transition-colors',
                     item.completed && 'line-through text-muted-foreground'
                   ]"
                 >
                   {{ item.text }}
                 </span>
-                <input
+                <textarea
                   v-else
                   :value="item.text"
+                  rows="1"
                   :class="[
-                    'text-sm flex-1 bg-transparent border-none outline-none transition-colors',
+                    'text-sm flex-1 min-w-0 break-words whitespace-pre-wrap resize-none bg-transparent border-none outline-none transition-colors leading-5 py-0',
                     item.completed && 'line-through text-muted-foreground'
                   ]"
-                  @blur="updateChecklistItemText(item.id, ($event.target as HTMLInputElement).value)"
-                  @keydown.enter="($event.target as HTMLInputElement).blur()"
+                  @vue:mounted="autosizeTextarea($event.el as HTMLTextAreaElement)"
+                  @input="autosizeTextarea($event.target as HTMLTextAreaElement)"
+                  @blur="updateChecklistItemText(item.id, ($event.target as HTMLTextAreaElement).value)"
+                  @keydown.enter.prevent="($event.target as HTMLTextAreaElement).blur()"
                 />
                 <button
                   v-if="effectiveEditable"
-                  class="shrink-0 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground"
+                  class="shrink-0 mt-0.5 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground"
                   @click="removeChecklistItem(item.id)"
                 >
                   <X :size="14" />
@@ -478,7 +505,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import {
   X,
@@ -598,6 +625,27 @@ const descriptionRef = ref<InstanceType<typeof ContentEditableInput> | null>(nul
 const localTitle = ref('')
 const localDescription = ref('')
 
+// Description expand/collapse
+const DESCRIPTION_MAX_LINES = 10
+const descriptionExpanded = ref(false)
+const descriptionFocused = ref(false)
+const descriptionOverflows = ref(false)
+
+function checkDescriptionOverflow() {
+  const el = descriptionRef.value?.el
+  if (!el) {
+    descriptionOverflows.value = false
+    return
+  }
+  const lineHeight = parseFloat(getComputedStyle(el).lineHeight)
+  if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+    descriptionOverflows.value = false
+    return
+  }
+  const threshold = lineHeight * DESCRIPTION_MAX_LINES + 8
+  descriptionOverflows.value = el.scrollHeight > threshold + 1
+}
+
 // Checklist state
 const localChecklist = ref<ChecklistItem[]>([])
 const newChecklistItem = ref('')
@@ -707,8 +755,13 @@ watch(() => props.task, (task) => {
     localShortBreak.value = task.shortBreak ?? POMODORO_DEFAULTS.shortBreak
     localLongBreak.value = task.longBreak ?? POMODORO_DEFAULTS.longBreak
     localLongBreakInterval.value = task.longBreakInterval ?? POMODORO_DEFAULTS.longBreakInterval
+    descriptionExpanded.value = false
+    nextTick(checkDescriptionOverflow)
   }
 }, { immediate: true })
+
+watch(localDescription, () => nextTick(checkDescriptionOverflow))
+watch(() => props.open, (open) => { if (open) nextTick(checkDescriptionOverflow) })
 
 const dueDateCalendarValue = computed(() => toCalendarDateValue(localDueDate.value))
 
@@ -767,6 +820,12 @@ function commitDescription() {
   }
 }
 
+function onDescriptionBlur() {
+  descriptionFocused.value = false
+  commitDescription()
+  nextTick(checkDescriptionOverflow)
+}
+
 function cancelEditDescription() {
   localDescription.value = props.task?.description || ''
   descriptionRef.value?.el?.blur()
@@ -815,6 +874,11 @@ function emitChecklistUpdate() {
   if (!props.task) return
   const items = localChecklist.value.map(i => ({ ...i }))
   emit('update:checklist', props.task.id, items)
+}
+
+function autosizeTextarea(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
 }
 
 function emitUpdate(partial: Partial<Task>) {

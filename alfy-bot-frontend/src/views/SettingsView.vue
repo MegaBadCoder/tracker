@@ -1,6 +1,84 @@
 <template>
-  <div class="max-w-lg mx-auto px-4 py-8 space-y-6">
+  <div class="max-w-lg mx-auto px-4 py-8 space-y-8">
     <h1 class="text-lg font-semibold">Настройки</h1>
+
+    <!-- Email & Password -->
+    <div class="space-y-4">
+      <h2 class="text-sm font-medium text-foreground">Email и пароль</h2>
+
+      <!-- Link email (Telegram-only users) -->
+      <template v-if="!userStore.user?.hasEmailAuth">
+        <form class="space-y-3" @submit.prevent="handleLinkEmail">
+          <Input
+            v-model="linkEmailForm.email"
+            type="email"
+            placeholder="Email"
+            required
+          />
+          <Input
+            v-model="linkEmailForm.password"
+            type="password"
+            placeholder="Пароль"
+            required
+            :minlength="6"
+            autocomplete="new-password"
+          />
+          <Input
+            v-model="linkEmailForm.confirmPassword"
+            type="password"
+            placeholder="Подтвердите пароль"
+            required
+            :minlength="6"
+            autocomplete="new-password"
+          />
+          <p v-if="linkEmailError" class="text-sm text-destructive">{{ linkEmailError }}</p>
+          <p v-if="linkEmailSuccess" class="text-sm text-emerald-600">{{ linkEmailSuccess }}</p>
+          <Button type="submit" :disabled="linkEmailLoading" class="w-full">
+            {{ linkEmailLoading ? '...' : 'Привязать email' }}
+          </Button>
+        </form>
+      </template>
+
+      <!-- Email linked — show email + change password -->
+      <template v-else>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-muted-foreground">Email:</span>
+          <span>{{ userStore.user?.email }}</span>
+          <span class="text-emerald-600">&#10003;</span>
+        </div>
+
+        <form class="space-y-3" @submit.prevent="handleChangePassword">
+          <Input
+            v-model="changePassForm.oldPassword"
+            type="password"
+            placeholder="Текущий пароль"
+            required
+            autocomplete="current-password"
+          />
+          <Input
+            v-model="changePassForm.newPassword"
+            type="password"
+            placeholder="Новый пароль"
+            required
+            :minlength="6"
+            autocomplete="new-password"
+          />
+          <Input
+            v-model="changePassForm.confirmPassword"
+            type="password"
+            placeholder="Подтвердите новый пароль"
+            required
+            :minlength="6"
+            autocomplete="new-password"
+          />
+          <p v-if="changePassError" class="text-sm text-destructive">{{ changePassError }}</p>
+          <p v-if="changePassSuccess" class="text-sm text-emerald-600">{{ changePassSuccess }}</p>
+          <Button type="submit" :disabled="changePassLoading" class="w-full">
+            {{ changePassLoading ? '...' : 'Изменить пароль' }}
+          </Button>
+        </form>
+      </template>
+    </div>
 
     <!-- Timezone -->
     <div class="space-y-2">
@@ -41,11 +119,90 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user-store'
+import { linkEmail, changePassword } from '@/api/auth'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const userStore = useUserStore()
+const router = useRouter()
 
+// ── Link email form ──
+const linkEmailForm = reactive({ email: '', password: '', confirmPassword: '' })
+const linkEmailError = ref<string | null>(null)
+const linkEmailSuccess = ref<string | null>(null)
+const linkEmailLoading = ref(false)
+
+async function handleLinkEmail() {
+  linkEmailError.value = null
+  linkEmailSuccess.value = null
+
+  if (linkEmailForm.password !== linkEmailForm.confirmPassword) {
+    linkEmailError.value = 'Пароли не совпадают'
+    return
+  }
+
+  linkEmailLoading.value = true
+  try {
+    const result = await linkEmail(
+      linkEmailForm.email,
+      linkEmailForm.password,
+      linkEmailForm.confirmPassword,
+    )
+    router.push({ name: 'verify-email', query: { email: result.email } })
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (status === 409) {
+      linkEmailError.value = 'Этот email уже используется'
+    } else {
+      linkEmailError.value = 'Ошибка привязки email'
+    }
+  } finally {
+    linkEmailLoading.value = false
+  }
+}
+
+// ── Change password form ──
+const changePassForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' })
+const changePassError = ref<string | null>(null)
+const changePassSuccess = ref<string | null>(null)
+const changePassLoading = ref(false)
+
+async function handleChangePassword() {
+  changePassError.value = null
+  changePassSuccess.value = null
+
+  if (changePassForm.newPassword !== changePassForm.confirmPassword) {
+    changePassError.value = 'Пароли не совпадают'
+    return
+  }
+
+  changePassLoading.value = true
+  try {
+    await changePassword(
+      changePassForm.oldPassword,
+      changePassForm.newPassword,
+      changePassForm.confirmPassword,
+    )
+    changePassSuccess.value = 'Пароль изменён'
+    changePassForm.oldPassword = ''
+    changePassForm.newPassword = ''
+    changePassForm.confirmPassword = ''
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (status === 401) {
+      changePassError.value = 'Неверный текущий пароль'
+    } else {
+      changePassError.value = 'Ошибка смены пароля'
+    }
+  } finally {
+    changePassLoading.value = false
+  }
+}
+
+// ── Timezone ──
 const POPULAR_TIMEZONES = [
   { value: 'Europe/Moscow', label: 'Москва (UTC+3)' },
   { value: 'Europe/Kaliningrad', label: 'Калининград (UTC+2)' },
