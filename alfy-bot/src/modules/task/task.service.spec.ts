@@ -330,6 +330,14 @@ describe('TaskService', () => {
   });
 
   describe('update — завершение recurring задачи', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     const rootTask = () =>
       makeTask({
         id: 'root-1',
@@ -425,9 +433,38 @@ describe('TaskService', () => {
         expect.objectContaining({ id: 'root-1', recurringCompletedCount: 3 }),
       );
     });
+
+    it('завершение задачи с dueDate в прошлом → next instance landing на сегодня', async () => {
+      jest.setSystemTime(new Date('2026-04-29T10:00:00.000Z'));
+      const task = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        dueDate: new Date('2026-04-05T10:00:00.000Z'),  // 24 days in the past
+        completed: false,
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      repo.findById.mockResolvedValue(task);
+      repo.findByParentId.mockResolvedValue([task]);
+
+      await service.update(1, 'root-1', { completed: true });
+
+      const instanceArg = repo.create.mock.calls[0][0] as Partial<Task>;
+      // For UTC user (default in spec mocks), startOfTodayLocal = 2026-04-29T00:00:00Z;
+      // currentDue=April 5 10:00, daily rule → first valid >= April 29 00:00 is April 29 10:00.
+      expect(instanceArg.dueDate).toEqual(new Date('2026-04-29T10:00:00.000Z'));
+    });
   });
 
   describe('update — идемпотентность complete', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('повторный complete: findUncompletedInSeries находит существующий -> не создаёт дубликат', async () => {
       const task = makeTask({
         id: 'root-1',
@@ -453,6 +490,14 @@ describe('TaskService', () => {
   });
 
   describe('update — uncomplete recurring задачи', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('completed=false + was completed + isAutoCreated=true next -> удаляет next instance', async () => {
       const task = makeTask({
         id: 'root-1',

@@ -6,8 +6,8 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 import {
-  computeNextDueDate,
   buildNextInstance,
+  findNextOccurrenceOnOrAfter,
 } from './domain/recurrence.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
 import {
@@ -159,11 +159,16 @@ export class TaskService {
       const completedCount = rootTask?.recurringCompletedCount ?? 0;
       const countAfterComplete = completedCount + 1;
 
+      const nowLocal = shiftToUserWallClock(new Date(), timezone);
+      const startOfTodayLocal = new Date(nowLocal);
+      startOfTodayLocal.setUTCHours(0, 0, 0, 0);
+
       // Shift to user's wall clock so domain sees correct calendar day
       const zonedDue = shiftToUserWallClock(task.dueDate, timezone);
-      const nextZoned = computeNextDueDate(
+      const nextZoned = findNextOccurrenceOnOrAfter(
         zonedDue,
         task.recurrence,
+        startOfTodayLocal,
         countAfterComplete,
       );
       const nextDate = nextZoned
