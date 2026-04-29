@@ -206,7 +206,9 @@
         </DropdownMenuTrigger>
         <RecurrencePicker
           :model-value="form.recurrence"
+          :on-missed="form.onMissed"
           @update:model-value="form.recurrence = $event ?? undefined"
+          @update:on-missed="form.onMissed = $event"
         />
       </DropdownMenu>
     </div>
@@ -338,6 +340,7 @@ const form = reactive<TaskFormData>({
   tags: [],
   location: '',
   recurrence: undefined as RecurrenceRule | undefined,
+  onMissed: 'shift' as 'shift' | 'freeze',
   isPomodoroTask: false,
   pomodoroCount: POMODORO_DEFAULTS.count,
   pomodoroDuration: POMODORO_DEFAULTS.duration,
@@ -377,6 +380,7 @@ const resetForm = () => {
   form.tags = []
   form.location = ''
   form.recurrence = undefined
+  form.onMissed = 'shift'
   form.isPomodoroTask = false
   form.pomodoroCount = POMODORO_DEFAULTS.count
   form.pomodoroDuration = POMODORO_DEFAULTS.duration
