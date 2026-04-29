@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { UserSettingsPort } from './domain/user-settings.port';
@@ -216,6 +216,14 @@ describe('TaskService', () => {
 
       await expect(service.update(1, 'nope', { title: 'X' }))
         .rejects.toThrow(NotFoundException);
+    });
+
+    it('бросает BadRequestException если задача isOverdue=true (immutable)', async () => {
+      repo.findById.mockResolvedValue(makeTask({ isOverdue: true }));
+
+      await expect(service.update(1, 'task-1', { title: 'Новое' }))
+        .rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
     });
   });
 

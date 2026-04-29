@@ -108,6 +108,11 @@ export class CreateTaskDto {
   @Type(() => RecurrenceRuleDto)
   recurrence?: RecurrenceRuleDto;
 
+  @ApiPropertyOptional({ enum: ['shift', 'freeze'] })
+  @IsOptional()
+  @IsIn(['shift', 'freeze'])
+  onMissed?: 'shift' | 'freeze';
+
   @ApiPropertyOptional({ example: true })
   @IsOptional()
   @IsBoolean()

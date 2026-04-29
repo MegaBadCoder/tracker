@@ -74,6 +74,12 @@ export class Task {
   @Column({ type: 'boolean', default: false })
   isAutoCreated: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  isOverdue: boolean;
+
+  @Column({ type: 'simple-enum', enum: ['shift', 'freeze'], default: 'shift' })
+  onMissed: 'shift' | 'freeze';
+
   @CreateDateColumn()
   createdAt: Date;
 

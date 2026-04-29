@@ -85,6 +85,10 @@ export class TaskService {
     const task = await this.taskRepo.findById(id, userId);
     if (!task) throw new NotFoundException(`Task #${id} not found`);
 
+    if (task.isOverdue) {
+      throw new BadRequestException('Overdue task cannot be modified.');
+    }
+
     // Detect recurring complete/uncomplete transitions
     const isCompletingRecurring =
       dto.completed === true &&

@@ -16,6 +16,7 @@ export interface RecurringTaskSnapshot {
   columnId: string | null;
   order: number;
   checklist: ChecklistData | null;
+  onMissed: 'shift' | 'freeze';
 }
 
 export function isSeriesEnded(
@@ -156,6 +157,7 @@ export interface NextInstanceData {
   columnId: string | null;
   order: number;
   checklist: ChecklistData | null;
+  onMissed: 'shift' | 'freeze';
 }
 
 /**
@@ -185,7 +187,40 @@ export function buildNextInstance(
     columnId: completedTask.columnId ?? null,
     order: completedTask.order ?? 0,
     checklist: resetChecklist(completedTask.checklist),
+    onMissed: completedTask.onMissed,
   };
+}
+
+/**
+ * Find the first occurrence on or after `refDateUtc` by iteratively advancing
+ * `currentDue` via `computeNextDueDate`. Returns null if the series ends before
+ * reaching `refDateUtc`. Bounded at 500 iterations to avoid runaway loops.
+ *
+ * @param completedCount — passed through to `computeNextDueDate` for endCount checks.
+ */
+export function findNextOccurrenceOnOrAfter(
+  currentDue: Date,
+  rule: RecurrenceRule,
+  refDateUtc: Date,
+  completedCount = 0,
+): Date | null {
+  const MAX_ITERATIONS = 500;
+  let cursor = currentDue;
+
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    const next = computeNextDueDate(cursor, rule, completedCount);
+    if (next === null) return null;
+
+    if (next.getTime() >= refDateUtc.getTime()) {
+      return next;
+    }
+
+    cursor = next;
+  }
+
+  throw new Error(
+    `findNextOccurrenceOnOrAfter exceeded ${MAX_ITERATIONS} iterations for frequency=${rule.frequency}`,
+  );
 }
 
 function resetChecklist(

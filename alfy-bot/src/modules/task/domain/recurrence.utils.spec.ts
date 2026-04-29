@@ -4,6 +4,7 @@ import {
   computeNextDueDate,
   buildNextInstance,
   isSeriesEnded,
+  findNextOccurrenceOnOrAfter,
 } from './recurrence.utils';
 
 function d(iso: string): Date {
@@ -310,5 +311,79 @@ describe('buildNextInstance', () => {
       parentId,
     );
     expect(instance.recurrence).toBeNull();
+  });
+});
+
+// ── findNextOccurrenceOnOrAfter ─────────────────────────────────────
+
+describe('findNextOccurrenceOnOrAfter', () => {
+  it('daily interval=1, currentDue=yesterday, ref=today -> today', () => {
+    // currentDue yesterday + 1 day = today (>= ref) -> today
+    const result = findNextOccurrenceOnOrAfter(
+      d('2026-04-28T10:00:00.000Z'),
+      makeRule(),
+      d('2026-04-29T10:00:00.000Z'),
+    );
+    expect(result).toEqual(d('2026-04-29T10:00:00.000Z'));
+  });
+
+  it('weekly Mon/Wed/Fri, currentDue=last Wed, ref=Thursday -> next Friday', () => {
+    // 2026-04-22 is Wednesday, ref 2026-04-23 is Thursday.
+    // Next occurrence in [Mon=1, Wed=3, Fri=5] >= Thursday is Friday 2026-04-24.
+    const result = findNextOccurrenceOnOrAfter(
+      d('2026-04-22T10:00:00.000Z'),
+      makeRule({ frequency: 'weekly', interval: 1, daysOfWeek: [1, 3, 5] }),
+      d('2026-04-23T10:00:00.000Z'),
+    );
+    expect(result).toEqual(d('2026-04-24T10:00:00.000Z'));
+  });
+
+  it('weekly Mon/Wed/Fri, currentDue=last Friday, ref=Saturday -> next Monday', () => {
+    // 2026-04-24 is Friday, ref 2026-04-25 is Saturday.
+    // Next matching day >= Saturday is Monday 2026-04-27.
+    const result = findNextOccurrenceOnOrAfter(
+      d('2026-04-24T10:00:00.000Z'),
+      makeRule({ frequency: 'weekly', interval: 1, daysOfWeek: [1, 3, 5] }),
+      d('2026-04-25T10:00:00.000Z'),
+    );
+    expect(result).toEqual(d('2026-04-27T10:00:00.000Z'));
+  });
+
+  it('monthly dayOfMonth=15, currentDue=last 15th, ref=16th of that month -> 15th of next month', () => {
+    const result = findNextOccurrenceOnOrAfter(
+      d('2026-03-15T10:00:00.000Z'),
+      makeRule({ frequency: 'monthly', interval: 1, dayOfMonth: 15 }),
+      d('2026-03-16T10:00:00.000Z'),
+    );
+    expect(result).toEqual(d('2026-04-15T10:00:00.000Z'));
+  });
+
+  it('yearly interval=1, currentDue=last year same date, ref=today -> next year same date', () => {
+    const result = findNextOccurrenceOnOrAfter(
+      d('2025-04-29T10:00:00.000Z'),
+      makeRule({ frequency: 'yearly', interval: 1 }),
+      d('2026-04-29T10:00:00.000Z'),
+    );
+    expect(result).toEqual(d('2026-04-29T10:00:00.000Z'));
+  });
+
+  it('endCount reached (completedCount >= endCount) -> null', () => {
+    const result = findNextOccurrenceOnOrAfter(
+      d('2026-04-05T10:00:00.000Z'),
+      makeRule({ endCount: 3 }),
+      d('2026-04-29T10:00:00.000Z'),
+      3,
+    );
+    expect(result).toBeNull();
+  });
+
+  it('endDate in the past relative to expected next -> null', () => {
+    // currentDue + 1 day = 2026-04-06, but endDate cuts series at 2026-04-05.
+    const result = findNextOccurrenceOnOrAfter(
+      d('2026-04-05T10:00:00.000Z'),
+      makeRule({ endDate: '2026-04-05T00:00:00.000Z' }),
+      d('2026-04-29T10:00:00.000Z'),
+    );
+    expect(result).toBeNull();
   });
 });

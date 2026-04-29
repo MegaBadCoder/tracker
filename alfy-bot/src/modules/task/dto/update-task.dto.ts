@@ -20,4 +20,5 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   longBreak?: never;
   longBreakInterval?: never;
   pomodoroCompleted?: never;
+  isOverdue?: never;
 }
