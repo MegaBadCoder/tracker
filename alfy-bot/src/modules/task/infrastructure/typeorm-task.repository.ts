@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, LessThan, Not, Repository } from 'typeorm';
 import { Task, PomodoroConfig } from '../../../shared/entities';
 import {
   TaskRepositoryPort,
@@ -169,5 +169,28 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
       { recurringParentId: parentId },
       { recurringParentId: null },
     );
+  }
+
+  async findOverdueRecurringCandidates(
+    userId: number,
+    dueBeforeUtc: Date,
+  ): Promise<Task[]> {
+    return this.taskRepo.find({
+      where: {
+        userId,
+        recurrence: Not(IsNull()),
+        completed: false,
+        isOverdue: false,
+        dueDate: LessThan(dueBeforeUtc),
+      },
+      relations: ['pomodoroConfig'],
+    });
+  }
+
+  async markOverdue(taskId: string): Promise<void> {
+    await this.taskRepo.update(taskId, {
+      isOverdue: true,
+      recurrence: null,
+    });
   }
 }

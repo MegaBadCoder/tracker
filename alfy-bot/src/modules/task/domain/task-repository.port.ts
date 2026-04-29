@@ -50,4 +50,9 @@ export abstract class TaskRepositoryPort {
     onlyUncompleted: boolean,
   ): Promise<void>;
   abstract clearParentId(parentId: string): Promise<void>;
+  abstract findOverdueRecurringCandidates(
+    userId: number,
+    dueBeforeUtc: Date,
+  ): Promise<Task[]>;
+  abstract markOverdue(taskId: string): Promise<void>;
 }

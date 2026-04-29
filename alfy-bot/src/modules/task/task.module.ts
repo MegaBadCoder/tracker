@@ -7,15 +7,19 @@ import { NotificationModule } from '../notification/notification.module';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { TimerSessionRepositoryPort } from './domain/timer-session-repository.port';
 import { NotificationPort } from './domain/notification.port';
+import { TelegramUserLookupPort } from './domain/telegram-user-lookup.port';
 import { TypeOrmTaskRepository } from './infrastructure/typeorm-task.repository';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { TypeOrmUserSettingsAdapter } from './infrastructure/typeorm-user-settings.adapter';
 import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-session.repository';
 import { TelegramNotificationAdapter } from './infrastructure/telegram-notification.adapter';
+import { TelegramUserLookupAdapter } from './infrastructure/telegram-user-lookup.adapter';
 import { CompositeNotificationAdapter } from './infrastructure/composite-notification.adapter';
 import { TimerExpiryScheduler } from './infrastructure/timer-expiry.scheduler';
+import { OverdueRecurringScheduler } from './infrastructure/overdue-recurring.scheduler';
 import { TaskService } from './task.service';
 import { TimerSessionService } from './timer-session.service';
+import { OverdueRecurringService } from './overdue-recurring.service';
 import { TaskController } from './task.controller';
 
 @Module({
@@ -34,10 +38,16 @@ import { TaskController } from './task.controller';
     },
     { provide: UserSettingsPort, useClass: TypeOrmUserSettingsAdapter },
     { provide: NotificationPort, useClass: CompositeNotificationAdapter },
+    {
+      provide: TelegramUserLookupPort,
+      useClass: TelegramUserLookupAdapter,
+    },
     TelegramNotificationAdapter,
     TaskService,
     TimerSessionService,
     TimerExpiryScheduler,
+    OverdueRecurringService,
+    OverdueRecurringScheduler,
   ],
   exports: [TaskService, TaskRepositoryPort],
 })

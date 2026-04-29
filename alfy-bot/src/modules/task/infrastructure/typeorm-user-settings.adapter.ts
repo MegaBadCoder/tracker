@@ -17,4 +17,9 @@ export class TypeOrmUserSettingsAdapter extends UserSettingsPort {
     const user = await this.userRepo.findOneBy({ id: userId });
     return user?.timezone ?? 'UTC';
   }
+
+  async listAllUserIds(): Promise<number[]> {
+    const users = await this.userRepo.find({ select: ['id'] });
+    return users.map((u) => u.id);
+  }
 }
