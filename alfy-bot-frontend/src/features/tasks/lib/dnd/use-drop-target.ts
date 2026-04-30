@@ -14,7 +14,7 @@ export function useDropTarget(opts: {
   onMounted(() => {
     const el = opts.el.value
     if (!el)
-      throw new Error(`useDropTarget: el is null for id "${opts.id}"`)
+      return
 
     dnd.register({
       id: opts.id,
