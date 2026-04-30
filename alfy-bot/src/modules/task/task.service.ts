@@ -1,19 +1,23 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
+import { ReorderInboxTasksDto } from './dto/reorder-inbox-tasks.dto';
+import { MoveTaskToInboxDto } from './dto/move-task-inbox.dto';
 import {
   buildNextInstance,
   findNextOccurrenceOnOrAfter,
 } from './domain/recurrence.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
-import {
-  shiftToUserWallClock,
-  shiftBackToUtc,
-} from './lib/timezone';
+import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 export interface UpdateTaskResponse {
   task: Task;
@@ -77,7 +81,9 @@ export class TaskService {
     dto: UpdateTaskDto,
   ): Promise<UpdateTaskResponse> {
     if (id.includes('__virtual__')) {
-      throw new BadRequestException('Virtual task instances cannot be modified directly.');
+      throw new BadRequestException(
+        'Virtual task instances cannot be modified directly.',
+      );
     }
 
     const { dueDate, deadline, recurrence, ...rest } = dto;
@@ -91,14 +97,10 @@ export class TaskService {
 
     // Detect recurring complete/uncomplete transitions
     const isCompletingRecurring =
-      dto.completed === true &&
-      !task.completed &&
-      task.recurrence;
+      dto.completed === true && !task.completed && task.recurrence;
 
     const isUncompletingRecurring =
-      dto.completed === false &&
-      task.completed &&
-      task.recurrence;
+      dto.completed === false && task.completed && task.recurrence;
 
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
@@ -109,8 +111,7 @@ export class TaskService {
       task.dueDate = dueDate ? new Date(dueDate) : null;
     if (deadline !== undefined)
       task.deadline = deadline ? new Date(deadline) : null;
-    if (recurrence !== undefined)
-      task.recurrence = recurrence ?? null;
+    if (recurrence !== undefined) task.recurrence = recurrence ?? null;
 
     // Mark user-modified instances as not auto-created
     if (task.recurringParentId && !dto.completed) {
@@ -171,9 +172,7 @@ export class TaskService {
         startOfTodayLocal,
         countAfterComplete,
       );
-      const nextDate = nextZoned
-        ? shiftBackToUtc(nextZoned, timezone)
-        : null;
+      const nextDate = nextZoned ? shiftBackToUtc(nextZoned, timezone) : null;
 
       if (nextDate) {
         const instanceData = buildNextInstance(task, nextDate, parentId);
@@ -286,5 +285,47 @@ export class TaskService {
 
     const deleted = await this.taskRepo.delete(id, userId);
     if (!deleted) throw new NotFoundException(`Task #${id} not found`);
+  }
+
+  async reorderInboxTasks(
+    userId: number,
+    dto: ReorderInboxTasksDto,
+  ): Promise<void> {
+    for (const id of dto.orderedIds) {
+      const task = await this.taskRepo.findById(id, userId);
+      if (!task) throw new NotFoundException(`Task #${id} not found`);
+      if (task.projectId !== null) {
+        throw new ForbiddenException(`Task #${id} is not an Inbox task`);
+      }
+    }
+
+    const updates = dto.orderedIds.map((id, index) => ({ id, order: index }));
+    await this.taskRepo.reorderTasks(updates);
+  }
+
+  async moveToInbox(
+    userId: number,
+    taskId: string,
+    dto: MoveTaskToInboxDto,
+  ): Promise<Task> {
+    const task = await this.taskRepo.findById(taskId, userId);
+    if (!task) throw new NotFoundException(`Task #${taskId} not found`);
+
+    let order: number;
+    if (dto.order !== undefined) {
+      order = dto.order;
+    } else {
+      const inboxTasks = await this.taskRepo.findAllByProject(userId, null);
+      const maxOrder = inboxTasks.reduce(
+        (max, t) => (t.order > max ? t.order : max),
+        -1,
+      );
+      order = maxOrder + 1;
+    }
+
+    task.projectId = null;
+    task.columnId = null;
+    task.order = order;
+    return this.taskRepo.save(task);
   }
 }

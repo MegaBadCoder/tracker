@@ -13,6 +13,8 @@ import {
   Question,
   Schedule,
   ReportAnswer,
+  Project,
+  ProjectColumn,
 } from '../../src/shared/entities';
 
 export interface TestContext {
@@ -28,7 +30,18 @@ export async function createTestApp(): Promise<TestContext> {
   const testDataSource = new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: [User, Task, PomodoroConfig, TimerSession, Goal, Question, Schedule, ReportAnswer],
+    entities: [
+      User,
+      Task,
+      PomodoroConfig,
+      TimerSession,
+      Goal,
+      Question,
+      Schedule,
+      ReportAnswer,
+      Project,
+      ProjectColumn,
+    ],
     synchronize: true,
   });
   await testDataSource.initialize();

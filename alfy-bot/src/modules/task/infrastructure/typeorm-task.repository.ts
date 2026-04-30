@@ -7,7 +7,6 @@ import {
   ChecklistData,
 } from '../domain/task-repository.port';
 
-
 @Injectable()
 export class TypeOrmTaskRepository extends TaskRepositoryPort {
   constructor(
@@ -23,7 +22,7 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     return this.taskRepo.find({
       where: { userId },
       relations: ['pomodoroConfig'],
-      order: { createdAt: 'DESC' },
+      order: { order: 'ASC', createdAt: 'DESC' },
     });
   }
 
@@ -123,13 +122,9 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     return this.taskRepo.save(task);
   }
 
-  async reorderTasks(
-    updates: { id: string; order: number }[],
-  ): Promise<void> {
+  async reorderTasks(updates: { id: string; order: number }[]): Promise<void> {
     await Promise.all(
-      updates.map(({ id, order }) =>
-        this.taskRepo.update(id, { order }),
-      ),
+      updates.map(({ id, order }) => this.taskRepo.update(id, { order })),
     );
   }
 

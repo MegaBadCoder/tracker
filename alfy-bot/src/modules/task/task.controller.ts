@@ -23,6 +23,8 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
+import { ReorderInboxTasksDto } from './dto/reorder-inbox-tasks.dto';
+import { MoveTaskToInboxDto } from './dto/move-task-inbox.dto';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -54,7 +56,9 @@ export class TaskController {
 
   // Dev-only: trigger overdue-recurring cron for current user immediately
   @Post('_dev/process-overdue')
-  @ApiOperation({ summary: 'DEV: запустить overdue-recurring обработку прямо сейчас' })
+  @ApiOperation({
+    summary: 'DEV: запустить overdue-recurring обработку прямо сейчас',
+  })
   async processOverdueDev(@Request() req: AuthRequest) {
     if (process.env.NODE_ENV === 'production') {
       throw new ForbiddenException('Dev-only endpoint');
@@ -85,6 +89,26 @@ export class TaskController {
   @ApiOperation({ summary: 'Деактивировать таймер' })
   async deactivateTimer(@Request() req: AuthRequest) {
     return this.timerService.deactivate(req.user.sub);
+  }
+
+  // Inbox reorder/move routes must be before :id routes to avoid route conflicts
+  @Patch('reorder')
+  @ApiOperation({ summary: 'Переупорядочить задачи в Inbox' })
+  async reorderInbox(
+    @Request() req: AuthRequest,
+    @Body() dto: ReorderInboxTasksDto,
+  ) {
+    return this.taskService.reorderInboxTasks(req.user.sub, dto);
+  }
+
+  @Patch(':id/move-to-inbox')
+  @ApiOperation({ summary: 'Переместить задачу в Inbox' })
+  async moveToInbox(
+    @Request() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: MoveTaskToInboxDto,
+  ) {
+    return this.taskService.moveToInbox(req.user.sub, id, dto);
   }
 
   @Put(':id/checklist')
