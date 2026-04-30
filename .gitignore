@@ -13,3 +13,4 @@ data/
 coverage
 .tmp
 .temp
+.worktrees/
