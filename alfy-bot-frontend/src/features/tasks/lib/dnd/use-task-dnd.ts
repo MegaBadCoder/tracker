@@ -18,6 +18,8 @@ interface DndState {
 }
 
 // Module-level singleton — only one drag active at a time.
+let scrollRafId: number | null = null
+
 const state = reactive<DndState>({
   active: null,
   pointer: { x: 0, y: 0 },
@@ -102,6 +104,29 @@ function clearState(): void {
   state.insertionIndex = null
 }
 
+function tickAutoScroll(): void {
+  if (!state.active) {
+    scrollRafId = null
+    return
+  }
+  const y = state.pointer.y
+  const h = window.innerHeight
+  if (y < 80) {
+    window.scrollBy({ top: -10 })
+  }
+  else if (y > h - 80) {
+    window.scrollBy({ top: 10 })
+  }
+  scrollRafId = requestAnimationFrame(tickAutoScroll)
+}
+
+function stopAutoScroll(): void {
+  if (scrollRafId !== null) {
+    cancelAnimationFrame(scrollRafId)
+    scrollRafId = null
+  }
+}
+
 function register(target: DropTargetRegistration): void {
   const idx = dropTargets.findIndex(t => t.id === target.id)
   if (idx !== -1) {
@@ -144,6 +169,8 @@ function start(session: DragSession, initialPointer: Pointer): void {
   state.pointer = initialPointer
   updateHitTest(initialPointer)
   addWindowListeners()
+  ;(window as any).Telegram?.WebApp?.disableVerticalSwipes?.()
+  scrollRafId = requestAnimationFrame(tickAutoScroll)
 }
 
 function commit(): void {
@@ -151,6 +178,9 @@ function commit(): void {
     cancel()
     return
   }
+
+  ;(window as any).Telegram?.WebApp?.enableVerticalSwipes?.()
+  stopAutoScroll()
 
   const session = state.active
   const target = state.hoveredTarget
@@ -217,6 +247,8 @@ function commit(): void {
 }
 
 function cancel(): void {
+  ;(window as any).Telegram?.WebApp?.enableVerticalSwipes?.()
+  stopAutoScroll()
   removeWindowListeners()
   clearState()
 }
