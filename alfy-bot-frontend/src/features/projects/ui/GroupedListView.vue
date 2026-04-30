@@ -1,5 +1,8 @@
 <template>
-  <div class="space-y-4">
+  <div v-if="tasks.length === 0 && columns.length === 0" class="p-6 text-center text-muted-foreground">
+    В этом проекте пока нет задач.
+  </div>
+  <div v-else class="space-y-4">
     <!-- Uncategorized -->
     <div v-if="uncategorizedTasks.length > 0">
       <div class="flex items-center gap-2 px-4 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">

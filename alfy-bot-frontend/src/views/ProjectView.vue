@@ -14,7 +14,6 @@ import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
-import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskListOptionsMenu from '@/features/tasks/ui/TaskListOptionsMenu.vue'
@@ -187,35 +186,15 @@ watch(projectId, (id) => {
         </p>
       </div>
 
-      <div v-else>
-        <GroupedListView
-          v-if="columns.length > 0"
-          :columns="columns"
-          :tasks="filteredTasks"
-          @toggle-task="handleToggleTask"
-          @open-task="handleOpenTask"
-          @delete-task="handleDeleteTask"
-          @show-timer="handleShowTimer"
-        />
-
-        <template v-else>
-          <div v-if="filteredTasks.length === 0" class="p-6 text-center text-muted-foreground">
-            В этом проекте пока нет задач.
-          </div>
-
-          <div v-else role="list" class="divide-y divide-border">
-            <TaskCard
-              v-for="task in filteredTasks"
-              :key="task.id"
-              :task="task"
-              @toggle="handleToggleTask"
-              @show-timer="handleShowTimer"
-              @delete="handleDeleteTask"
-              @open="handleOpenTask"
-            />
-          </div>
-        </template>
-      </div>
+      <GroupedListView
+        v-else
+        :columns="columns"
+        :tasks="filteredTasks"
+        @toggle-task="handleToggleTask"
+        @open-task="handleOpenTask"
+        @delete-task="handleDeleteTask"
+        @show-timer="handleShowTimer"
+      />
     </PageContainer>
   </div>
   <TaskDetailDialog
