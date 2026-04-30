@@ -11,9 +11,11 @@ import { useProjectStore } from '@/features/projects/model/project-store'
 import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
+import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskListOptionsMenu from '@/features/tasks/ui/TaskListOptionsMenu.vue'
@@ -64,6 +66,22 @@ const filteredTasks = computed(() => {
         return (a.order ?? 0) - (b.order ?? 0)
       return a.completed ? 1 : -1
     })
+})
+
+// Reorder list for flat list branch (columns.length === 0)
+const listEl = ref<HTMLElement | null>(null)
+
+function getItems() {
+  if (!listEl.value)
+    return []
+  return Array.from(listEl.value.querySelectorAll<HTMLElement>('[data-task-id]'))
+    .map(el => ({ id: el.dataset.taskId!, el }))
+}
+
+const { insertionIndex } = useReorderList({
+  scope: computed(() => `project:${projectId.value}`).value,
+  listEl,
+  getItems,
 })
 
 async function handleViewModeChange(mode: string) {
@@ -186,6 +204,27 @@ watch(projectId, (id) => {
         </p>
       </div>
 
+      <!-- Flat list (no columns) — reorder enabled -->
+      <template v-else-if="columns.length === 0">
+        <div v-if="filteredTasks.length === 0" class="p-6 text-center text-muted-foreground">
+          В этом проекте пока нет задач.
+        </div>
+        <div v-else ref="listEl" role="list" class="divide-y divide-border">
+          <template v-for="(task, i) in filteredTasks" :key="task.id">
+            <div v-if="insertionIndex === i" class="h-0.5 bg-primary" />
+            <TaskCard
+              :task="task"
+              @toggle="handleToggleTask"
+              @show-timer="handleShowTimer"
+              @delete="handleDeleteTask"
+              @open="handleOpenTask"
+            />
+          </template>
+          <div v-if="insertionIndex === filteredTasks.length" class="h-0.5 bg-primary" />
+        </div>
+      </template>
+
+      <!-- Grouped list (with columns) — vuedraggable handles its own DnD -->
       <GroupedListView
         v-else
         :columns="columns"

@@ -7,6 +7,7 @@ import PageContainer from '@/components/PageContainer.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTimerStore } from '@/features/task-timer'
+import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -63,6 +64,17 @@ const sortedTasks = computed(() => {
       return a.completed ? 1 : -1
     })
 })
+
+const listEl = ref<HTMLElement | null>(null)
+
+function getItems() {
+  if (!listEl.value)
+    return []
+  return Array.from(listEl.value.querySelectorAll<HTMLElement>('[data-task-id]'))
+    .map(el => ({ id: el.dataset.taskId!, el }))
+}
+
+const { insertionIndex } = useReorderList({ scope: 'inbox', listEl, getItems })
 
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
   isCreatingTask.value = true
@@ -163,17 +175,19 @@ onMounted(() => {
         Пока нет задач. Добавьте первую задачу выше.
       </div>
 
-      <div v-else role="list" class="divide-y divide-border">
-        <TaskCard
-          v-for="task in sortedTasks"
-          :key="task.id"
-          :task="task"
-          :project-name="getProjectName(task)"
-          @toggle="handleToggleTask"
-          @show-timer="handleShowTimer"
-          @delete="handleDeleteTask"
-          @open="handleOpenTask"
-        />
+      <div v-else ref="listEl" role="list" class="divide-y divide-border">
+        <template v-for="(task, i) in sortedTasks" :key="task.id">
+          <div v-if="insertionIndex === i" class="h-0.5 bg-primary" />
+          <TaskCard
+            :task="task"
+            :project-name="getProjectName(task)"
+            @toggle="handleToggleTask"
+            @show-timer="handleShowTimer"
+            @delete="handleDeleteTask"
+            @open="handleOpenTask"
+          />
+        </template>
+        <div v-if="insertionIndex === sortedTasks.length" class="h-0.5 bg-primary" />
       </div>
     </div>
   </PageContainer>

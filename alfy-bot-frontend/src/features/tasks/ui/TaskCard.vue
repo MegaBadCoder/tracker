@@ -1,21 +1,69 @@
+<script setup lang="ts">
+import type { TaskCardEmits, TaskCardProps } from '../model/types'
+import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, GripVertical, MapPin, Repeat, Timer, Trash2 } from 'lucide-vue-next'
+import { computed, ref, toRef } from 'vue'
+import { Badge } from '@/components/ui/badge'
+import { RoundCheckbox } from '@/components/ui/roundCheckbox'
+import { computeChecklistProgress } from '../lib/checklist'
+import { useDragSource } from '../lib/dnd/use-drag-source'
+import { DATE_SHORT, DATE_WITH_TIME, formatDate, formatPomodoro } from '../lib/formatters'
+import { getPriorityColor } from '../lib/priority'
+import { PRIORITY_LABELS } from '../model/constants'
+
+const props = defineProps<TaskCardProps>()
+const emit = defineEmits<TaskCardEmits>()
+
+const cardEl = ref<HTMLElement | null>(null)
+const handleEl = ref<HTMLElement | null>(null)
+
+useDragSource({
+  task: toRef(props, 'task'),
+  cardEl,
+  handleEl,
+  onTap: () => emit('open', props.task),
+})
+
+const isCompact = computed(() => props.variant === 'compact')
+
+const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
+const checklistTotal = computed(() => checklistStats.value.total)
+const checklistDone = computed(() => checklistStats.value.completed)
+
+const hasMeta = computed(() =>
+  props.projectName || props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask || props.task.recurrence || checklistTotal.value > 0,
+)
+</script>
+
 <template>
   <div
+    ref="cardEl"
     role="listitem"
     :data-task-id="task.id"
-    :class="[
-      'group flex items-center gap-3 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
+    class="group flex items-center gap-3 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm" :class="[
       isCompact ? 'px-3 py-2 min-h-[36px]' : 'px-4 py-3 min-h-[44px] hover:pl-5',
       task.isOverdue
         ? 'border-l-4 border-red-500 bg-red-500/10 dark:bg-red-500/20'
         : task.completed && 'opacity-50',
     ]"
-    @click="$emit('open', task)"
   >
+    <!-- Drag handle -->
+    <button
+      ref="handleEl"
+      class="cursor-grab touch-none flex-shrink-0 p-0.5 text-muted-foreground opacity-0 group-hover:opacity-60 coarse:opacity-60 focus:outline-none"
+      data-no-drag="true"
+      tabindex="-1"
+      type="button"
+      aria-label="Перетащить задачу"
+    >
+      <GripVertical :size="14" />
+    </button>
+
     <!-- Checkbox -->
     <RoundCheckbox
       :model-value="task.completed"
       :disabled="task.isOverdue"
       class="shrink-0"
+      data-no-drag="true"
       @click.stop
       @update:model-value="$emit('toggle', task.id)"
     />
@@ -24,8 +72,7 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <span
-          :class="[
-            'text-sm truncate',
+          class="text-sm truncate" :class="[
             task.isOverdue
               ? 'text-red-600 dark:text-red-400 font-medium'
               : task.completed
@@ -51,6 +98,7 @@
           v-if="task.isPomodoroTask"
           variant="outline"
           class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground cursor-pointer hover:bg-muted/80 transition-colors duration-150"
+          data-no-drag="true"
           @click.stop="$emit('showTimer', task.id)"
         >
           <Timer :size="11" />
@@ -98,8 +146,7 @@
         <Badge
           v-if="checklistTotal > 0"
           variant="outline"
-          :class="[
-            'gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full',
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full" :class="[
             checklistDone === checklistTotal
               ? 'bg-green-500/10 text-green-600 dark:text-green-400'
               : 'bg-muted text-muted-foreground',
@@ -131,35 +178,10 @@
       v-if="!isCompact"
       class="shrink-0 p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all duration-150 cursor-pointer"
       title="Удалить"
+      data-no-drag="true"
       @click.stop="$emit('delete', task.id)"
     >
       <Trash2 :size="14" />
     </button>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed } from 'vue'
-import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, MapPin, Repeat, Timer, Trash2 } from 'lucide-vue-next'
-import { RoundCheckbox } from '@/components/ui/roundCheckbox'
-import { Badge } from '@/components/ui/badge'
-import { formatDate, formatPomodoro, DATE_SHORT, DATE_WITH_TIME } from '../lib/formatters'
-import { computeChecklistProgress } from '../lib/checklist'
-import { getPriorityColor } from '../lib/priority'
-import { PRIORITY_LABELS } from '../model/constants'
-import type { TaskCardProps, TaskCardEmits } from '../model/types'
-
-const props = defineProps<TaskCardProps>()
-defineEmits<TaskCardEmits>()
-
-const isCompact = computed(() => props.variant === 'compact')
-
-const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
-const checklistTotal = computed(() => checklistStats.value.total)
-const checklistDone = computed(() => checklistStats.value.completed)
-
-const hasMeta = computed(() =>
-  props.projectName || props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask || props.task.recurrence || checklistTotal.value > 0
-)
-
-</script>
