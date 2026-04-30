@@ -1,61 +1,20 @@
-<template>
-  <div v-if="columnStore.loading" class="text-center py-8">
-    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-  </div>
-  <div v-else class="flex gap-4 overflow-x-auto pb-4 h-full items-start">
-    <!-- Uncategorized column -->
-    <BoardColumn
-      :column="null"
-      :tasks="uncategorizedTasks"
-      :project-id="projectId"
-      @task-change="handleTaskChange"
-      @toggle-task="$emit('toggleTask', $event)"
-      @open-task="$emit('openTask', $event)"
-    />
-
-    <!-- Regular columns -->
-    <draggable
-      :model-value="sortedColumns"
-      item-key="id"
-      handle=".column-drag-handle"
-      :animation="150"
-      ghost-class="opacity-30"
-      class="flex gap-4"
-      @end="handleColumnReorder"
-    >
-      <template #item="{ element: col }">
-        <BoardColumn
-          :column="col"
-          :tasks="tasksByColumn.get(col.id) ?? []"
-          :project-id="projectId"
-          @task-change="handleTaskChange"
-          @toggle-task="$emit('toggleTask', $event)"
-          @open-task="$emit('openTask', $event)"
-          @delete-column="handleDeleteColumn(col.id)"
-          @rename-column="handleRenameColumn(col.id, $event)"
-        />
-      </template>
-    </draggable>
-
-    <!-- Add column -->
-    <AddColumnButton @add="handleAddColumn" />
-  </div>
-</template>
-
 <script setup lang="ts">
+import type { Task } from '@/features/tasks/model/types'
+import { storeToRefs } from 'pinia'
 import { computed, watch } from 'vue'
 import draggable from 'vuedraggable'
-import { storeToRefs } from 'pinia'
-import { useColumnStore } from '../model/column-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useBoardDnd } from '../lib/use-board-dnd'
-import BoardColumn from './BoardColumn.vue'
+import { useColumnStore } from '../model/column-store'
 import AddColumnButton from './AddColumnButton.vue'
-import type { Task } from '@/features/tasks/model/types'
+import BoardColumn from './BoardColumn.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   projectId: string
-}>()
+  showCompleted?: boolean
+}>(), {
+  showCompleted: true,
+})
 
 defineEmits<{
   toggleTask: [id: string]
@@ -68,7 +27,7 @@ const { tasks } = storeToRefs(taskStore)
 const { onTaskChange, onColumnReorder } = useBoardDnd(taskStore, columnStore)
 
 const projectTasks = computed(() =>
-  tasks.value.filter(t => t.projectId === props.projectId),
+  tasks.value.filter(t => t.projectId === props.projectId && (props.showCompleted || !t.completed)),
 )
 
 const sortedColumns = computed(() =>
@@ -117,6 +76,51 @@ async function handleRenameColumn(columnId: string, title: string) {
 }
 
 watch(() => props.projectId, (id) => {
-  if (id) columnStore.fetchColumns(id)
+  if (id)
+    columnStore.fetchColumns(id)
 }, { immediate: true })
 </script>
+
+<template>
+  <div v-if="columnStore.loading" class="text-center py-8">
+    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+  </div>
+  <div v-else class="flex gap-4 overflow-x-auto pb-4 h-full items-start">
+    <!-- Uncategorized column -->
+    <BoardColumn
+      :column="null"
+      :tasks="uncategorizedTasks"
+      :project-id="projectId"
+      @task-change="handleTaskChange"
+      @toggle-task="$emit('toggleTask', $event)"
+      @open-task="$emit('openTask', $event)"
+    />
+
+    <!-- Regular columns -->
+    <draggable
+      :model-value="sortedColumns"
+      item-key="id"
+      handle=".column-drag-handle"
+      :animation="150"
+      ghost-class="opacity-30"
+      class="flex gap-4"
+      @end="handleColumnReorder"
+    >
+      <template #item="{ element: col }">
+        <BoardColumn
+          :column="col"
+          :tasks="tasksByColumn.get(col.id) ?? []"
+          :project-id="projectId"
+          @task-change="handleTaskChange"
+          @toggle-task="$emit('toggleTask', $event)"
+          @open-task="$emit('openTask', $event)"
+          @delete-column="handleDeleteColumn(col.id)"
+          @rename-column="handleRenameColumn(col.id, $event)"
+        />
+      </template>
+    </draggable>
+
+    <!-- Add column -->
+    <AddColumnButton @add="handleAddColumn" />
+  </div>
+</template>

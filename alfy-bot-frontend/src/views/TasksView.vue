@@ -1,5 +1,135 @@
+<script setup lang="ts">
+import type { Task } from '@/features/tasks/model/types'
+import { storeToRefs } from 'pinia'
+import { computed, inject, onMounted, ref } from 'vue'
+import AppHeader from '@/components/AppHeader.vue'
+import PageContainer from '@/components/PageContainer.vue'
+import { useConfirm } from '@/composables/useConfirm'
+import { useProjectStore } from '@/features/projects/model/project-store'
+import { useTimerStore } from '@/features/task-timer'
+import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
+import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
+import { useTaskStore } from '@/features/tasks/model/task-store'
+import TaskCard from '@/features/tasks/ui/TaskCard.vue'
+import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskForm from '@/features/tasks/ui/TaskForm.vue'
+import TaskListOptionsMenu from '@/features/tasks/ui/TaskListOptionsMenu.vue'
+
+const openSidebar = inject<() => void>('openSidebar')
+
+const timerStore = useTimerStore()
+const { startTask } = timerStore
+const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
+const isCreatingTask = ref(false)
+
+const taskStore = useTaskStore()
+const { tasks, loading, error } = storeToRefs(taskStore)
+const {
+  fetchTasks,
+  createTask,
+  toggleTask,
+  deleteTask,
+} = taskStore
+
+const projectStore = useProjectStore()
+
+const { confirm } = useConfirm()
+
+const showCompleted = useShowCompleted('inbox')
+
+function getProjectName(task: Task) {
+  if (!task.projectId)
+    return undefined
+  return projectStore.projectMap.get(task.projectId)?.title
+}
+
+const {
+  selectedTask,
+  isDetailOpen,
+  handleOpenTask,
+  handleUpdateTask,
+  handleUpdateChecklist,
+  handleUpdatePomodoroConfig,
+  handleDeleteFromDialog,
+} = useTaskDetailHandlers(taskStore, confirm)
+
+const sortedTasks = computed(() => {
+  return [...tasks.value]
+    .filter(t => !t.projectId)
+    .filter(t => showCompleted.value || !t.completed)
+    .sort((a, b) => {
+      if (a.completed === b.completed)
+        return 0
+      return a.completed ? 1 : -1
+    })
+})
+
+async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
+  isCreatingTask.value = true
+  try {
+    await createTask(taskData)
+    taskFormRef.value?.resetForm()
+  }
+  catch (err) {
+    console.error('Ошибка добавления задачи:', err)
+  }
+  finally {
+    isCreatingTask.value = false
+  }
+}
+
+async function handleToggleTask(taskId: string) {
+  try {
+    await toggleTask(taskId)
+  }
+  catch (err) {
+    console.error('Ошибка обновления задачи:', err)
+  }
+}
+
+function handleShowTimer(taskId: string) {
+  const task = tasks.value.find(t => t.id === taskId)
+  if (!task?.isPomodoroTask)
+    return
+
+  startTask({
+    id: task.id,
+    pomodoroTime: task.pomodoroDuration || 25,
+    breakTime: task.shortBreak || 5,
+    longBreakTime: task.longBreak || 15,
+    longBreakInterval: task.longBreakInterval || 4,
+    pomodoroCount: task.pomodoroCount || 4,
+  })
+}
+
+async function handleDeleteTask(taskId: string) {
+  const confirmed = await confirm({
+    title: 'Удалить задачу?',
+    message: 'Это действие нельзя отменить.',
+    confirmText: 'Удалить',
+    cancelText: 'Отмена',
+  })
+  if (confirmed) {
+    try {
+      await deleteTask(taskId)
+    }
+    catch (err) {
+      console.error('Ошибка удаления задачи:', err)
+    }
+  }
+}
+
+onMounted(() => {
+  fetchTasks()
+})
+</script>
+
 <template>
-  <AppHeader title="Задачи" :on-menu-click="openSidebar" />
+  <AppHeader title="Задачи" :on-menu-click="openSidebar">
+    <template #right>
+      <TaskListOptionsMenu v-model:show-completed="showCompleted" />
+    </template>
+  </AppHeader>
   <PageContainer>
     <!-- Форма добавления новой задачи -->
     <div class="mb-6">
@@ -8,16 +138,20 @@
 
     <!-- Загрузка -->
     <div v-if="loading" class="text-center py-8">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-      <p class="mt-2 text-muted-foreground">Загрузка задач...</p>
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+      <p class="mt-2 text-muted-foreground">
+        Загрузка задач...
+      </p>
     </div>
 
     <!-- Ошибка -->
     <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
-      <p class="text-destructive">{{ error }}</p>
+      <p class="text-destructive">
+        {{ error }}
+      </p>
       <button
-        @click="fetchTasks"
         class="mt-2 px-3 py-1 bg-destructive/20 text-destructive rounded hover:bg-destructive/30"
+        @click="fetchTasks"
       >
         Повторить
       </button>
@@ -52,119 +186,4 @@
     @update:checklist="handleUpdateChecklist"
     @update:pomodoro-config="handleUpdatePomodoroConfig"
   />
-
 </template>
-
-<script setup lang="ts">
-import { onMounted, ref, computed, inject } from 'vue'
-import { storeToRefs } from 'pinia'
-import TaskCard from '@/features/tasks/ui/TaskCard.vue'
-import type { Task } from '@/features/tasks/model/types'
-import TaskForm from '@/features/tasks/ui/TaskForm.vue'
-import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
-import { useTimerStore } from '@/features/task-timer'
-import { useTaskStore } from '@/features/tasks/model/task-store'
-import { useProjectStore } from '@/features/projects/model/project-store'
-import { useConfirm } from '@/composables/useConfirm'
-import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
-import PageContainer from '@/components/PageContainer.vue'
-import AppHeader from '@/components/AppHeader.vue'
-
-const openSidebar = inject<() => void>('openSidebar')
-
-const timerStore = useTimerStore()
-const { startTask } = timerStore
-const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
-const isCreatingTask = ref(false)
-
-const taskStore = useTaskStore()
-const { tasks, loading, error } = storeToRefs(taskStore)
-const {
-  fetchTasks,
-  createTask,
-  toggleTask,
-  deleteTask,
-} = taskStore
-
-const projectStore = useProjectStore()
-
-const { confirm } = useConfirm()
-
-const getProjectName = (task: Task) => {
-  if (!task.projectId) return undefined
-  return projectStore.projectMap.get(task.projectId)?.title
-}
-
-const {
-  selectedTask,
-  isDetailOpen,
-  handleOpenTask,
-  handleUpdateTask,
-  handleUpdateChecklist,
-  handleUpdatePomodoroConfig,
-  handleDeleteFromDialog,
-} = useTaskDetailHandlers(taskStore, confirm)
-
-const sortedTasks = computed(() => {
-  return [...tasks.value]
-    .filter(t => !t.projectId)
-    .sort((a, b) => {
-      if (a.completed === b.completed) return 0
-      return a.completed ? 1 : -1
-    })
-})
-
-const handleAddTask = async (taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) => {
-  isCreatingTask.value = true
-  try {
-    await createTask(taskData)
-    taskFormRef.value?.resetForm()
-  } catch (err) {
-    console.error('Ошибка добавления задачи:', err)
-  } finally {
-    isCreatingTask.value = false
-  }
-}
-
-const handleToggleTask = async (taskId: string) => {
-  try {
-    await toggleTask(taskId)
-  } catch (err) {
-    console.error('Ошибка обновления задачи:', err)
-  }
-}
-
-const handleShowTimer = (taskId: string) => {
-  const task = tasks.value.find(t => t.id === taskId)
-  if (!task?.isPomodoroTask) return
-
-  startTask({
-    id: task.id,
-    pomodoroTime: task.pomodoroDuration || 25,
-    breakTime: task.shortBreak || 5,
-    longBreakTime: task.longBreak || 15,
-    longBreakInterval: task.longBreakInterval || 4,
-    pomodoroCount: task.pomodoroCount || 4
-  })
-}
-
-const handleDeleteTask = async (taskId: string) => {
-  const confirmed = await confirm({
-    title: 'Удалить задачу?',
-    message: 'Это действие нельзя отменить.',
-    confirmText: 'Удалить',
-    cancelText: 'Отмена'
-  })
-  if (confirmed) {
-    try {
-      await deleteTask(taskId)
-    } catch (err) {
-      console.error('Ошибка удаления задачи:', err)
-    }
-  }
-}
-
-onMounted(() => {
-  fetchTasks()
-})
-</script>
