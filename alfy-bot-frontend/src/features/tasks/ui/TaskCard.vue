@@ -49,7 +49,7 @@ const hasMeta = computed(() =>
     <!-- Drag handle -->
     <button
       ref="handleEl"
-      class="cursor-grab touch-none flex-shrink-0 p-0.5 text-muted-foreground opacity-0 group-hover:opacity-60 coarse:opacity-60 focus:outline-none"
+      class="task-drag-handle cursor-grab touch-none flex-shrink-0 p-0.5 text-muted-foreground opacity-0 group-hover:opacity-60 focus:outline-none"
       data-no-drag="true"
       tabindex="-1"
       type="button"
@@ -185,3 +185,11 @@ const hasMeta = computed(() =>
     </button>
   </div>
 </template>
+
+<style scoped>
+@media (pointer: coarse) {
+  .task-drag-handle {
+    opacity: 0.6;
+  }
+}
+</style>
