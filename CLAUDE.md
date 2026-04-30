@@ -88,6 +88,13 @@ npx vue-tsc --noEmit -p tsconfig.app.json       # тип-чек без билд�
 
 Авторизация: при старте `main.ts` пробует `authorize()` если есть `Telegram.WebApp.initData` или dev-флаг `VITE_DEV_TELEGRAM_ID`. Router guard в `router/index.ts` редиректит на `/login` любой не-public маршрут при отсутствии токена. Public-маршруты помечены `meta: { public: true }`.
 
+## Drag-and-drop (две системы — выбирать по контексту)
+
+В кодбазе сосуществуют два независимых DnD-стека. Не смешивать.
+
+- **Кастомный движок на PointerEvents** в `features/tasks/lib/dnd/` (`useTaskDnd`, `useDragSource`, `useDropTarget`, `useReorderList`) + `<TaskDragGhost />` через teleport в `App.vue`. Используется для: reorder задач в Inbox (`TasksView`) и в проекте-list-без-колонок (`ProjectView` когда `columns.length === 0`), drop задач на проекты/Inbox в сайдбаре. Жесты: drag-handle (немедленно) + long-press 350ms на mobile + threshold 5px на desktop.
+- **`vuedraggable`** в `features/projects/ui/BoardView.vue`, `BoardColumn.vue`, `ProjectTreeNav.vue`. Используется для: задач внутри колонок board-view, переупорядочивания самих колонок, переупорядочивания проектов в сайдбаре. Не трогать без явной задачи.
+
 # UI conventions — shadcn-vue
 
 При работе с Vue UI (особенно `alfy-bot-frontend`) источник истины — `https://www.shadcn-vue.com/`, **не React-докс**.
