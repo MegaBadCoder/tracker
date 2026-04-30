@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { ReorderListRegistration } from './types'
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTaskDnd } from './use-task-dnd'
 
 /**
@@ -32,34 +32,51 @@ export function computeInsertionIndex(
 }
 
 export function useReorderList(opts: {
-  scope: string
+  scope: string | (() => string)
   listEl: Ref<HTMLElement | null>
   getItems: () => { id: string, el: HTMLElement }[]
 }): { insertionIndex: ComputedRef<number | null> } {
   const dnd = useTaskDnd()
+  const getScope = typeof opts.scope === 'function' ? opts.scope : () => opts.scope as string
 
-  const registration: ReorderListRegistration = {
-    scope: opts.scope,
-    get listEl(): HTMLElement {
-      if (!opts.listEl.value)
-        throw new Error(`useReorderList: listEl is null for scope "${opts.scope}"`)
-      return opts.listEl.value
-    },
-    getItems: opts.getItems,
+  let currentScope = getScope()
+
+  function buildRegistration(scope: string): ReorderListRegistration {
+    return {
+      scope,
+      get listEl(): HTMLElement {
+        if (!opts.listEl.value)
+          throw new Error(`useReorderList: listEl is null for scope "${scope}"`)
+        return opts.listEl.value
+      },
+      getItems: opts.getItems,
+    }
   }
 
   onMounted(() => {
-    dnd.registerReorderList(registration)
+    currentScope = getScope()
+    dnd.registerReorderList(buildRegistration(currentScope))
   })
 
+  // Re-register when scope changes (e.g. project navigation reuses ProjectView).
+  if (typeof opts.scope === 'function') {
+    watch(opts.scope, (newScope) => {
+      if (newScope === currentScope)
+        return
+      dnd.unregisterReorderList(currentScope)
+      currentScope = newScope
+      dnd.registerReorderList(buildRegistration(currentScope))
+    })
+  }
+
   onUnmounted(() => {
-    dnd.unregisterReorderList(opts.scope)
+    dnd.unregisterReorderList(currentScope)
   })
 
   const insertionIndex = computed<number | null>(() => {
     if (!dnd.state.active)
       return null
-    if (dnd.state.hoveredList?.scope !== opts.scope)
+    if (dnd.state.hoveredList?.scope !== currentScope)
       return null
     return dnd.state.insertionIndex
   })

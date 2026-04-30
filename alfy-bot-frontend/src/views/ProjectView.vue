@@ -79,7 +79,7 @@ function getItems() {
 }
 
 const { insertionIndex } = useReorderList({
-  scope: computed(() => `project:${projectId.value}`).value,
+  scope: () => `project:${projectId.value}`,
   listEl,
   getItems,
 })

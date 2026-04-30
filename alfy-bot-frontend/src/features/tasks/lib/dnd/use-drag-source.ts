@@ -108,10 +108,12 @@ export function useDragSource(opts: {
     function cleanup(): void {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
     }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   // Touch/pen: drag starts after long-press; cancels on early move > threshold.
