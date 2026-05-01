@@ -44,9 +44,7 @@ export function useReorderList(opts: {
   function buildRegistration(scope: string): ReorderListRegistration {
     return {
       scope,
-      get listEl(): HTMLElement {
-        if (!opts.listEl.value)
-          throw new Error(`useReorderList: listEl is null for scope "${scope}"`)
+      get listEl(): HTMLElement | null {
         return opts.listEl.value
       },
       getItems: opts.getItems,

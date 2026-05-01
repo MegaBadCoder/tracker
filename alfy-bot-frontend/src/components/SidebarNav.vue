@@ -25,6 +25,7 @@ const { isHovered: isInboxHovered } = useDropTarget({
       :key="link.to"
       :ref="link.to === '/tasks' ? (el: any) => { inboxLinkEl = el?.$el ?? null } : undefined"
       :to="link.to"
+      :data-drop-kind="link.to === '/tasks' ? 'inbox' : undefined"
       class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors"
       :class="[
         route.path === link.to

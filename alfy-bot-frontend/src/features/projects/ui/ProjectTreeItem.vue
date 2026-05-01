@@ -98,6 +98,8 @@ const { isHovered } = useDropTarget({
       <RouterLink
         ref="linkRef"
         :to="`/tasks/project/${node.id}`"
+        data-drop-kind="project"
+        :data-project-id="node.id"
         class="flex items-center gap-2 px-3 py-1.5 pr-8 rounded-md text-sm transition-colors hover:bg-sidebar-accent/50 text-sidebar-foreground"
         :style="{ paddingLeft: `${12 + depth * 16}px` }"
         :class="{ 'bg-accent ring-2 ring-primary': isHovered }"

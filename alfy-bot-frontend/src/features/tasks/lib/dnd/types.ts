@@ -23,7 +23,12 @@ export interface DropTargetRegistration {
 export interface ReorderListRegistration {
   /** 'inbox' | 'project:<projectId>' */
   scope: string
-  listEl: HTMLElement
+  /**
+   * Returns null when the host's list element is currently unmounted/hidden
+   * (e.g. ProjectView reused across navigation, but the flat-list branch is
+   * not in the current DOM). Engine must skip such registrations during hit-test.
+   */
+  listEl: HTMLElement | null
   getItems: () => { id: string, el: HTMLElement }[]
 }
 

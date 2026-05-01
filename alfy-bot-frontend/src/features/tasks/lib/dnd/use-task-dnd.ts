@@ -31,13 +31,42 @@ const state = reactive<DndState>({
 const dropTargets: DropTargetRegistration[] = []
 const reorderLists: ReorderListRegistration[] = []
 
+function collectDomDropTargets(): DropTargetRegistration[] {
+  // Scan DOM at drag time (not at mount), so we always pick up the visible
+  // copy of slot-rendered elements (e.g. desktop vs hidden mobile sidebar).
+  // Elements opt in via `data-drop-kind="project"|"inbox"` and `data-project-id`.
+  const nodes = document.querySelectorAll<HTMLElement>('[data-drop-kind]')
+  const out: DropTargetRegistration[] = []
+  nodes.forEach((el) => {
+    const kind = el.dataset.dropKind as 'project' | 'inbox' | undefined
+    if (kind !== 'project' && kind !== 'inbox')
+      return
+    // Skip elements that are visually hidden (display:none ancestor → rect 0).
+    const rect = el.getBoundingClientRect()
+    if (rect.width === 0 && rect.height === 0)
+      return
+    out.push({
+      id: kind === 'inbox' ? 'inbox' : `project:${el.dataset.projectId}`,
+      kind,
+      el,
+      projectId: el.dataset.projectId,
+    })
+  })
+  return out
+}
+
 function updateHitTest(pointer: Pointer): void {
-  state.hoveredTarget = findHoveredTarget(dropTargets, pointer)
+  // Refresh from DOM each tick — handles dynamic visibility, scroll, slot dup.
+  const live = collectDomDropTargets()
+  state.hoveredTarget = findHoveredTarget(live, pointer)
 
   // Find which reorder list contains the pointer.
   let foundList: ReorderListRegistration | null = null
   for (const list of reorderLists) {
-    const rect = list.listEl.getBoundingClientRect()
+    const el = list.listEl
+    if (!el)
+      continue
+    const rect = el.getBoundingClientRect()
     if (
       pointer.x >= rect.left
       && pointer.x <= rect.right
@@ -199,6 +228,26 @@ function commit(): void {
   const task = session.task
 
   const doCommit = async (): Promise<void> => {
+    // Sidebar drop targets (move-to-project / move-to-inbox) win over reorder.
+    // If pointer was over a project/inbox link in sidebar at drop time, that's
+    // an explicit "move" intent, not a "reorder".
+    if (target) {
+      if (target.kind === 'project') {
+        // Compute order = max order among uncategorized tasks in target project + 1.
+        const projectTasks = taskStore.tasks.filter(
+          t => t.projectId === target.projectId && (t.columnId === null || t.columnId === undefined),
+        )
+        const maxOrder = projectTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0)
+        await taskStore.moveTask(task.id, target.projectId!, { columnId: null, order: maxOrder + 1 })
+        return
+      }
+      if (target.kind === 'inbox') {
+        await taskStore.moveTask(task.id, null, {})
+        return
+      }
+      // 'reorder-slot' is a virtual drop slot inside a list — fall through to list logic below.
+    }
+
     if (list) {
       // Reorder within a flat list (inbox or project-list-without-columns).
       const scope = list.scope
@@ -219,24 +268,6 @@ function commit(): void {
       }
       else {
         console.error('DnD commit failed: unknown reorder scope', scope)
-      }
-      return
-    }
-
-    if (target) {
-      if (target.kind === 'project') {
-        // Compute order = max order among uncategorized tasks in target project + 1.
-        const projectTasks = taskStore.tasks.filter(
-          t => t.projectId === target.projectId && (t.columnId === null || t.columnId === undefined),
-        )
-        const maxOrder = projectTasks.reduce((max, t) => Math.max(max, t.order ?? 0), 0)
-        await taskStore.moveTask(task.id, target.projectId!, { columnId: null, order: maxOrder + 1 })
-      }
-      else if (target.kind === 'inbox') {
-        await taskStore.moveTask(task.id, null, {})
-      }
-      else {
-        console.error('DnD commit failed: unexpected target kind', target.kind)
       }
     }
   }
