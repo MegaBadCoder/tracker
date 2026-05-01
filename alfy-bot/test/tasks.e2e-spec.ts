@@ -240,11 +240,13 @@ describe('Tasks (e2e)', () => {
 
     it('reorders inbox tasks and assigns order 0,1,2', async () => {
       const reversed = [...taskIds].reverse();
-      await request(app.getHttpServer())
+      const { body } = await request(app.getHttpServer())
         .patch('/api/tasks/reorder')
         .set('Authorization', `Bearer ${token}`)
         .send({ orderedIds: reversed })
         .expect(200);
+
+      expect(body).toEqual({ ok: true, orderedIds: reversed });
 
       const { body: all } = await request(app.getHttpServer())
         .get('/api/tasks')

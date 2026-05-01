@@ -290,7 +290,7 @@ export class TaskService {
   async reorderInboxTasks(
     userId: number,
     dto: ReorderInboxTasksDto,
-  ): Promise<void> {
+  ): Promise<{ ok: true; orderedIds: string[] }> {
     for (const id of dto.orderedIds) {
       const task = await this.taskRepo.findById(id, userId);
       if (!task) throw new NotFoundException(`Task #${id} not found`);
@@ -301,6 +301,7 @@ export class TaskService {
 
     const updates = dto.orderedIds.map((id, index) => ({ id, order: index }));
     await this.taskRepo.reorderTasks(updates);
+    return { ok: true, orderedIds: dto.orderedIds };
   }
 
   async moveToInbox(
