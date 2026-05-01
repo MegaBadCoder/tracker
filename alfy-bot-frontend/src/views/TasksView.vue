@@ -8,6 +8,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTimerStore } from '@/features/task-timer'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
+import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -38,6 +39,10 @@ const { confirm } = useConfirm()
 
 const showCompleted = useShowCompleted('inbox')
 
+const dnd = useTaskDnd()
+const draggedId = computed(() => dnd.state.active?.task.id ?? null)
+const draggedHeight = computed(() => dnd.state.active?.originRect.height ?? 0)
+
 function getProjectName(task: Task) {
   if (!task.projectId)
     return undefined
@@ -58,9 +63,10 @@ const sortedTasks = computed(() => {
   return [...tasks.value]
     .filter(t => !t.projectId)
     .filter(t => showCompleted.value || !t.completed)
+    .filter(t => t.id !== draggedId.value)
     .sort((a, b) => {
       if (a.completed === b.completed)
-        return 0
+        return (a.order ?? 0) - (b.order ?? 0)
       return a.completed ? 1 : -1
     })
 })
@@ -177,7 +183,11 @@ onMounted(() => {
 
       <div v-else ref="listEl" role="list" class="divide-y divide-border">
         <template v-for="(task, i) in sortedTasks" :key="task.id">
-          <div v-if="insertionIndex === i" class="h-0.5 bg-primary" />
+          <div
+            v-if="insertionIndex === i"
+            class="border-2 border-dashed border-primary/40 rounded-md bg-primary/5"
+            :style="{ height: `${draggedHeight}px` }"
+          />
           <TaskCard
             :task="task"
             :project-name="getProjectName(task)"
@@ -187,7 +197,11 @@ onMounted(() => {
             @open="handleOpenTask"
           />
         </template>
-        <div v-if="insertionIndex === sortedTasks.length" class="h-0.5 bg-primary" />
+        <div
+          v-if="insertionIndex === sortedTasks.length"
+          class="border-2 border-dashed border-primary/40 rounded-md bg-primary/5"
+          :style="{ height: `${draggedHeight}px` }"
+        />
       </div>
     </div>
   </PageContainer>

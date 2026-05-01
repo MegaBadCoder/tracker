@@ -12,6 +12,7 @@ import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
+import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -57,10 +58,15 @@ const {
   handleDeleteFromDialog,
 } = useTaskDetailHandlers(taskStore, confirm)
 
+const dnd = useTaskDnd()
+const draggedId = computed(() => dnd.state.active?.task.id ?? null)
+const draggedHeight = computed(() => dnd.state.active?.originRect.height ?? 0)
+
 const filteredTasks = computed(() => {
   return tasks.value
     .filter(t => t.projectId === projectId.value)
     .filter(t => showCompleted.value || !t.completed)
+    .filter(t => t.id !== draggedId.value)
     .sort((a, b) => {
       if (a.completed === b.completed)
         return (a.order ?? 0) - (b.order ?? 0)
@@ -211,7 +217,11 @@ watch(projectId, (id) => {
         </div>
         <div v-else ref="listEl" role="list" class="divide-y divide-border">
           <template v-for="(task, i) in filteredTasks" :key="task.id">
-            <div v-if="insertionIndex === i" class="h-0.5 bg-primary" />
+            <div
+              v-if="insertionIndex === i"
+              class="border-2 border-dashed border-primary/40 rounded-md bg-primary/5"
+              :style="{ height: `${draggedHeight}px` }"
+            />
             <TaskCard
               :task="task"
               @toggle="handleToggleTask"
@@ -220,7 +230,11 @@ watch(projectId, (id) => {
               @open="handleOpenTask"
             />
           </template>
-          <div v-if="insertionIndex === filteredTasks.length" class="h-0.5 bg-primary" />
+          <div
+            v-if="insertionIndex === filteredTasks.length"
+            class="border-2 border-dashed border-primary/40 rounded-md bg-primary/5"
+            :style="{ height: `${draggedHeight}px` }"
+          />
         </div>
       </template>
 

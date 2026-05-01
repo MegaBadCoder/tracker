@@ -39,8 +39,8 @@ const hasMeta = computed(() =>
     ref="cardEl"
     role="listitem"
     :data-task-id="task.id"
-    class="group flex items-center gap-3 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm" :class="[
-      isCompact ? 'px-3 py-2 min-h-[36px]' : 'px-4 py-3 min-h-[44px] hover:pl-5',
+    class="group flex items-center gap-2 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm" :class="[
+      isCompact ? 'pl-1 pr-3 py-2 min-h-[36px]' : 'pl-1 pr-4 py-3 min-h-[44px]',
       task.isOverdue
         ? 'border-l-4 border-red-500 bg-red-500/10 dark:bg-red-500/20'
         : task.completed && 'opacity-50',
