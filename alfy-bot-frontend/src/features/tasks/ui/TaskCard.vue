@@ -26,7 +26,7 @@
         <span
           :class="[
             'text-sm truncate',
-            task.isOverdue
+            task.isOverdueфы
               ? 'text-red-600 dark:text-red-400 font-medium'
               : task.completed
                 ? 'line-through text-muted-foreground'
