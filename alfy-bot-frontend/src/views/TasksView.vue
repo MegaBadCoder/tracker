@@ -61,9 +61,8 @@ const sortedTasks = computed(() => {
     .filter(t => showCompleted.value || !t.completed)
     .filter(t => !hideOverdue.value || !t.isOverdue)
     .sort((a, b) => {
-      if (a.completed === b.completed)
-        return 0
-      return a.completed ? 1 : -1
+      const w = (t: Task) => (t.isOverdue ? 2 : 0) + (t.completed ? 1 : 0)
+      return w(a) - w(b)
     })
 })
 
