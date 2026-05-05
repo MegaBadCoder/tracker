@@ -1,6 +1,6 @@
 # Fix complete-recurring idempotency for overdue parent
 
-**Status:** planning
+**Status:** done
 **Branch:** main
 **Worktree:** none
 **Mode:** interactive
@@ -68,4 +68,11 @@ Invariants:
 Smoke: `curl PATCH /api/tasks/$SUCCESSOR_ID {completed:true}` → response.nextInstance.id отличается от parent.id, parent.recurringCompletedCount=1 в БД
 
 ## Conclusion
-<empty — filled by up:ureview>
+
+Outcome: `findByParentId` исключает overdue-парентов из выборки → idempotency-check `completeRecurringTask` больше не путает архивный overdue-парент с живым next-инстансом; HEAD `12f7656`.
+
+Invariants:
+- Diff ограничен SQL-условием в `findByParentId`: 4 sub-clause'а, ничего больше (verify: `git show 12f7656 --stat` → 1 файл, +10/-3)
+- Overdue-парент сам по себе никогда не попадает в `completeRecurringTask`/`uncompleteRecurringTask` — guard `if (task.isOverdue) throw` в [task.service.ts:91-93](alfy-bot/src/modules/task/task.service.ts#L91-L93). Фикс затрагивает только neighbor-lookup, не сами вызовы
+- `uncompleteRecurringTask` поведение идентично пре-фиксу: ветка `if (isRoot && nextInstance)` не срабатывала ни когда (overdue-парент → `isRoot=false`), `else if (!isRoot)` decrement-ветка отрабатывает одинаково в обоих сценариях — verify через reasoning + 105 task-тестов зелёные
+- E2E подтверждение: smoke на живой БД → новый инстанс на сегодня, parent.recurringCompletedCount 0→1, pomodoroConfig перенесён
