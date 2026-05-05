@@ -11,6 +11,7 @@ import { useProjectStore } from '@/features/projects/model/project-store'
 import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
+import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -27,6 +28,7 @@ const project = computed(() => projectStore.projectMap.get(projectId.value))
 const isBoardMode = computed(() => project.value?.viewMode === 'board')
 
 const showCompleted = useShowCompleted(projectId)
+const hideOverdue = useHideOverdue(projectId)
 
 const columnStore = useColumnStore()
 const columns = computed(() => columnStore.columns)
@@ -59,6 +61,7 @@ const filteredTasks = computed(() => {
   return tasks.value
     .filter(t => t.projectId === projectId.value)
     .filter(t => showCompleted.value || !t.completed)
+    .filter(t => !hideOverdue.value || !t.isOverdue)
     .sort((a, b) => {
       if (a.completed === b.completed)
         return (a.order ?? 0) - (b.order ?? 0)
@@ -134,7 +137,7 @@ watch(projectId, (id) => {
           :model-value="project.viewMode"
           @update:model-value="handleViewModeChange"
         />
-        <TaskListOptionsMenu v-model:show-completed="showCompleted" />
+        <TaskListOptionsMenu v-model:show-completed="showCompleted" v-model:hide-overdue="hideOverdue" />
       </template>
     </AppHeader>
 
@@ -161,6 +164,7 @@ watch(projectId, (id) => {
         <BoardView
           :project-id="projectId"
           :show-completed="showCompleted"
+          :hide-overdue="hideOverdue"
           @toggle-task="handleToggleTask"
           @open-task="handleOpenTask"
         />
