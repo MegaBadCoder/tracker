@@ -139,10 +139,17 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
   ): Promise<Task[]> {
     const where = onlyUncompleted
       ? [
-          { recurringParentId: parentId, completed: false },
-          { id: parentId, completed: false },
+          {
+            recurringParentId: parentId,
+            completed: false,
+            isOverdue: false,
+          },
+          { id: parentId, completed: false, isOverdue: false },
         ]
-      : [{ recurringParentId: parentId }, { id: parentId }];
+      : [
+          { recurringParentId: parentId, isOverdue: false },
+          { id: parentId, isOverdue: false },
+        ];
 
     return this.taskRepo.find({
       where,
