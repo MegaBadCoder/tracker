@@ -108,10 +108,11 @@ describe('ProjectTaskService — move & reorder', () => {
       updateChecklist: jest.fn(),
       updatePomodoroConfig: jest.fn(),
       findAllByProject: jest.fn().mockResolvedValue([]),
-      updatePosition: jest.fn().mockImplementation(
-        (taskId, _userId, projectId, columnId, order) =>
+      updatePosition: jest
+        .fn()
+        .mockImplementation((taskId, _userId, projectId, columnId, order) =>
           Promise.resolve(makeTask({ id: taskId, projectId, columnId, order })),
-      ),
+        ),
       reorderTasks: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -140,14 +141,16 @@ describe('ProjectTaskService — move & reorder', () => {
       });
 
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
-        'task-1', 1, 'proj-1', null, 0,
+        'task-1',
+        1,
+        'proj-1',
+        null,
+        0,
       );
     });
 
     it('перемещает задачу из проекта во Входящие (projectId=null)', async () => {
-      taskRepo.findById.mockResolvedValue(
-        makeTask({ projectId: 'proj-1' }),
-      );
+      taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
       projRepo.findById.mockResolvedValue(makeProject());
 
       await service.moveTask(1, 'proj-1', 'task-1', {
@@ -156,7 +159,11 @@ describe('ProjectTaskService — move & reorder', () => {
       });
 
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
-        'task-1', 1, null, null, 0,
+        'task-1',
+        1,
+        null,
+        null,
+        0,
       );
     });
 
@@ -172,7 +179,11 @@ describe('ProjectTaskService — move & reorder', () => {
       });
 
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
-        'task-1', 1, 'proj-1', 'col-1', 2,
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        2,
       );
     });
 
@@ -190,7 +201,11 @@ describe('ProjectTaskService — move & reorder', () => {
       });
 
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
-        'task-1', 1, 'proj-1', 'col-2', 0,
+        'task-1',
+        1,
+        'proj-1',
+        'col-2',
+        0,
       );
     });
 
@@ -204,7 +219,11 @@ describe('ProjectTaskService — move & reorder', () => {
       });
 
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
-        'task-1', 1, 'proj-1', null, 5,
+        'task-1',
+        1,
+        'proj-1',
+        null,
+        5,
       );
     });
 

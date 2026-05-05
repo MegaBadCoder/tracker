@@ -14,7 +14,10 @@ import { GOALS_MENU_KEYBOARD } from '../../../shared/constants/keyboards';
 import { MESSAGES } from '../../../shared/constants/messages';
 import type { FrequencyType } from '../../../shared/constants/schedule-types';
 import { DateParserService } from '../../../shared/services/date-parser.service';
-import { QUESTION_TYPES, QuestionType } from '../../../shared/types/question-types';
+import {
+  QUESTION_TYPES,
+  QuestionType,
+} from '../../../shared/types/question-types';
 import {
   calculateEndDate,
   formatDate,
@@ -757,7 +760,10 @@ export class CreateGoalScene {
       return;
     }
 
-    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(
+      ctx.from.id,
+      {},
+    );
 
     const goal = await this.goalService.create(user.id, {
       goal_name: ctx.session.goalName,

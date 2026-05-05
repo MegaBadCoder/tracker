@@ -57,9 +57,7 @@ describe('ProjectColumnService', () => {
       create: jest
         .fn()
         .mockImplementation((data) => Promise.resolve(makeColumn(data))),
-      save: jest
-        .fn()
-        .mockImplementation((col) => Promise.resolve(col)),
+      save: jest.fn().mockImplementation((col) => Promise.resolve(col)),
       delete: jest.fn().mockResolvedValue(true),
       reorder: jest.fn().mockResolvedValue(undefined),
     };
@@ -114,11 +112,11 @@ describe('ProjectColumnService', () => {
   describe('create', () => {
     it('создаёт колонку с автоматическим order', async () => {
       projRepo.findById.mockResolvedValue(makeProject());
-      colRepo.findAllByProject.mockResolvedValue([
-        makeColumn({ order: 0 }),
-      ]);
+      colRepo.findAllByProject.mockResolvedValue([makeColumn({ order: 0 })]);
 
-      const result = await service.create(1, 'proj-1', { title: 'In Progress' });
+      const result = await service.create(1, 'proj-1', {
+        title: 'In Progress',
+      });
 
       expect(colRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -141,25 +139,25 @@ describe('ProjectColumnService', () => {
     });
 
     it('бросает NotFoundException если проект не найден', async () => {
-      await expect(
-        service.create(1, 'nope', { title: 'X' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(1, 'nope', { title: 'X' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('бросает ForbiddenException если проект принадлежит другому пользователю', async () => {
       projRepo.findById.mockResolvedValue(makeProject({ userId: 999 }));
 
-      await expect(
-        service.create(1, 'proj-1', { title: 'X' }),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.create(1, 'proj-1', { title: 'X' })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('бросает BadRequestException если проект имеет viewMode=list', async () => {
       projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'list' }));
 
-      await expect(
-        service.create(1, 'proj-1', { title: 'X' }),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.create(1, 'proj-1', { title: 'X' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -209,9 +207,9 @@ describe('ProjectColumnService', () => {
       projRepo.findById.mockResolvedValue(makeProject());
       colRepo.delete.mockResolvedValue(false);
 
-      await expect(
-        service.delete(1, 'proj-1', 'nope'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.delete(1, 'proj-1', 'nope')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -233,9 +231,9 @@ describe('ProjectColumnService', () => {
     it('бросает BadRequestException если массив пустой', async () => {
       projRepo.findById.mockResolvedValue(makeProject());
 
-      await expect(
-        service.reorder(1, 'proj-1', []),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reorder(1, 'proj-1', [])).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

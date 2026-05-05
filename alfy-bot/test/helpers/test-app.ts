@@ -28,7 +28,16 @@ export async function createTestApp(): Promise<TestContext> {
   const testDataSource = new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: [User, Task, PomodoroConfig, TimerSession, Goal, Question, Schedule, ReportAnswer],
+    entities: [
+      User,
+      Task,
+      PomodoroConfig,
+      TimerSession,
+      Goal,
+      Question,
+      Schedule,
+      ReportAnswer,
+    ],
     synchronize: true,
   });
   await testDataSource.initialize();

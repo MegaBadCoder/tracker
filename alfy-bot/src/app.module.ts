@@ -41,7 +41,20 @@ import { SharedModule } from './shared/shared.module';
     TypeOrmModule.forRoot({
       type: 'sqlite',
       database: 'data/database.sqlite',
-      entities: [User, AuthMethod, Goal, Question, ReportAnswer, Schedule, Task, PomodoroConfig, TimerSession, PushSubscription, Project, ProjectColumn],
+      entities: [
+        User,
+        AuthMethod,
+        Goal,
+        Question,
+        ReportAnswer,
+        Schedule,
+        Task,
+        PomodoroConfig,
+        TimerSession,
+        PushSubscription,
+        Project,
+        ProjectColumn,
+      ],
       synchronize: true,
     }),
     TelegrafModule.forRoot({
@@ -60,6 +73,11 @@ import { SharedModule } from './shared/shared.module';
     BotModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ScheduleMigrationService, QuestionMigrationService, AuthMethodMigrationService],
+  providers: [
+    AppService,
+    ScheduleMigrationService,
+    QuestionMigrationService,
+    AuthMethodMigrationService,
+  ],
 })
-export class AppModule { }
+export class AppModule {}

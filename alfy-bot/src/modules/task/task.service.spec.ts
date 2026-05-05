@@ -33,7 +33,9 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   return task;
 }
 
-function makePomodoroConfig(overrides: Partial<PomodoroConfig> = {}): PomodoroConfig {
+function makePomodoroConfig(
+  overrides: Partial<PomodoroConfig> = {},
+): PomodoroConfig {
   const config = new PomodoroConfig();
   Object.assign(config, {
     id: 'pomo-1',
@@ -57,16 +59,22 @@ describe('TaskService', () => {
     repo = {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockImplementation((data) => Promise.resolve(makeTask(data))),
+      create: jest
+        .fn()
+        .mockImplementation((data) => Promise.resolve(makeTask(data))),
       save: jest.fn().mockImplementation((task) => Promise.resolve(task)),
-      update: jest.fn().mockImplementation((id, _userId, data) =>
-        Promise.resolve(makeTask({ id, ...data })),
-      ),
+      update: jest
+        .fn()
+        .mockImplementation((id, _userId, data) =>
+          Promise.resolve(makeTask({ id, ...data })),
+        ),
       delete: jest.fn().mockResolvedValue(true),
       incrementPomodoroCompleted: jest.fn().mockResolvedValue(undefined),
-      updateChecklist: jest.fn().mockImplementation((task, data) =>
-        Promise.resolve(makeTask({ ...task, checklist: data })),
-      ),
+      updateChecklist: jest
+        .fn()
+        .mockImplementation((task, data) =>
+          Promise.resolve(makeTask({ ...task, checklist: data })),
+        ),
       findByParentId: jest.fn().mockResolvedValue([]),
       deleteByParentId: jest.fn().mockResolvedValue(undefined),
       clearParentId: jest.fn().mockResolvedValue(undefined),
@@ -179,7 +187,8 @@ describe('TaskService', () => {
         pomodoroDuration: 45,
       });
 
-      const config = repo.create.mock.calls[0][0].pomodoroConfig as PomodoroConfig;
+      const config = repo.create.mock.calls[0][0]
+        .pomodoroConfig as PomodoroConfig;
       expect(config.pomodoroDuration).toBe(45);
       // Остальные поля не заданы — дефолты применит БД
       expect(config.pomodoroCount).toBeUndefined();
@@ -203,26 +212,32 @@ describe('TaskService', () => {
     it('обновляет поля задачи', async () => {
       repo.findById.mockResolvedValue(makeTask());
 
-      const result = await service.update(1, 'task-1', { title: 'Новое название' });
-
-      expect(repo.save).toHaveBeenCalledWith(expect.objectContaining({
+      const result = await service.update(1, 'task-1', {
         title: 'Новое название',
-      }));
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Новое название',
+        }),
+      );
       expect(result.task.title).toBe('Новое название');
     });
 
     it('бросает NotFoundException если задача не найдена', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.update(1, 'nope', { title: 'X' }))
-        .rejects.toThrow(NotFoundException);
+      await expect(service.update(1, 'nope', { title: 'X' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('бросает BadRequestException если задача isOverdue=true (immutable)', async () => {
       repo.findById.mockResolvedValue(makeTask({ isOverdue: true }));
 
-      await expect(service.update(1, 'task-1', { title: 'Новое' }))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        service.update(1, 'task-1', { title: 'Новое' }),
+      ).rejects.toThrow(BadRequestException);
       expect(repo.save).not.toHaveBeenCalled();
     });
   });
@@ -241,10 +256,12 @@ describe('TaskService', () => {
         expect.objectContaining({ id: 'task-1' }),
         { pomodoroCount: 8, pomodoroDuration: 50 },
       );
-      expect(result.pomodoroConfig).toEqual(expect.objectContaining({
-        pomodoroCount: 8,
-        pomodoroDuration: 50,
-      }));
+      expect(result.pomodoroConfig).toEqual(
+        expect.objectContaining({
+          pomodoroCount: 8,
+          pomodoroDuration: 50,
+        }),
+      );
     });
 
     it('удаляет конфиг при null', async () => {
@@ -263,8 +280,9 @@ describe('TaskService', () => {
     it('бросает NotFoundException для несуществующей задачи', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.updatePomodoroConfig(1, 'nope', { pomodoroCount: 4 }))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        service.updatePomodoroConfig(1, 'nope', { pomodoroCount: 4 }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -275,7 +293,10 @@ describe('TaskService', () => {
       await service.incrementPomodoro(1, 'task-1', 1.0);
 
       expect(repo.findById).toHaveBeenCalledWith('task-1', 1);
-      expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith('task-1', 1.0);
+      expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith(
+        'task-1',
+        1.0,
+      );
     });
 
     it('передаёт дробные значения', async () => {
@@ -283,14 +304,18 @@ describe('TaskService', () => {
 
       await service.incrementPomodoro(1, 'task-1', 0.6);
 
-      expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith('task-1', 0.6);
+      expect(repo.incrementPomodoroCompleted).toHaveBeenCalledWith(
+        'task-1',
+        0.6,
+      );
     });
 
     it('бросает NotFoundException если задача не найдена', async () => {
       repo.findById.mockResolvedValue(null);
 
-      await expect(service.incrementPomodoro(1, 'nope', 1))
-        .rejects.toThrow(NotFoundException);
+      await expect(service.incrementPomodoro(1, 'nope', 1)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -422,8 +447,8 @@ describe('TaskService', () => {
       });
 
       repo.findById
-        .mockResolvedValueOnce(instance)  // find the instance being updated
-        .mockResolvedValueOnce(root);      // find the root for count update
+        .mockResolvedValueOnce(instance) // find the instance being updated
+        .mockResolvedValueOnce(root); // find the root for count update
       repo.findByParentId.mockResolvedValue([instance]);
 
       await service.update(1, 'inst-1', { completed: true });
@@ -439,7 +464,7 @@ describe('TaskService', () => {
       const task = makeTask({
         id: 'root-1',
         recurrence: dailyRule,
-        dueDate: new Date('2026-04-05T10:00:00.000Z'),  // 24 days in the past
+        dueDate: new Date('2026-04-05T10:00:00.000Z'), // 24 days in the past
         completed: false,
         recurringParentId: null,
         recurringCompletedCount: 0,
@@ -489,7 +514,7 @@ describe('TaskService', () => {
     });
   });
 
-  describe('update — uncomplete recurring задачи', () => {
+  describe('update — uncomplete recurring задачи (disconnect-семантика)', () => {
     beforeEach(() => {
       jest.useFakeTimers();
       jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
@@ -498,7 +523,46 @@ describe('TaskService', () => {
       jest.useRealTimers();
     });
 
-    it('completed=false + was completed + isAutoCreated=true next -> удаляет next instance', async () => {
+    it('X — root + N (autoCreated) -> X отключён, N повышен до root, count = X.count - 1', async () => {
+      const task = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        completed: true,
+        recurringParentId: null,
+        recurringCompletedCount: 3,
+      });
+      const nextInstance = makeTask({
+        id: 'inst-1',
+        recurrence: dailyRule,
+        recurringParentId: 'root-1',
+        completed: false,
+        isAutoCreated: true,
+      });
+
+      repo.findById.mockResolvedValue(task);
+      repo.findByParentId.mockResolvedValue([nextInstance]);
+
+      const result = await service.update(1, 'root-1', { completed: false });
+
+      // X disconnected
+      expect(result.task.recurrence).toBeNull();
+      expect(result.task.recurringParentId).toBeNull();
+      expect(result.task.recurringCompletedCount).toBe(0);
+      expect(result.task.isAutoCreated).toBe(false);
+      expect(result.task.completed).toBe(false);
+
+      // N promoted
+      expect(result.nextInstance).toBeDefined();
+      expect(result.nextInstance!.id).toBe('inst-1');
+      expect(result.nextInstance!.recurringParentId).toBeNull();
+      expect(result.nextInstance!.recurringCompletedCount).toBe(2);
+      expect(result.nextInstance!.isAutoCreated).toBe(false);
+
+      // No deletion
+      expect(repo.delete).not.toHaveBeenCalled();
+    });
+
+    it('X — root + N (user-modified) -> N всё равно повышен до root', async () => {
       const task = makeTask({
         id: 'root-1',
         recurrence: dailyRule,
@@ -508,57 +572,7 @@ describe('TaskService', () => {
       });
       const nextInstance = makeTask({
         id: 'inst-1',
-        recurringParentId: 'root-1',
-        completed: false,
-        isAutoCreated: true,
-      });
-
-      repo.findById
-        .mockResolvedValueOnce(task)  // find current task
-        .mockResolvedValueOnce(task); // find root for count
-      repo.findByParentId.mockResolvedValue([nextInstance]);
-
-      await service.update(1, 'root-1', { completed: false });
-
-      expect(repo.delete).toHaveBeenCalledWith('inst-1', 1);
-    });
-
-    it('completed=false + was completed + isAutoCreated=true -> декремент recurringCompletedCount на ROOT', async () => {
-      const task = makeTask({
-        id: 'root-1',
         recurrence: dailyRule,
-        completed: true,
-        recurringParentId: null,
-        recurringCompletedCount: 2,
-      });
-      const nextInstance = makeTask({
-        id: 'inst-1',
-        recurringParentId: 'root-1',
-        completed: false,
-        isAutoCreated: true,
-      });
-
-      repo.findById
-        .mockResolvedValueOnce(task)
-        .mockResolvedValueOnce(task);
-      repo.findByParentId.mockResolvedValue([nextInstance]);
-
-      await service.update(1, 'root-1', { completed: false });
-
-      expect(repo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ recurringCompletedCount: 1 }),
-      );
-    });
-
-    it('completed=false + was completed + isAutoCreated=false next -> НЕ удаляет (user modified)', async () => {
-      const task = makeTask({
-        id: 'root-1',
-        recurrence: dailyRule,
-        completed: true,
-        recurringParentId: null,
-      });
-      const nextInstance = makeTask({
-        id: 'inst-1',
         recurringParentId: 'root-1',
         completed: false,
         isAutoCreated: false,
@@ -567,31 +581,16 @@ describe('TaskService', () => {
       repo.findById.mockResolvedValue(task);
       repo.findByParentId.mockResolvedValue([nextInstance]);
 
-      await service.update(1, 'root-1', { completed: false });
+      const result = await service.update(1, 'root-1', { completed: false });
 
+      expect(result.task.recurrence).toBeNull();
+      expect(result.nextInstance).toBeDefined();
+      expect(result.nextInstance!.recurringParentId).toBeNull();
+      expect(result.nextInstance!.recurringCompletedCount).toBe(0);
       expect(repo.delete).not.toHaveBeenCalled();
     });
 
-    it('completed=false + was completed + нет next -> просто uncomplete', async () => {
-      const task = makeTask({
-        id: 'root-1',
-        recurrence: dailyRule,
-        completed: true,
-        recurringParentId: null,
-      });
-
-      repo.findById.mockResolvedValue(task);
-      repo.findByParentId.mockResolvedValue([]);
-
-      await service.update(1, 'root-1', { completed: false });
-
-      expect(repo.save).toHaveBeenCalledWith(
-        expect.objectContaining({ completed: false }),
-      );
-      expect(repo.delete).not.toHaveBeenCalled();
-    });
-
-    it('возвращает { task, deletedInstanceId } при удалении', async () => {
+    it('X — root, N нет -> X отключён, series мертв', async () => {
       const task = makeTask({
         id: 'root-1',
         recurrence: dailyRule,
@@ -599,21 +598,120 @@ describe('TaskService', () => {
         recurringParentId: null,
         recurringCompletedCount: 1,
       });
-      const nextInstance = makeTask({
+
+      repo.findById.mockResolvedValue(task);
+      repo.findByParentId.mockResolvedValue([]);
+
+      const result = await service.update(1, 'root-1', { completed: false });
+
+      expect(result.task.recurrence).toBeNull();
+      expect(result.task.recurringParentId).toBeNull();
+      expect(result.task.recurringCompletedCount).toBe(0);
+      expect(result.task.completed).toBe(false);
+      expect(result.nextInstance).toBeUndefined();
+      expect(repo.delete).not.toHaveBeenCalled();
+    });
+
+    it('X — instance + N -> X отключён, root.count декрементится, N не трогаем', async () => {
+      const root = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        completed: false,
+        recurringParentId: null,
+        recurringCompletedCount: 2,
+      });
+      const task = makeTask({
         id: 'inst-1',
+        recurrence: dailyRule,
+        completed: true,
+        recurringParentId: 'root-1',
+        recurringCompletedCount: 0,
+        isAutoCreated: false,
+      });
+      const nextInstance = makeTask({
+        id: 'inst-2',
+        recurrence: dailyRule,
         recurringParentId: 'root-1',
         completed: false,
         isAutoCreated: true,
       });
 
       repo.findById
-        .mockResolvedValueOnce(task)
-        .mockResolvedValueOnce(task);
+        .mockResolvedValueOnce(task) // initial findById in update()
+        .mockResolvedValueOnce(root); // findById for root in uncompleteRecurringTask
+      repo.findByParentId.mockResolvedValue([nextInstance]);
+
+      const result = await service.update(1, 'inst-1', { completed: false });
+
+      // X disconnected
+      expect(result.task.recurrence).toBeNull();
+      expect(result.task.recurringParentId).toBeNull();
+      expect(result.task.completed).toBe(false);
+
+      // Root's count decremented
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'root-1', recurringCompletedCount: 1 }),
+      );
+
+      // N untouched (not promoted, not saved with new parent)
+      expect(repo.save).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'inst-2', recurringParentId: null }),
+      );
+      expect(repo.delete).not.toHaveBeenCalled();
+      expect(result.nextInstance).toBeUndefined();
+    });
+
+    it('X — instance, N нет -> X отключён, root.count декрементится', async () => {
+      const root = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        completed: false,
+        recurringParentId: null,
+        recurringCompletedCount: 1,
+      });
+      const task = makeTask({
+        id: 'inst-1',
+        recurrence: dailyRule,
+        completed: true,
+        recurringParentId: 'root-1',
+        isAutoCreated: false,
+      });
+
+      repo.findById.mockResolvedValueOnce(task).mockResolvedValueOnce(root);
+      repo.findByParentId.mockResolvedValue([]);
+
+      const result = await service.update(1, 'inst-1', { completed: false });
+
+      expect(result.task.recurrence).toBeNull();
+      expect(result.task.recurringParentId).toBeNull();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'root-1', recurringCompletedCount: 0 }),
+      );
+      expect(result.nextInstance).toBeUndefined();
+    });
+
+    it('счётчик не уходит в минус (X.count=0)', async () => {
+      const task = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        completed: true,
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      const nextInstance = makeTask({
+        id: 'inst-1',
+        recurrence: dailyRule,
+        recurringParentId: 'root-1',
+        completed: false,
+        isAutoCreated: true,
+      });
+
+      repo.findById.mockResolvedValue(task);
       repo.findByParentId.mockResolvedValue([nextInstance]);
 
       const result = await service.update(1, 'root-1', { completed: false });
 
-      expect(result.deletedInstanceId).toBe('inst-1');
+      expect(result.nextInstance!.recurringCompletedCount).toBe(0);
     });
   });
 
@@ -641,7 +739,11 @@ describe('TaskService', () => {
     it('endDate пройдена -> nextInstance не создаётся', async () => {
       const task = makeTask({
         id: 'root-1',
-        recurrence: { frequency: 'daily', interval: 1, endDate: '2026-04-05T00:00:00.000Z' },
+        recurrence: {
+          frequency: 'daily',
+          interval: 1,
+          endDate: '2026-04-05T00:00:00.000Z',
+        },
         dueDate: new Date('2026-04-05T10:00:00.000Z'),
         completed: false,
         recurringParentId: null,

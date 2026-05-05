@@ -67,9 +67,8 @@ export const useProjectStore = defineStore('projects', () => {
     projects.value[index] = { ...previous, ...payload } as Project
 
     try {
-      const { data } = await api.patch<Project>(`/projects/${id}`, payload)
-      projects.value[index] = data
-      return data
+      await api.patch(`/projects/${id}`, payload)
+      return projects.value[index]
     } catch (err) {
       projects.value[index] = previous
       throw err

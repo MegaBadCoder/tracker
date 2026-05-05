@@ -57,10 +57,10 @@ export class BotUpdate implements OnModuleInit {
     const username = ctx.from.username;
     const firstName = ctx.from.first_name;
 
-    const user = await this.authService.findOrCreateTelegramUser(
-      telegramId,
-      { username, firstName },
-    );
+    const user = await this.authService.findOrCreateTelegramUser(telegramId, {
+      username,
+      firstName,
+    });
 
     await ctx.reply(
       `Привет, ${user.firstName || 'друг'}! Я Alfy бот 👋\n\nВыбери действие из меню ниже:`,

@@ -227,6 +227,20 @@ describe('useProjectStore', () => {
       expect(store.projects[0].title).toBe('Обновлённый')
     })
 
+    it('сохраняет оптимистичное состояние если PATCH вернул пустое тело', async () => {
+      const project = makeProject()
+      vi.mocked(api.get).mockResolvedValue({ data: [project] })
+      vi.mocked(api.patch).mockResolvedValue({ data: {} })
+
+      const store = useProjectStore()
+      await store.fetchProjects()
+
+      await store.updateProject('proj-1', { viewMode: 'board' })
+
+      expect(store.projects[0].viewMode).toBe('board')
+      expect(store.projects[0].title).toBe('Проект')
+    })
+
     it('откатывает при ошибке API', async () => {
       const project = makeProject()
       vi.mocked(api.get).mockResolvedValue({ data: [project] })

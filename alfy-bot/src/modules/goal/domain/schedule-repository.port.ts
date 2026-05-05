@@ -8,10 +8,7 @@ export interface ScheduleData {
 }
 
 export abstract class ScheduleRepositoryPort {
-  abstract create(
-    questionId: number,
-    data: ScheduleData,
-  ): Promise<Schedule>;
+  abstract create(questionId: number, data: ScheduleData): Promise<Schedule>;
   abstract createNewVersion(
     questionId: number,
     data: ScheduleData,

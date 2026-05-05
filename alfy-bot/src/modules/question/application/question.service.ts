@@ -12,10 +12,7 @@ import {
 } from '../../goal/domain/schedule-repository.port';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportAnswerRepositoryPort } from '../../report/domain/report-answer-repository.port';
-import {
-  HabitWithHistoryDto,
-  HabitDayStatus,
-} from '../dto/habit-response.dto';
+import { HabitWithHistoryDto, HabitDayStatus } from '../dto/habit-response.dto';
 
 /** Форматирует Date в 'YYYY-MM-DD' по локальному времени */
 function toLocalISO(d: Date): string {
@@ -154,7 +151,10 @@ export class QuestionService {
     id: number,
     userId: number,
     data: Partial<
-      Pick<Question, 'question' | 'type' | 'can_skip' | 'is_habit' | 'target_value'>
+      Pick<
+        Question,
+        'question' | 'type' | 'can_skip' | 'is_habit' | 'target_value'
+      >
     >,
   ): Promise<Question> {
     const question = await this.assertOwnership(id, userId);
@@ -162,8 +162,14 @@ export class QuestionService {
     // Validate target_value for number type
     if (data.target_value !== undefined) {
       const effectiveType = data.type ?? question.type;
-      if (effectiveType === 'number' && data.target_value !== null && isNaN(Number(data.target_value))) {
-        throw new BadRequestException('target_value must be a valid number for number-type questions');
+      if (
+        effectiveType === 'number' &&
+        data.target_value !== null &&
+        isNaN(Number(data.target_value))
+      ) {
+        throw new BadRequestException(
+          'target_value must be a valid number for number-type questions',
+        );
       }
     }
 
@@ -201,10 +207,7 @@ export class QuestionService {
     await this.questionRepo.deactivate(id);
   }
 
-  private async assertOwnership(
-    id: number,
-    userId: number,
-  ): Promise<Question> {
+  private async assertOwnership(id: number, userId: number): Promise<Question> {
     const question = await this.questionRepo.findById(id);
     if (!question) {
       throw new NotFoundException(`Question #${id} not found`);

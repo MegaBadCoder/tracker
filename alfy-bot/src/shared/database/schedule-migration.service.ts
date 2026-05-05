@@ -49,13 +49,10 @@ export class ScheduleMigrationService implements OnApplicationBootstrap {
     await this.removeForeignKeyConstraint('goal_schedules', 'goal_questions');
   }
 
-  private async removeForeignKeyConstraint(
-    tableName: string,
-    fkTable: string,
-  ) {
-    await this.dataSource.query(`PRAGMA foreign_keys=off`);
+  private async removeForeignKeyConstraint(tableName: string, fkTable: string) {
+    await this.dataSource.query('PRAGMA foreign_keys=off');
     try {
-      await this.dataSource.query(`BEGIN TRANSACTION`);
+      await this.dataSource.query('BEGIN TRANSACTION');
       await this.dataSource.query(`
         CREATE TABLE "${tableName}_new" (
           "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -75,22 +72,22 @@ export class ScheduleMigrationService implements OnApplicationBootstrap {
       await this.dataSource.query(
         `ALTER TABLE "${tableName}_new" RENAME TO "${tableName}"`,
       );
-      await this.dataSource.query(`COMMIT`);
+      await this.dataSource.query('COMMIT');
       this.logger.log(
         `${tableName}: migration complete — UNIQUE constraint removed`,
       );
     } catch (error) {
-      await this.dataSource.query(`ROLLBACK`).catch(() => {});
+      await this.dataSource.query('ROLLBACK').catch(() => {});
       this.logger.error(`${tableName} migration failed`, error);
       throw error;
     } finally {
-      await this.dataSource.query(`PRAGMA foreign_keys=on`);
+      await this.dataSource.query('PRAGMA foreign_keys=on');
     }
   }
 
   private async tableExists(name: string): Promise<boolean> {
     const result = await this.dataSource.query(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+      'SELECT name FROM sqlite_master WHERE type=\'table\' AND name=?',
       [name],
     );
     return result.length > 0;

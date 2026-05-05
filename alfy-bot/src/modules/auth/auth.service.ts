@@ -87,13 +87,8 @@ export class AuthService {
     return { message: 'Verification code sent', email: dto.email };
   }
 
-  async loginWithEmail(
-    dto: LoginEmailDto,
-  ): Promise<{ accessToken: string }> {
-    const method = await this.authMethodRepo.findByProvider(
-      'email',
-      dto.email,
-    );
+  async loginWithEmail(dto: LoginEmailDto): Promise<{ accessToken: string }> {
+    const method = await this.authMethodRepo.findByProvider('email', dto.email);
     if (!method || !method.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -111,13 +106,8 @@ export class AuthService {
     return { accessToken };
   }
 
-  async verifyEmail(
-    dto: VerifyEmailDto,
-  ): Promise<{ accessToken: string }> {
-    const method = await this.authMethodRepo.findByProvider(
-      'email',
-      dto.email,
-    );
+  async verifyEmail(dto: VerifyEmailDto): Promise<{ accessToken: string }> {
+    const method = await this.authMethodRepo.findByProvider('email', dto.email);
     if (!method) {
       throw new BadRequestException('User not found');
     }
@@ -143,13 +133,8 @@ export class AuthService {
     return { accessToken };
   }
 
-  async resendCode(
-    dto: ResendCodeDto,
-  ): Promise<{ message: string }> {
-    const method = await this.authMethodRepo.findByProvider(
-      'email',
-      dto.email,
-    );
+  async resendCode(dto: ResendCodeDto): Promise<{ message: string }> {
+    const method = await this.authMethodRepo.findByProvider('email', dto.email);
     if (!method) {
       throw new BadRequestException('User not found');
     }
@@ -159,9 +144,7 @@ export class AuthService {
 
     const code = this.generateVerificationCode();
     method.verificationCode = code;
-    method.verificationCodeExpiresAt = new Date(
-      Date.now() + 10 * 60 * 1000,
-    );
+    method.verificationCodeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.authMethodRepo.save(method);
 
     await this.emailNotification.sendVerificationCode(dto.email, code);
@@ -228,13 +211,8 @@ export class AuthService {
     return { message: 'Password changed' };
   }
 
-  async forgotPassword(
-    dto: ForgotPasswordDto,
-  ): Promise<{ message: string }> {
-    const method = await this.authMethodRepo.findByProvider(
-      'email',
-      dto.email,
-    );
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string }> {
+    const method = await this.authMethodRepo.findByProvider('email', dto.email);
     if (!method) {
       // Don't reveal whether email exists
       return { message: 'If this email is registered, a code has been sent' };
@@ -242,9 +220,7 @@ export class AuthService {
 
     const code = this.generateVerificationCode();
     method.verificationCode = code;
-    method.verificationCodeExpiresAt = new Date(
-      Date.now() + 10 * 60 * 1000,
-    );
+    method.verificationCodeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
     await this.authMethodRepo.save(method);
 
     await this.emailNotification.sendVerificationCode(dto.email, code);
@@ -252,13 +228,8 @@ export class AuthService {
     return { message: 'If this email is registered, a code has been sent' };
   }
 
-  async resetPassword(
-    dto: ResetPasswordDto,
-  ): Promise<{ accessToken: string }> {
-    const method = await this.authMethodRepo.findByProvider(
-      'email',
-      dto.email,
-    );
+  async resetPassword(dto: ResetPasswordDto): Promise<{ accessToken: string }> {
+    const method = await this.authMethodRepo.findByProvider('email', dto.email);
     if (!method) {
       throw new BadRequestException('Invalid code');
     }
@@ -331,9 +302,7 @@ export class AuthService {
     return Object.fromEntries(params.entries());
   }
 
-  validateLoginWidget(
-    dto: TelegramAuthDto,
-  ): {
+  validateLoginWidget(dto: TelegramAuthDto): {
     id: number;
     first_name?: string;
     last_name?: string;
@@ -341,9 +310,7 @@ export class AuthService {
     photo_url?: string;
   } {
     if (!dto.hash || !dto.auth_date || !dto.id) {
-      throw new UnauthorizedException(
-        'Missing required Login Widget fields',
-      );
+      throw new UnauthorizedException('Missing required Login Widget fields');
     }
 
     const age = Math.floor(Date.now() / 1000) - dto.auth_date;
@@ -372,10 +339,7 @@ export class AuthService {
       .join('\n');
 
     const botToken = this.botToken;
-    const secretKey = crypto
-      .createHash('sha256')
-      .update(botToken)
-      .digest();
+    const secretKey = crypto.createHash('sha256').update(botToken).digest();
 
     const expectedHash = crypto
       .createHmac('sha256', secretKey)
@@ -403,10 +367,7 @@ export class AuthService {
           'Dev login is only available in development mode',
         );
       }
-      const user = await this.findOrCreateTelegramUser(
-        dto.devTelegramId,
-        {},
-      );
+      const user = await this.findOrCreateTelegramUser(dto.devTelegramId, {});
       const accessToken = this.tokenIssuer.sign({ sub: user.id });
       return { accessToken };
     }
@@ -473,10 +434,7 @@ export class AuthService {
     };
   }
 
-  async updateTimezone(
-    userId: number,
-    timezone: string,
-  ): Promise<string> {
+  async updateTimezone(userId: number, timezone: string): Promise<string> {
     return this.userService.updateTimezone(userId, timezone);
   }
 

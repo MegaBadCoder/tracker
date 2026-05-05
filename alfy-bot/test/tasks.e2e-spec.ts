@@ -205,9 +205,7 @@ describe('Tasks (e2e)', () => {
 
   describe('Auth', () => {
     it('returns 401 without token', async () => {
-      await request(app.getHttpServer())
-        .get('/api/tasks')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/tasks').expect(401);
     });
 
     it('returns 401 with invalid token', async () => {

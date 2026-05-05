@@ -1,13 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AnalyticsEntryDto {
-  @ApiProperty({ example: '2026-02-01', description: 'Дата в формате YYYY-MM-DD' })
+  @ApiProperty({
+    example: '2026-02-01',
+    description: 'Дата в формате YYYY-MM-DD',
+  })
   date: string;
 
   @ApiPropertyOptional({
     example: '15',
     nullable: true,
-    description: 'Текстовое значение ответа. "Не было заполнено" если пропущено для текстового типа',
+    description:
+      'Текстовое значение ответа. "Не было заполнено" если пропущено для текстового типа',
   })
   answer_text: string | null;
 
@@ -21,6 +25,9 @@ export class AnalyticsEntryDto {
   @ApiPropertyOptional({ example: null, nullable: true })
   answer_bool: boolean | null;
 
-  @ApiProperty({ example: true, description: 'false если дата была запланирована, но ответ не был дан' })
+  @ApiProperty({
+    example: true,
+    description: 'false если дата была запланирована, но ответ не был дан',
+  })
   filled: boolean;
 }

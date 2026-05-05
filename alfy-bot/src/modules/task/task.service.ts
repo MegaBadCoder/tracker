@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -10,10 +14,7 @@ import {
   findNextOccurrenceOnOrAfter,
 } from './domain/recurrence.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
-import {
-  shiftToUserWallClock,
-  shiftBackToUtc,
-} from './lib/timezone';
+import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 export interface UpdateTaskResponse {
   task: Task;
@@ -77,7 +78,9 @@ export class TaskService {
     dto: UpdateTaskDto,
   ): Promise<UpdateTaskResponse> {
     if (id.includes('__virtual__')) {
-      throw new BadRequestException('Virtual task instances cannot be modified directly.');
+      throw new BadRequestException(
+        'Virtual task instances cannot be modified directly.',
+      );
     }
 
     const { dueDate, deadline, recurrence, ...rest } = dto;
@@ -91,14 +94,10 @@ export class TaskService {
 
     // Detect recurring complete/uncomplete transitions
     const isCompletingRecurring =
-      dto.completed === true &&
-      !task.completed &&
-      task.recurrence;
+      dto.completed === true && !task.completed && task.recurrence;
 
     const isUncompletingRecurring =
-      dto.completed === false &&
-      task.completed &&
-      task.recurrence;
+      dto.completed === false && task.completed && task.recurrence;
 
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
@@ -109,8 +108,7 @@ export class TaskService {
       task.dueDate = dueDate ? new Date(dueDate) : null;
     if (deadline !== undefined)
       task.deadline = deadline ? new Date(deadline) : null;
-    if (recurrence !== undefined)
-      task.recurrence = recurrence ?? null;
+    if (recurrence !== undefined) task.recurrence = recurrence ?? null;
 
     // Mark user-modified instances as not auto-created
     if (task.recurringParentId && !dto.completed) {
@@ -171,9 +169,7 @@ export class TaskService {
         startOfTodayLocal,
         countAfterComplete,
       );
-      const nextDate = nextZoned
-        ? shiftBackToUtc(nextZoned, timezone)
-        : null;
+      const nextDate = nextZoned ? shiftBackToUtc(nextZoned, timezone) : null;
 
       if (nextDate) {
         const instanceData = buildNextInstance(task, nextDate, parentId);
@@ -213,36 +209,42 @@ export class TaskService {
     userId: number,
     task: Task,
   ): Promise<UpdateTaskResponse> {
+    const isRoot = task.recurringParentId === null;
     const parentId = task.recurringParentId ?? task.id;
 
     const uncompleted = await this.taskRepo.findByParentId(parentId, true);
     const nextInstance = uncompleted.find((t) => t.id !== task.id);
 
-    let deletedInstanceId: string | undefined;
+    // Snapshot count before disconnect — used to seed promoted root.
+    const originalCount = task.recurringCompletedCount ?? 0;
 
-    if (nextInstance?.isAutoCreated) {
-      await this.taskRepo.delete(nextInstance.id, userId);
-      deletedInstanceId = nextInstance.id;
+    // Disconnect X from the series unconditionally.
+    task.recurrence = null;
+    task.recurringParentId = null;
+    task.recurringCompletedCount = 0;
+    task.isAutoCreated = false;
+    task.completed = false;
 
-      // Decrement completed count on root
-      const rootTask = task.recurringParentId
-        ? await this.taskRepo.findById(parentId, userId)
-        : task;
+    let promotedInstance: Task | undefined;
 
+    if (isRoot && nextInstance) {
+      nextInstance.recurringParentId = null;
+      nextInstance.recurringCompletedCount = Math.max(0, originalCount - 1);
+      nextInstance.isAutoCreated = false;
+      promotedInstance = await this.taskRepo.save(nextInstance);
+    } else if (!isRoot) {
+      const rootTask = await this.taskRepo.findById(parentId, userId);
       if (rootTask) {
         rootTask.recurringCompletedCount = Math.max(
           0,
-          rootTask.recurringCompletedCount - 1,
+          (rootTask.recurringCompletedCount ?? 0) - 1,
         );
-        if (rootTask.id !== task.id) {
-          await this.taskRepo.save(rootTask);
-        }
+        await this.taskRepo.save(rootTask);
       }
     }
 
-    task.completed = false;
     const saved = await this.taskRepo.save(task);
-    return { task: saved, deletedInstanceId };
+    return { task: saved, nextInstance: promotedInstance };
   }
 
   async updatePomodoroConfig(

@@ -54,7 +54,9 @@ export class TaskController {
 
   // Dev-only: trigger overdue-recurring cron for current user immediately
   @Post('_dev/process-overdue')
-  @ApiOperation({ summary: 'DEV: запустить overdue-recurring обработку прямо сейчас' })
+  @ApiOperation({
+    summary: 'DEV: запустить overdue-recurring обработку прямо сейчас',
+  })
   async processOverdueDev(@Request() req: AuthRequest) {
     if (process.env.NODE_ENV === 'production') {
       throw new ForbiddenException('Dev-only endpoint');

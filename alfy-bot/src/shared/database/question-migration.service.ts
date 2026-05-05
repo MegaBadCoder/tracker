@@ -20,9 +20,9 @@ export class QuestionMigrationService implements OnApplicationBootstrap {
       'Found goal_questions table — migrating data to questions/schedules',
     );
 
-    await this.dataSource.query(`PRAGMA foreign_keys=off`);
+    await this.dataSource.query('PRAGMA foreign_keys=off');
     try {
-      await this.dataSource.query(`BEGIN TRANSACTION`);
+      await this.dataSource.query('BEGIN TRANSACTION');
 
       // Copy questions with new columns
       await this.dataSource.query(`
@@ -47,25 +47,25 @@ export class QuestionMigrationService implements OnApplicationBootstrap {
       `);
 
       // Drop old tables
-      await this.dataSource.query(`DROP TABLE "goal_schedules"`);
-      await this.dataSource.query(`DROP TABLE "goal_questions"`);
+      await this.dataSource.query('DROP TABLE "goal_schedules"');
+      await this.dataSource.query('DROP TABLE "goal_questions"');
 
-      await this.dataSource.query(`COMMIT`);
+      await this.dataSource.query('COMMIT');
       this.logger.log(
         'Migration complete: goal_questions → questions, goal_schedules → schedules',
       );
     } catch (error) {
-      await this.dataSource.query(`ROLLBACK`).catch(() => {});
+      await this.dataSource.query('ROLLBACK').catch(() => {});
       this.logger.error('Question migration failed', error);
       throw error;
     } finally {
-      await this.dataSource.query(`PRAGMA foreign_keys=on`);
+      await this.dataSource.query('PRAGMA foreign_keys=on');
     }
   }
 
   private async tableExists(name: string): Promise<boolean> {
     const result = await this.dataSource.query(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
+      'SELECT name FROM sqlite_master WHERE type=\'table\' AND name=?',
       [name],
     );
     return result.length > 0;

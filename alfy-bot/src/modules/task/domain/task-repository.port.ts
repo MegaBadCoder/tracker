@@ -1,5 +1,8 @@
 import { Task, PomodoroConfig } from '../../../shared/entities';
-import type { ChecklistItem, ChecklistData } from '../../../shared/types/checklist.types';
+import type {
+  ChecklistItem,
+  ChecklistData,
+} from '../../../shared/types/checklist.types';
 
 // Re-export for backward compatibility
 export type { ChecklistItem, ChecklistData };
@@ -19,10 +22,7 @@ export abstract class TaskRepositoryPort {
     taskId: string,
     increment: number,
   ): Promise<void>;
-  abstract updateChecklist(
-    task: Task,
-    data: ChecklistData,
-  ): Promise<Task>;
+  abstract updateChecklist(task: Task, data: ChecklistData): Promise<Task>;
   abstract updatePomodoroConfig(
     task: Task,
     data: Partial<PomodoroConfig> | null,

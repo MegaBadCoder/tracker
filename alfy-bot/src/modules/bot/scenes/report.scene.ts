@@ -154,7 +154,10 @@ export class ReportScene {
   private async offerNextGoal(ctx: SceneContext) {
     if (!ctx.from) return;
 
-    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(
+      ctx.from.id,
+      {},
+    );
     const allGoals = await this.goalService.findActiveByUser(user.id);
     const today = todayISO();
 
@@ -162,7 +165,11 @@ export class ReportScene {
     for (const goal of allGoals) {
       if (goal.id === ctx.session.goalId) continue;
       if (!this.scheduleService.hasAnyQuestionDueToday(goal)) continue;
-      const filled = await this.reportService.isDateFilled(goal.id, today, goal);
+      const filled = await this.reportService.isDateFilled(
+        goal.id,
+        today,
+        goal,
+      );
       if (!filled) {
         remainingGoals.push(goal);
       }
@@ -202,7 +209,10 @@ export class ReportScene {
 
     await ctx.reply('Создание отчета', Markup.removeKeyboard());
 
-    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(
+      ctx.from.id,
+      {},
+    );
     ctx.session.userId = user.id;
 
     if (ctx.session.preselectedGoalId) {
@@ -218,7 +228,11 @@ export class ReportScene {
     const availableGoals: Goal[] = [];
     for (const goal of allGoals) {
       if (!this.scheduleService.hasAnyQuestionDueToday(goal)) continue;
-      const filled = await this.reportService.isDateFilled(goal.id, today, goal);
+      const filled = await this.reportService.isDateFilled(
+        goal.id,
+        today,
+        goal,
+      );
       if (!filled) {
         availableGoals.push(goal);
       }
@@ -345,7 +359,10 @@ export class ReportScene {
     }
 
     if (!ctx.session.userId) {
-      const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
+      const user = await this.authService.findOrCreateTelegramUser(
+        ctx.from.id,
+        {},
+      );
       ctx.session.userId = user.id;
     }
 

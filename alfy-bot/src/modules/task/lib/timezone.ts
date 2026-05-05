@@ -25,7 +25,14 @@ export function shiftToUserWallClock(utcDate: Date, tz: string): Date {
   const hour = p('hour') === 24 ? 0 : p('hour');
 
   return new Date(
-    Date.UTC(p('year'), p('month') - 1, p('day'), hour, p('minute'), p('second')),
+    Date.UTC(
+      p('year'),
+      p('month') - 1,
+      p('day'),
+      hour,
+      p('minute'),
+      p('second'),
+    ),
   );
 }
 

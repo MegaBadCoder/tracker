@@ -20,4 +20,4 @@ import { ReportController } from './report.controller';
   ],
   exports: [ReportService, ReportAnswerRepositoryPort],
 })
-export class ReportModule { }
+export class ReportModule {}

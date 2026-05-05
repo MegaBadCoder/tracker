@@ -223,9 +223,7 @@ export function findNextOccurrenceOnOrAfter(
   );
 }
 
-function resetChecklist(
-  checklist: ChecklistData | null,
-): ChecklistData | null {
+function resetChecklist(checklist: ChecklistData | null): ChecklistData | null {
   if (!checklist || !checklist.items || checklist.items.length === 0) {
     return null;
   }

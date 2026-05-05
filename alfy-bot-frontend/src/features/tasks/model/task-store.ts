@@ -130,12 +130,16 @@ export const useTaskStore = defineStore('tasks', () => {
         tasks.value[index] = { ...existing, ...updatedTask, checklist: existing.checklist }
       }
 
-      // Handle recurring: add new instance to store (avoid duplicates)
+      // Handle recurring: add or refresh next instance in store.
+      // On complete -> brand-new instance; on uncomplete -> promoted existing instance with updated fields.
       if (response.nextInstance) {
         const nextInstance = parseTask(response.nextInstance as Record<string, unknown>)
-        const alreadyExists = tasks.value.some(t => t.id === nextInstance.id)
-        if (!alreadyExists) {
+        const existingIndex = tasks.value.findIndex(t => t.id === nextInstance.id)
+        if (existingIndex === -1) {
           tasks.value.unshift(nextInstance)
+        } else {
+          const existing = tasks.value[existingIndex]!
+          tasks.value[existingIndex] = { ...existing, ...nextInstance, checklist: existing.checklist }
         }
       }
 

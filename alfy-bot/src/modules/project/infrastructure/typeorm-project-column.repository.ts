@@ -20,10 +20,7 @@ export class TypeOrmProjectColumnRepository extends ProjectColumnRepositoryPort 
     });
   }
 
-  async findById(
-    id: string,
-    projectId: string,
-  ): Promise<ProjectColumn | null> {
+  async findById(id: string, projectId: string): Promise<ProjectColumn | null> {
     return this.repo.findOne({ where: { id, projectId } });
   }
 

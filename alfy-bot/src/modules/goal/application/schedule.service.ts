@@ -12,10 +12,7 @@ export class ScheduleService {
    * Finds the schedule that was effective on a given date.
    * Returns the schedule with the largest effective_from <= date.
    */
-  getScheduleForDate(
-    schedules: Schedule[],
-    date: Date,
-  ): Schedule | null {
+  getScheduleForDate(schedules: Schedule[], date: Date): Schedule | null {
     if (!schedules || schedules.length === 0) return null;
 
     const dateStr = toLocalISO(date);
@@ -76,26 +73,28 @@ export class ScheduleService {
    * Uses question.schedule (latest) to check if due on date.
    * Reference date is question.createdAt.
    */
-  isQuestionDueOnDate(
-    question: Question,
-    date: Date,
-  ): boolean {
+  isQuestionDueOnDate(question: Question, date: Date): boolean {
     const schedule = question.schedule;
     if (!schedule) return true;
-    return this.isScheduleDueOnDate(schedule, toLocalISO(question.createdAt), date);
+    return this.isScheduleDueOnDate(
+      schedule,
+      toLocalISO(question.createdAt),
+      date,
+    );
   }
 
   /**
    * History-aware check: resolves the correct schedule for the given date
    * from the question's schedule history, then checks if due.
    */
-  isQuestionDueOnDateHistorical(
-    question: Question,
-    date: Date,
-  ): boolean {
+  isQuestionDueOnDateHistorical(question: Question, date: Date): boolean {
     const schedule = this.getScheduleForDate(question.schedules, date);
     if (!schedule) return true;
-    return this.isScheduleDueOnDate(schedule, toLocalISO(question.createdAt), date);
+    return this.isScheduleDueOnDate(
+      schedule,
+      toLocalISO(question.createdAt),
+      date,
+    );
   }
 
   isQuestionDueToday(question: Question): boolean {
