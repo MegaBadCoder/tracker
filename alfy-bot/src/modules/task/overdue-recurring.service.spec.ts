@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OverdueRecurringService } from './overdue-recurring.service';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { UserSettingsPort } from './domain/user-settings.port';
-import { Task } from '../../shared/entities';
+import { PomodoroConfig, Task } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -48,7 +48,9 @@ describe('OverdueRecurringService', () => {
     repo = {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockImplementation((data) => Promise.resolve(makeTask(data))),
+      create: jest
+        .fn()
+        .mockImplementation((data) => Promise.resolve(makeTask(data))),
       save: jest.fn().mockImplementation((task) => Promise.resolve(task)),
       update: jest.fn().mockResolvedValue(null),
       delete: jest.fn().mockResolvedValue(true),
@@ -100,7 +102,11 @@ describe('OverdueRecurringService', () => {
       });
       repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
 
-      await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
 
       expect(repo.freezeAndCreateNext).toHaveBeenCalledTimes(1);
       const [oldId, successor] = repo.freezeAndCreateNext.mock.calls[0];
@@ -116,6 +122,76 @@ describe('OverdueRecurringService', () => {
       expect(successor.recurringParentId).toBe('t1');
 
       expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('переносит pomodoro-настройки на successor и сбрасывает pomodoroCompleted', async () => {
+      const sourceConfig = Object.assign(new PomodoroConfig(), {
+        id: 'p1',
+        taskId: 't1',
+        pomodoroCount: 6,
+        pomodoroDuration: 30,
+        shortBreak: 7,
+        longBreak: 20,
+        longBreakInterval: 3,
+        pomodoroCompleted: 4,
+      });
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        dueDate: new Date('2026-04-28T09:00:00.000Z'),
+        completed: false,
+        isOverdue: false,
+        recurrence: dailyRule,
+        onMissed: 'freeze',
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+        pomodoroConfig: sourceConfig,
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      expect(repo.freezeAndCreateNext).toHaveBeenCalledTimes(1);
+      const [, successor] = repo.freezeAndCreateNext.mock.calls[0];
+      expect(successor.pomodoroConfig).toBeInstanceOf(PomodoroConfig);
+      expect(successor.pomodoroConfig).not.toBe(sourceConfig);
+      expect(successor.pomodoroConfig.id).toBeUndefined();
+      expect(successor.pomodoroConfig.taskId).toBeUndefined();
+      expect(successor.pomodoroConfig.pomodoroCount).toBe(6);
+      expect(successor.pomodoroConfig.pomodoroDuration).toBe(30);
+      expect(successor.pomodoroConfig.shortBreak).toBe(7);
+      expect(successor.pomodoroConfig.longBreak).toBe(20);
+      expect(successor.pomodoroConfig.longBreakInterval).toBe(3);
+      expect(successor.pomodoroConfig.pomodoroCompleted).toBe(0);
+    });
+
+    it('кандидат без pomodoroConfig → successor без pomodoroConfig', async () => {
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        dueDate: new Date('2026-04-28T09:00:00.000Z'),
+        completed: false,
+        isOverdue: false,
+        recurrence: dailyRule,
+        onMissed: 'freeze',
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+        pomodoroConfig: null,
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      const [, successor] = repo.freezeAndCreateNext.mock.calls[0];
+      expect(successor.pomodoroConfig).toBeUndefined();
     });
   });
 
@@ -134,14 +210,20 @@ describe('OverdueRecurringService', () => {
       });
       repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
 
-      await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
 
       expect(repo.freezeAndCreateNext).not.toHaveBeenCalled();
       expect(repo.create).not.toHaveBeenCalled();
 
       expect(repo.save).toHaveBeenCalledTimes(1);
       const saved = repo.save.mock.calls[0][0];
-      expect(saved.dueDate.getTime()).toBe(new Date('2026-04-29T09:00:00.000Z').getTime());
+      expect(saved.dueDate.getTime()).toBe(
+        new Date('2026-04-29T09:00:00.000Z').getTime(),
+      );
     });
 
     it('серия закончилась → recurrence=null, dueDate без изменений', async () => {
@@ -159,7 +241,11 @@ describe('OverdueRecurringService', () => {
       });
       repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
 
-      await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
 
       expect(repo.freezeAndCreateNext).not.toHaveBeenCalled();
       expect(repo.save).toHaveBeenCalledTimes(1);
@@ -173,7 +259,11 @@ describe('OverdueRecurringService', () => {
     it('пустой список кандидатов → никаких downstream вызовов', async () => {
       repo.findOverdueRecurringCandidates.mockResolvedValue([]);
 
-      await service.processForUser(1, 'UTC', new Date('2026-04-29T00:00:00.000Z'));
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
 
       expect(repo.freezeAndCreateNext).not.toHaveBeenCalled();
       expect(repo.create).not.toHaveBeenCalled();
@@ -190,7 +280,9 @@ describe('OverdueRecurringService', () => {
         return Promise.resolve('UTC');
       });
 
-      await service.processAllUsersAtMidnight(new Date('2026-04-29T19:00:00.000Z'));
+      await service.processAllUsersAtMidnight(
+        new Date('2026-04-29T19:00:00.000Z'),
+      );
 
       expect(repo.findOverdueRecurringCandidates).toHaveBeenCalledTimes(1);
       const calledUserIds = repo.findOverdueRecurringCandidates.mock.calls.map(
@@ -207,7 +299,9 @@ describe('OverdueRecurringService', () => {
         return Promise.resolve('UTC');
       });
 
-      await service.processAllUsersAtMidnight(new Date('2026-04-29T18:00:00.000Z'));
+      await service.processAllUsersAtMidnight(
+        new Date('2026-04-29T18:00:00.000Z'),
+      );
 
       expect(repo.findOverdueRecurringCandidates).not.toHaveBeenCalled();
     });

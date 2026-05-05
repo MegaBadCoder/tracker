@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { PomodoroConfig, Task } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { UserSettingsPort } from './domain/user-settings.port';
 import {
@@ -7,6 +8,17 @@ import {
   findNextOccurrenceOnOrAfter,
 } from './domain/recurrence.utils';
 import { shiftBackToUtc, shiftToUserWallClock } from './lib/timezone';
+
+function clonePomodoroConfigFresh(src: PomodoroConfig): PomodoroConfig {
+  const c = new PomodoroConfig();
+  c.pomodoroCount = src.pomodoroCount;
+  c.pomodoroDuration = src.pomodoroDuration;
+  c.shortBreak = src.shortBreak;
+  c.longBreak = src.longBreak;
+  c.longBreakInterval = src.longBreakInterval;
+  c.pomodoroCompleted = 0;
+  return c;
+}
 
 @Injectable()
 export class OverdueRecurringService {
@@ -54,9 +66,15 @@ export class OverdueRecurringService {
       if (task.onMissed === 'freeze') {
         const nextZoned = computeNextDueDate(zonedDue, rule, completedCount);
         const nextDate = nextZoned ? shiftBackToUtc(nextZoned, tz) : null;
-        const successorData = nextDate
+        let successorData: Partial<Task> | null = nextDate
           ? buildNextInstance(task, nextDate, parentId)
           : null;
+        if (successorData && task.pomodoroConfig) {
+          successorData = {
+            ...successorData,
+            pomodoroConfig: clonePomodoroConfigFresh(task.pomodoroConfig),
+          };
+        }
         await this.taskRepo.freezeAndCreateNext(task.id, successorData);
       } else {
         // 'shift'
