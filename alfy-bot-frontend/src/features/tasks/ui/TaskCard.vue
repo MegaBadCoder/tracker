@@ -5,9 +5,7 @@
     :class="[
       'group flex items-center gap-3 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
       isCompact ? 'px-3 py-2 min-h-[36px]' : 'px-4 py-3 min-h-[44px] hover:pl-5',
-      task.isOverdue
-        ? 'border-l-4 border-red-500 bg-red-500/10 dark:bg-red-500/20'
-        : task.completed && 'opacity-50',
+      task.completed && 'opacity-50',
     ]"
     @click="$emit('open', task)"
   >
@@ -15,6 +13,7 @@
     <RoundCheckbox
       :model-value="task.completed"
       :disabled="task.isOverdue"
+      :overdue="task.isOverdue"
       class="shrink-0"
       @click.stop
       @update:model-value="$emit('toggle', task.id)"
@@ -26,11 +25,7 @@
         <span
           :class="[
             'text-sm truncate',
-            task.isOverdueфы
-              ? 'text-red-600 dark:text-red-400 font-medium'
-              : task.completed
-                ? 'line-through text-muted-foreground'
-                : 'text-foreground',
+            task.completed ? 'line-through text-muted-foreground' : 'text-foreground',
           ]"
         >
           {{ task.title }}
@@ -39,6 +34,14 @@
 
       <!-- Meta chips -->
       <div v-if="hasMeta" class="flex flex-wrap items-center gap-1.5 mt-1">
+        <Badge
+          v-if="task.isOverdue"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-red-500/10 text-red-600 dark:text-red-400"
+        >
+          <AlertCircle :size="11" />
+          Просрочена
+        </Badge>
         <Badge
           v-if="projectName"
           variant="outline"
@@ -139,8 +142,8 @@
 </template>
 
 <script setup lang="ts">
+import { AlertCircle, Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, MapPin, Repeat, Timer, Trash2 } from 'lucide-vue-next'
 import { computed } from 'vue'
-import { Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, MapPin, Repeat, Timer, Trash2 } from 'lucide-vue-next'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatPomodoro, DATE_SHORT, DATE_WITH_TIME } from '../lib/formatters'
@@ -158,8 +161,17 @@ const checklistStats = computed(() => computeChecklistProgress(props.task.checkl
 const checklistTotal = computed(() => checklistStats.value.total)
 const checklistDone = computed(() => checklistStats.value.completed)
 
-const hasMeta = computed(() =>
-  props.projectName || props.task.priority || props.task.dueDate || props.task.deadline || props.task.location || props.task.isPomodoroTask || props.task.recurrence || checklistTotal.value > 0
+const hasMeta = computed(
+  () =>
+    props.task.isOverdue
+    || props.projectName
+    || props.task.priority
+    || props.task.dueDate
+    || props.task.deadline
+    || props.task.location
+    || props.task.isPomodoroTask
+    || props.task.recurrence
+    || checklistTotal.value > 0,
 )
 
 </script>
