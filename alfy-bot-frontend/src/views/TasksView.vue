@@ -7,6 +7,7 @@ import PageContainer from '@/components/PageContainer.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTimerStore } from '@/features/task-timer'
+import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -36,6 +37,7 @@ const projectStore = useProjectStore()
 const { confirm } = useConfirm()
 
 const showCompleted = useShowCompleted('inbox')
+const hideOverdue = useHideOverdue('inbox')
 
 function getProjectName(task: Task) {
   if (!task.projectId)
@@ -57,6 +59,7 @@ const sortedTasks = computed(() => {
   return [...tasks.value]
     .filter(t => !t.projectId)
     .filter(t => showCompleted.value || !t.completed)
+    .filter(t => !hideOverdue.value || !t.isOverdue)
     .sort((a, b) => {
       if (a.completed === b.completed)
         return 0
@@ -127,7 +130,7 @@ onMounted(() => {
 <template>
   <AppHeader title="Задачи" :on-menu-click="openSidebar">
     <template #right>
-      <TaskListOptionsMenu v-model:show-completed="showCompleted" />
+      <TaskListOptionsMenu v-model:show-completed="showCompleted" v-model:hide-overdue="hideOverdue" />
     </template>
   </AppHeader>
   <PageContainer>
