@@ -1,10 +1,108 @@
+<script setup lang="ts">
+import type { ProjectTreeNode } from '../model/types'
+import {
+  Book,
+  Briefcase,
+  Camera,
+  Code,
+  Coffee,
+  FolderOpen,
+  Gamepad2,
+  Globe,
+  GraduationCap,
+  Heart,
+  Home,
+  Lightbulb,
+  MoreHorizontal,
+  Music,
+  Palette,
+  Pencil,
+  Plane,
+  Rocket,
+  Shield,
+  ShoppingCart,
+  Star,
+  Stethoscope,
+  Target,
+  Users,
+  Wrench,
+  Zap,
+} from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useDropTarget } from '@/features/tasks/lib/dnd/use-drop-target'
+
+const props = defineProps<{
+  node: ProjectTreeNode
+  depth: number
+}>()
+
+defineEmits<{
+  edit: [node: ProjectTreeNode]
+}>()
+
+const iconComponents: Record<string, any> = {
+  FolderOpen,
+  Star,
+  Briefcase,
+  Home,
+  Book,
+  Code,
+  Zap,
+  Heart,
+  Target,
+  Rocket,
+  Globe,
+  Music,
+  Camera,
+  Coffee,
+  Lightbulb,
+  Shield,
+  Users,
+  Palette,
+  Gamepad2,
+  GraduationCap,
+  Stethoscope,
+  Wrench,
+  ShoppingCart,
+  Plane,
+}
+
+const nodeIcon = computed(() => {
+  if (props.node.icon && iconComponents[props.node.icon]) {
+    return iconComponents[props.node.icon]
+  }
+  return FolderOpen
+})
+
+const linkRef = ref<InstanceType<typeof RouterLink> | null>(null)
+const linkEl = computed<HTMLElement | null>(() => (linkRef.value as any)?.$el ?? null)
+
+const { isHovered } = useDropTarget({
+  id: `project:${props.node.id}`,
+  kind: 'project',
+  el: linkEl,
+  projectId: props.node.id,
+})
+</script>
+
 <template>
   <div>
     <div class="group/row relative">
       <RouterLink
+        ref="linkRef"
         :to="`/tasks/project/${node.id}`"
+        data-drop-kind="project"
+        :data-project-id="node.id"
         class="flex items-center gap-2 px-3 py-1.5 pr-8 rounded-md text-sm transition-colors hover:bg-sidebar-accent/50 text-sidebar-foreground"
         :style="{ paddingLeft: `${12 + depth * 16}px` }"
+        :class="{ 'bg-accent ring-2 ring-primary': isHovered }"
       >
         <component
           :is="nodeIcon"
@@ -42,44 +140,3 @@
     />
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
-import {
-  FolderOpen, Star, Briefcase, Home, Book, Code, Zap, Heart,
-  Target, Rocket, Globe, Music, Camera, Coffee, Lightbulb, Shield,
-  Users, Palette, Gamepad2, GraduationCap, Stethoscope, Wrench,
-  ShoppingCart, Plane, MoreHorizontal, Pencil,
-} from 'lucide-vue-next'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from '@/components/ui/dropdown-menu'
-import type { ProjectTreeNode } from '../model/types'
-
-const props = defineProps<{
-  node: ProjectTreeNode
-  depth: number
-}>()
-
-defineEmits<{
-  edit: [node: ProjectTreeNode]
-}>()
-
-const iconComponents: Record<string, any> = {
-  FolderOpen, Star, Briefcase, Home, Book, Code, Zap, Heart,
-  Target, Rocket, Globe, Music, Camera, Coffee, Lightbulb, Shield,
-  Users, Palette, Gamepad2, GraduationCap, Stethoscope, Wrench,
-  ShoppingCart, Plane,
-}
-
-const nodeIcon = computed(() => {
-  if (props.node.icon && iconComponents[props.node.icon]) {
-    return iconComponents[props.node.icon]
-  }
-  return FolderOpen
-})
-</script>

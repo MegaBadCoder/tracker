@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +10,8 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
+import { ReorderInboxTasksDto } from './dto/reorder-inbox-tasks.dto';
+import { MoveTaskToInboxDto } from './dto/move-task-inbox.dto';
 import {
   buildNextInstance,
   findNextOccurrenceOnOrAfter,
@@ -288,5 +291,48 @@ export class TaskService {
 
     const deleted = await this.taskRepo.delete(id, userId);
     if (!deleted) throw new NotFoundException(`Task #${id} not found`);
+  }
+
+  async reorderInboxTasks(
+    userId: number,
+    dto: ReorderInboxTasksDto,
+  ): Promise<{ ok: true; orderedIds: string[] }> {
+    for (const id of dto.orderedIds) {
+      const task = await this.taskRepo.findById(id, userId);
+      if (!task) throw new NotFoundException(`Task #${id} not found`);
+      if (task.projectId !== null) {
+        throw new ForbiddenException(`Task #${id} is not an Inbox task`);
+      }
+    }
+
+    const updates = dto.orderedIds.map((id, index) => ({ id, order: index }));
+    await this.taskRepo.reorderTasks(updates);
+    return { ok: true, orderedIds: dto.orderedIds };
+  }
+
+  async moveToInbox(
+    userId: number,
+    taskId: string,
+    dto: MoveTaskToInboxDto,
+  ): Promise<Task> {
+    const task = await this.taskRepo.findById(taskId, userId);
+    if (!task) throw new NotFoundException(`Task #${taskId} not found`);
+
+    let order: number;
+    if (dto.order !== undefined) {
+      order = dto.order;
+    } else {
+      const inboxTasks = await this.taskRepo.findAllByProject(userId, null);
+      const maxOrder = inboxTasks.reduce(
+        (max, t) => (t.order > max ? t.order : max),
+        -1,
+      );
+      order = maxOrder + 1;
+    }
+
+    task.projectId = null;
+    task.columnId = null;
+    task.order = order;
+    return this.taskRepo.save(task);
   }
 }

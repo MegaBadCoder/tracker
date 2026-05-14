@@ -7,6 +7,8 @@ import PageContainer from '@/components/PageContainer.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTimerStore } from '@/features/task-timer'
+import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
+import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
 import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
@@ -39,6 +41,10 @@ const { confirm } = useConfirm()
 const showCompleted = useShowCompleted('inbox')
 const hideOverdue = useHideOverdue('inbox')
 
+const dnd = useTaskDnd()
+const draggedId = computed(() => dnd.state.active?.task.id ?? null)
+const draggedHeight = computed(() => dnd.state.active?.originRect.height ?? 0)
+
 function getProjectName(task: Task) {
   if (!task.projectId)
     return undefined
@@ -60,11 +66,26 @@ const sortedTasks = computed(() => {
     .filter(t => !t.projectId)
     .filter(t => showCompleted.value || !t.completed)
     .filter(t => !hideOverdue.value || !t.isOverdue)
+    .filter(t => t.id !== draggedId.value)
     .sort((a, b) => {
       const w = (t: Task) => (t.isOverdue ? 2 : 0) + (t.completed ? 1 : 0)
-      return w(a) - w(b)
+      const wd = w(a) - w(b)
+      if (wd !== 0)
+        return wd
+      return (a.order ?? 0) - (b.order ?? 0)
     })
 })
+
+const listEl = ref<HTMLElement | null>(null)
+
+function getItems() {
+  if (!listEl.value)
+    return []
+  return Array.from(listEl.value.querySelectorAll<HTMLElement>('[data-task-id]'))
+    .map(el => ({ id: el.dataset.taskId!, el }))
+}
+
+const { insertionIndex } = useReorderList({ scope: 'inbox', listEl, getItems })
 
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
   isCreatingTask.value = true
@@ -165,16 +186,26 @@ onMounted(() => {
         Пока нет задач. Добавьте первую задачу выше.
       </div>
 
-      <div v-else role="list" class="divide-y divide-border">
-        <TaskCard
-          v-for="task in sortedTasks"
-          :key="task.id"
-          :task="task"
-          :project-name="getProjectName(task)"
-          @toggle="handleToggleTask"
-          @show-timer="handleShowTimer"
-          @delete="handleDeleteTask"
-          @open="handleOpenTask"
+      <div v-else ref="listEl" role="list" class="divide-y divide-border">
+        <template v-for="(task, i) in sortedTasks" :key="task.id">
+          <div
+            v-if="insertionIndex === i"
+            class="border-2 border-dashed border-primary/40 rounded-md bg-primary/5"
+            :style="{ height: `${draggedHeight}px` }"
+          />
+          <TaskCard
+            :task="task"
+            :project-name="getProjectName(task)"
+            @toggle="handleToggleTask"
+            @show-timer="handleShowTimer"
+            @delete="handleDeleteTask"
+            @open="handleOpenTask"
+          />
+        </template>
+        <div
+          v-if="insertionIndex === sortedTasks.length"
+          class="border-2 border-dashed border-primary/40 rounded-md bg-primary/5"
+          :style="{ height: `${draggedHeight}px` }"
         />
       </div>
     </div>

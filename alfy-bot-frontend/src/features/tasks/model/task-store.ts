@@ -253,7 +253,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  const moveTask = async (taskId: string, projectId: string, payload: { columnId?: string | null; order?: number }) => {
+  const moveTask = async (taskId: string, projectId: string | null, payload: { columnId?: string | null; order?: number }) => {
     const task = tasks.value.find(t => t.id === taskId)
     if (!task) return
 
@@ -264,11 +264,41 @@ export const useTaskStore = defineStore('tasks', () => {
     if (payload.order !== undefined) task.order = payload.order
 
     try {
-      await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
+      if (projectId === null) {
+        const body: { order?: number } = {}
+        if (payload.order !== undefined) body.order = payload.order
+        await api.patch(`/tasks/${taskId}/move-to-inbox`, body)
+      } else {
+        await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
+      }
     } catch (err) {
       task.projectId = previous.projectId
       task.columnId = previous.columnId
       task.order = previous.order
+      throw err
+    }
+  }
+
+  const reorderInboxTasks = async (orderedIds: string[]) => {
+    const previousOrders = new Map(
+      orderedIds.map(id => {
+        const t = tasks.value.find(task => task.id === id)
+        return [id, t?.order] as [string, number | undefined]
+      }),
+    )
+
+    orderedIds.forEach((id, i) => {
+      const t = tasks.value.find(task => task.id === id)
+      if (t) t.order = i
+    })
+
+    try {
+      await api.patch('/tasks/reorder', { orderedIds })
+    } catch (err) {
+      orderedIds.forEach(id => {
+        const t = tasks.value.find(task => task.id === id)
+        if (t) t.order = previousOrders.get(id)
+      })
       throw err
     }
   }
@@ -316,6 +346,7 @@ export const useTaskStore = defineStore('tasks', () => {
     toggleTask,
     deleteTask,
     moveTask,
+    reorderInboxTasks,
     reorderTasks,
     incrementPomodoro,
     updateChecklist,

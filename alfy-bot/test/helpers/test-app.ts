@@ -13,6 +13,8 @@ import {
   Question,
   Schedule,
   ReportAnswer,
+  Project,
+  ProjectColumn,
 } from '../../src/shared/entities';
 
 export interface TestContext {
@@ -37,6 +39,8 @@ export async function createTestApp(): Promise<TestContext> {
       Question,
       Schedule,
       ReportAnswer,
+      Project,
+      ProjectColumn,
     ],
     synchronize: true,
   });
