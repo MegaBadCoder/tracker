@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Task, PomodoroConfig, TimerSession, User } from '../../shared/entities';
+import {
+  Task,
+  PomodoroConfig,
+  TimerSession,
+  User,
+} from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
 import { UserModule } from '../user/user.module';
 import { NotificationModule } from '../notification/notification.module';

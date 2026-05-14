@@ -4,10 +4,7 @@ import {
   ValidationOptions,
 } from 'class-validator';
 
-export function Match(
-  property: string,
-  validationOptions?: ValidationOptions,
-) {
+export function Match(property: string, validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'match',

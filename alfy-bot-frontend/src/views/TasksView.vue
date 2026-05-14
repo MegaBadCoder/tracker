@@ -9,6 +9,7 @@ import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTimerStore } from '@/features/task-timer'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
+import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -38,6 +39,7 @@ const projectStore = useProjectStore()
 const { confirm } = useConfirm()
 
 const showCompleted = useShowCompleted('inbox')
+const hideOverdue = useHideOverdue('inbox')
 
 const dnd = useTaskDnd()
 const draggedId = computed(() => dnd.state.active?.task.id ?? null)
@@ -63,11 +65,14 @@ const sortedTasks = computed(() => {
   return [...tasks.value]
     .filter(t => !t.projectId)
     .filter(t => showCompleted.value || !t.completed)
+    .filter(t => !hideOverdue.value || !t.isOverdue)
     .filter(t => t.id !== draggedId.value)
     .sort((a, b) => {
-      if (a.completed === b.completed)
-        return (a.order ?? 0) - (b.order ?? 0)
-      return a.completed ? 1 : -1
+      const w = (t: Task) => (t.isOverdue ? 2 : 0) + (t.completed ? 1 : 0)
+      const wd = w(a) - w(b)
+      if (wd !== 0)
+        return wd
+      return (a.order ?? 0) - (b.order ?? 0)
     })
 })
 
@@ -145,7 +150,7 @@ onMounted(() => {
 <template>
   <AppHeader title="Задачи" :on-menu-click="openSidebar">
     <template #right>
-      <TaskListOptionsMenu v-model:show-completed="showCompleted" />
+      <TaskListOptionsMenu v-model:show-completed="showCompleted" v-model:hide-overdue="hideOverdue" />
     </template>
   </AppHeader>
   <PageContainer>

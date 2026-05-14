@@ -43,30 +43,22 @@ export class AuthController {
   }
 
   @Post('verify-email')
-  verifyEmail(
-    @Body() dto: VerifyEmailDto,
-  ): Promise<{ accessToken: string }> {
+  verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ accessToken: string }> {
     return this.authService.verifyEmail(dto);
   }
 
   @Post('resend-code')
-  resendCode(
-    @Body() dto: ResendCodeDto,
-  ): Promise<{ message: string }> {
+  resendCode(@Body() dto: ResendCodeDto): Promise<{ message: string }> {
     return this.authService.resendCode(dto);
   }
 
   @Post('login')
-  loginEmail(
-    @Body() dto: LoginEmailDto,
-  ): Promise<{ accessToken: string }> {
+  loginEmail(@Body() dto: LoginEmailDto): Promise<{ accessToken: string }> {
     return this.authService.loginWithEmail(dto);
   }
 
   @Post('forgot-password')
-  forgotPassword(
-    @Body() dto: ForgotPasswordDto,
-  ): Promise<{ message: string }> {
+  forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
     return this.authService.forgotPassword(dto);
   }
 

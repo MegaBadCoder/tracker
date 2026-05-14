@@ -34,6 +34,8 @@ export class EmailService extends EmailNotificationPort {
       html: `<p>Ваш код подтверждения: <strong>${code}</strong></p><p>Код действителен 10 минут.</p>`,
     });
 
-    this.logger.log(`Verification email sent to ${to}, messageId: ${info.messageId}`);
+    this.logger.log(
+      `Verification email sent to ${to}, messageId: ${info.messageId}`,
+    );
   }
 }

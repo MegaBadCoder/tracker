@@ -31,11 +31,7 @@ export class ProjectTaskController {
     @Param('projectId') projectId: string,
     @Body() dto: ReorderTasksDto,
   ) {
-    return this.projectTaskService.reorderTasks(
-      req.user.sub,
-      projectId,
-      dto,
-    );
+    return this.projectTaskService.reorderTasks(req.user.sub, projectId, dto);
   }
 
   @Patch(':taskId/move')

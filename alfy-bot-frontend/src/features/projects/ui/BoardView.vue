@@ -12,8 +12,10 @@ import BoardColumn from './BoardColumn.vue'
 const props = withDefaults(defineProps<{
   projectId: string
   showCompleted?: boolean
+  hideOverdue?: boolean
 }>(), {
   showCompleted: true,
+  hideOverdue: true,
 })
 
 defineEmits<{
@@ -27,7 +29,11 @@ const { tasks } = storeToRefs(taskStore)
 const { onTaskChange, onColumnReorder } = useBoardDnd(taskStore, columnStore)
 
 const projectTasks = computed(() =>
-  tasks.value.filter(t => t.projectId === props.projectId && (props.showCompleted || !t.completed)),
+  tasks.value.filter(t =>
+    t.projectId === props.projectId
+    && (props.showCompleted || !t.completed)
+    && (!props.hideOverdue || !t.isOverdue),
+  ),
 )
 
 const sortedColumns = computed(() =>

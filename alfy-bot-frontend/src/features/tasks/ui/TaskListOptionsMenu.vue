@@ -9,8 +9,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
 
-defineProps<{ showCompleted: boolean }>()
-defineEmits<{ 'update:showCompleted': [value: boolean] }>()
+defineProps<{ showCompleted: boolean, hideOverdue: boolean }>()
+defineEmits<{
+  'update:showCompleted': [value: boolean]
+  'update:hideOverdue': [value: boolean]
+}>()
 </script>
 
 <template>
@@ -29,6 +32,17 @@ defineEmits<{ 'update:showCompleted': [value: boolean] }>()
         <Switch
           :model-value="showCompleted"
           @update:model-value="$emit('update:showCompleted', $event)"
+          @click.stop
+        />
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        class="flex items-center justify-between cursor-pointer"
+        @select.prevent="$emit('update:hideOverdue', !hideOverdue)"
+      >
+        <span>Скрывать просроченные</span>
+        <Switch
+          :model-value="hideOverdue"
+          @update:model-value="$emit('update:hideOverdue', $event)"
           @click.stop
         />
       </DropdownMenuItem>

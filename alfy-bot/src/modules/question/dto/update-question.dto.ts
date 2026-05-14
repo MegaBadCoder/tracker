@@ -28,7 +28,8 @@ export class UpdateQuestionDto {
 
   @ApiPropertyOptional({
     example: '100',
-    description: 'Эталонное значение (цель). Для number — числовой ориентир на графике.',
+    description:
+      'Эталонное значение (цель). Для number — числовой ориентир на графике.',
     nullable: true,
   })
   @IsString()

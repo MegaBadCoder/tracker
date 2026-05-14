@@ -73,22 +73,22 @@ const sortedColumns = computed(() =>
   [...props.columns].sort((a, b) => a.order - b.order),
 )
 
+function taskWeight(t: Task): number {
+  return (t.isOverdue ? 2 : 0) + (t.completed ? 1 : 0)
+}
+
+function compareTasks(a: Task, b: Task): number {
+  const wd = taskWeight(a) - taskWeight(b)
+  if (wd !== 0) return wd
+  return (a.order ?? 0) - (b.order ?? 0)
+}
+
 const uncategorizedTasks = computed(() =>
-  props.tasks
-    .filter(t => !t.columnId)
-    .sort((a, b) => {
-      if (a.completed === b.completed) return (a.order ?? 0) - (b.order ?? 0)
-      return a.completed ? 1 : -1
-    }),
+  props.tasks.filter(t => !t.columnId).sort(compareTasks),
 )
 
 function getColumnTasks(columnId: string): Task[] {
-  return props.tasks
-    .filter(t => t.columnId === columnId)
-    .sort((a, b) => {
-      if (a.completed === b.completed) return (a.order ?? 0) - (b.order ?? 0)
-      return a.completed ? 1 : -1
-    })
+  return props.tasks.filter(t => t.columnId === columnId).sort(compareTasks)
 }
 
 function columnTaskCount(columnId: string): number {

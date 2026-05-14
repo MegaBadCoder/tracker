@@ -206,7 +206,10 @@ describe('CreateGoalScene - Simple Goal', () => {
       await scene.handlePointANo(mockCtx);
 
       expect(mockCtx.session.pointA).toBe(false);
-      expect(authService.findOrCreateTelegramUser).toHaveBeenCalledWith(456, {});
+      expect(authService.findOrCreateTelegramUser).toHaveBeenCalledWith(
+        456,
+        {},
+      );
       expect(goalService.create).toHaveBeenCalledWith(1, {
         goal_name: 'Моя цель',
         goal_start: expect.any(String),
@@ -378,9 +381,7 @@ describe('CreateGoalScene - Simple Goal', () => {
       await scene.handleText(mockCtx);
 
       expect(mockCtx.session.awaitingQuestionText).toBe(false);
-      expect(mockCtx.session._pendingQuestionText).toBe(
-        'Сколько км пробежал?',
-      );
+      expect(mockCtx.session._pendingQuestionText).toBe('Сколько км пробежал?');
       expect(mockCtx.telegram.editMessageText).toHaveBeenCalledWith(
         mockCtx.chat.id,
         123,

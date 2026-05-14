@@ -11,8 +11,12 @@
       <div
         :class="[
           'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200',
-          modelValue ? 'bg-blue-500 border-blue-500' : 'border-gray-300',
-          disabled && 'opacity-50'
+          modelValue
+            ? 'bg-blue-500 border-blue-500'
+            : overdue
+              ? 'border-red-500'
+              : 'border-gray-300',
+          disabled && !overdue && 'opacity-50'
         ]"
       >
         <Check
@@ -39,6 +43,7 @@ defineOptions({
 interface Props {
   modelValue?: boolean
   disabled?: boolean
+  overdue?: boolean
 }
 
 interface Emits {
@@ -47,7 +52,8 @@ interface Emits {
 
 withDefaults(defineProps<Props>(), {
   modelValue: false,
-  disabled: false
+  disabled: false,
+  overdue: false,
 })
 
 const emit = defineEmits<Emits>()

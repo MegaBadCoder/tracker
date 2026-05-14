@@ -26,8 +26,12 @@ export class ProjectService {
   async create(userId: number, dto: CreateProjectDto): Promise<Project> {
     if (dto.parentId) {
       const parent = await this.projectRepo.findById(dto.parentId, userId);
-      if (!parent) throw new NotFoundException(`Parent project #${dto.parentId} not found`);
-      if (parent.userId !== userId) throw new ForbiddenException('Parent project belongs to another user');
+      if (!parent)
+        throw new NotFoundException(
+          `Parent project #${dto.parentId} not found`,
+        );
+      if (parent.userId !== userId)
+        throw new ForbiddenException('Parent project belongs to another user');
     }
 
     return this.projectRepo.create({
@@ -41,7 +45,11 @@ export class ProjectService {
     });
   }
 
-  async update(userId: number, id: string, dto: UpdateProjectDto): Promise<Project> {
+  async update(
+    userId: number,
+    id: string,
+    dto: UpdateProjectDto,
+  ): Promise<Project> {
     const project = await this.projectRepo.findById(id, userId);
     if (!project) throw new NotFoundException(`Project #${id} not found`);
 
@@ -50,8 +58,12 @@ export class ProjectService {
         throw new BadRequestException('Project cannot be its own parent');
       }
       const parent = await this.projectRepo.findById(dto.parentId, userId);
-      if (!parent) throw new NotFoundException(`Parent project #${dto.parentId} not found`);
-      if (parent.userId !== userId) throw new ForbiddenException('Parent project belongs to another user');
+      if (!parent)
+        throw new NotFoundException(
+          `Parent project #${dto.parentId} not found`,
+        );
+      if (parent.userId !== userId)
+        throw new ForbiddenException('Parent project belongs to another user');
     }
 
     Object.assign(project, dto);

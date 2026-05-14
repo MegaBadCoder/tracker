@@ -31,7 +31,7 @@ export class ListGoalsScene {
     private goalService: GoalService,
     private authService: AuthService,
     private reportService: ReportService,
-  ) { }
+  ) {}
 
   @SceneEnter()
   async onEnter(@Ctx() ctx: SceneContext) {
@@ -94,9 +94,7 @@ export class ListGoalsScene {
   }
 
   @Action(/confirm_delete_(\d+)/)
-  async confirmDelete(
-    @Ctx() ctx: SceneContext & { match: RegExpMatchArray },
-  ) {
+  async confirmDelete(@Ctx() ctx: SceneContext & { match: RegExpMatchArray }) {
     await ctx.answerCbQuery();
     const goalId = parseInt(ctx.match[1]);
 
@@ -107,9 +105,7 @@ export class ListGoalsScene {
   }
 
   @Action(/cancel_delete_(\d+)/)
-  async cancelDelete(
-    @Ctx() ctx: SceneContext & { match: RegExpMatchArray },
-  ) {
+  async cancelDelete(@Ctx() ctx: SceneContext & { match: RegExpMatchArray }) {
     await ctx.answerCbQuery();
     const goalId = parseInt(ctx.match[1]);
     await this.showGoalDetails(ctx, goalId);
@@ -202,7 +198,10 @@ export class ListGoalsScene {
   private async getFilteredGoals(@Ctx() ctx: SceneContext): Promise<Goal[]> {
     if (!ctx.from) return [];
 
-    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(
+      ctx.from.id,
+      {},
+    );
 
     if (ctx.session.currentFilter === 'all') {
       return await this.goalService.findAllByUser(user.id);
@@ -306,7 +305,10 @@ export class ListGoalsScene {
 
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const filledToday = await this.reportService.isDateFilled(goal.id, todayStr);
+    const filledToday = await this.reportService.isDateFilled(
+      goal.id,
+      todayStr,
+    );
 
     const statusLabel = this.getStatusLabel(goal.status);
 

@@ -6,4 +6,4 @@ import { DateParserService } from './services/date-parser.service';
   providers: [DateParserService],
   exports: [DateParserService],
 })
-export class SharedModule { }
+export class SharedModule {}

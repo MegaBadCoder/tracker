@@ -2,13 +2,18 @@
   <div class="flex flex-col h-[100dvh]">
     <AppHeader title="Календарь" :on-menu-click="openSidebar" fluid />
     <main class="flex-1 min-h-0">
-      <WeeklyCalendar class="h-full" @open-task="handleOpenTask" />
+      <WeeklyCalendar
+        class="h-full"
+        @open-task="handleOpenTask"
+        @create-task="handleCreateTaskInSlot"
+      />
     </main>
   </div>
   <TaskDetailDialog
     :task="selectedTask"
     :open="isDetailOpen"
-    @update:open="isDetailOpen = $event"
+    :autofocus-title="autofocusTitle"
+    @update:open="handleDetailOpenChange"
     @delete="handleDeleteFromDialog"
     @update="handleUpdateTask"
     @update:checklist="handleUpdateChecklist"
@@ -33,7 +38,10 @@ const { confirm } = useConfirm()
 const {
   selectedTask,
   isDetailOpen,
+  autofocusTitle,
   handleOpenTask,
+  handleCreateTaskInSlot,
+  handleDetailOpenChange,
   handleUpdateTask,
   handleUpdateChecklist,
   handleUpdatePomodoroConfig,

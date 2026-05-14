@@ -45,7 +45,10 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 
 describe('computeNextDueDate', () => {
   it('daily interval=1 -> +1 day', () => {
-    const result = computeNextDueDate(d('2026-04-05T10:00:00.000Z'), makeRule());
+    const result = computeNextDueDate(
+      d('2026-04-05T10:00:00.000Z'),
+      makeRule(),
+    );
     expect(result).toEqual(d('2026-04-06T10:00:00.000Z'));
   });
 

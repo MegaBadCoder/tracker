@@ -27,7 +27,10 @@ import { ProjectTaskController } from './project-task.controller';
   ],
   providers: [
     { provide: ProjectRepositoryPort, useClass: TypeOrmProjectRepository },
-    { provide: ProjectColumnRepositoryPort, useClass: TypeOrmProjectColumnRepository },
+    {
+      provide: ProjectColumnRepositoryPort,
+      useClass: TypeOrmProjectColumnRepository,
+    },
     ProjectService,
     ProjectColumnService,
     ProjectTaskService,

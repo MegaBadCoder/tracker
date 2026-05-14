@@ -11,10 +11,7 @@ import { TypeOrmGoalRepository } from './infrastructure/typeorm-goal.repository'
 import { TypeOrmScheduleRepository } from './infrastructure/typeorm-schedule.repository';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Goal, Question, Schedule]),
-    AuthModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Goal, Question, Schedule]), AuthModule],
   controllers: [GoalController],
   providers: [
     { provide: GoalRepositoryPort, useClass: TypeOrmGoalRepository },
@@ -24,4 +21,4 @@ import { TypeOrmScheduleRepository } from './infrastructure/typeorm-schedule.rep
   ],
   exports: [GoalService, ScheduleService],
 })
-export class GoalModule { }
+export class GoalModule {}

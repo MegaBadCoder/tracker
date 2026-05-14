@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsBoolean, IsOptional, IsIn, IsArray, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsIn,
+  IsArray,
+  IsNumber,
+} from 'class-validator';
 
 export class CreateQuestionDto {
   @ApiProperty({ example: 'Сколько воды выпил?' })
@@ -21,7 +28,8 @@ export class CreateQuestionDto {
 
   @ApiPropertyOptional({
     example: '100',
-    description: 'Эталонное значение (цель). Для number — числовой ориентир на графике.',
+    description:
+      'Эталонное значение (цель). Для number — числовой ориентир на графике.',
     nullable: true,
   })
   @IsString()

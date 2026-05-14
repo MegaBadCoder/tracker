@@ -32,7 +32,10 @@ export class EditGoalScene {
 
     await ctx.reply('Редактирование цели', Markup.removeKeyboard());
 
-    const user = await this.authService.findOrCreateTelegramUser(ctx.from.id, {});
+    const user = await this.authService.findOrCreateTelegramUser(
+      ctx.from.id,
+      {},
+    );
     const goals = await this.goalService.findActiveByUser(user.id);
 
     if (goals.length === 0) {

@@ -129,3 +129,16 @@ npx vue-tsc --noEmit -p tsconfig.app.json       # тип-чек без билд�
 - Локальное время браузера = таймзона пользователя.
 - Утилиты дат (`recurrence.ts`, `dateTime.ts`) используют локальные методы (`getDay`, `setDate`), не UTC.
 - Календарь и виртуальные проекции считаются в локальном времени — никаких явных конверсий.
+
+Add as a new top-level ## Workflow Discipline section near the top of CLAUDE.md\n\n## Workflow Discipline
+- When user invokes a new task (e.g. /up:make), START that task immediately. Do NOT divert to finalize or close prior tasks unless explicitly asked.
+- Always verify the correct git worktree/branch BEFORE editing files. Run `git branch --show-current` and `pwd` first when working on branch-specific features.
+- When user interrupts, STOP and ask what they want instead of continuing the previous plan.
+Add as new ## Domain Data Conventions section\n\n## Domain Data Conventions
+- Pull status/label strings from API objects (e.g. `status_obj.name`), never hardcode Russian/English status strings like 'Выполнен' or 'Не выполнен'.
+- Distinguish template types carefully: orderTemplates vs geometry templates have different shapes — confirm before adding fields like `geometry` or attaching map/click handlers.
+- When changing identifier values (e.g. product_code 'ARCHIVE_ORDER' → 'archive'), grep for all existing filter/consumer usages first.
+Add as new ## Bug Diagnosis section\n\n## Bug Diagnosis
+- Before proposing a CSS/styling fix, reproduce the actual symptom and confirm root cause. State your hypothesis explicitly and ask user to confirm before editing.
+- For recurring/scheduled-task logic, ensure next-instance dates are 'on-or-after today', not 'next-by-rule from last completion'.
+- Always respond in the language the user is writing in (Russian if they write Russian).

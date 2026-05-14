@@ -29,7 +29,7 @@ interface AuthRequest extends Request {
 @UseGuards(JwtAuthGuard)
 @Controller('questions')
 export class ReportController {
-  constructor(private readonly reportService: ReportService) { }
+  constructor(private readonly reportService: ReportService) {}
 
   @Get(':questionId/analytics')
   @ApiOperation({

@@ -19,21 +19,32 @@ export class ProjectColumnService {
 
   private async validateProjectAccess(userId: number, projectId: string) {
     const project = await this.projectRepo.findById(projectId, userId);
-    if (!project) throw new NotFoundException(`Project #${projectId} not found`);
-    if (project.userId !== userId) throw new ForbiddenException('Project belongs to another user');
+    if (!project)
+      throw new NotFoundException(`Project #${projectId} not found`);
+    if (project.userId !== userId)
+      throw new ForbiddenException('Project belongs to another user');
     return project;
   }
 
-  async getAllByProject(userId: number, projectId: string): Promise<ProjectColumn[]> {
+  async getAllByProject(
+    userId: number,
+    projectId: string,
+  ): Promise<ProjectColumn[]> {
     await this.validateProjectAccess(userId, projectId);
     return this.columnRepo.findAllByProject(projectId);
   }
 
-  async create(userId: number, projectId: string, dto: CreateColumnDto): Promise<ProjectColumn> {
+  async create(
+    userId: number,
+    projectId: string,
+    dto: CreateColumnDto,
+  ): Promise<ProjectColumn> {
     const project = await this.validateProjectAccess(userId, projectId);
 
     if (project.viewMode === 'list') {
-      throw new BadRequestException('Cannot add columns to a list-mode project');
+      throw new BadRequestException(
+        'Cannot add columns to a list-mode project',
+      );
     }
 
     const existing = await this.columnRepo.findAllByProject(projectId);
@@ -69,7 +80,11 @@ export class ProjectColumnService {
     if (!deleted) throw new NotFoundException(`Column #${id} not found`);
   }
 
-  async reorder(userId: number, projectId: string, orderedIds: string[]): Promise<void> {
+  async reorder(
+    userId: number,
+    projectId: string,
+    orderedIds: string[],
+  ): Promise<void> {
     await this.validateProjectAccess(userId, projectId);
 
     if (orderedIds.length === 0) {

@@ -212,36 +212,42 @@ export class TaskService {
     userId: number,
     task: Task,
   ): Promise<UpdateTaskResponse> {
+    const isRoot = task.recurringParentId === null;
     const parentId = task.recurringParentId ?? task.id;
 
     const uncompleted = await this.taskRepo.findByParentId(parentId, true);
     const nextInstance = uncompleted.find((t) => t.id !== task.id);
 
-    let deletedInstanceId: string | undefined;
+    // Snapshot count before disconnect — used to seed promoted root.
+    const originalCount = task.recurringCompletedCount ?? 0;
 
-    if (nextInstance?.isAutoCreated) {
-      await this.taskRepo.delete(nextInstance.id, userId);
-      deletedInstanceId = nextInstance.id;
+    // Disconnect X from the series unconditionally.
+    task.recurrence = null;
+    task.recurringParentId = null;
+    task.recurringCompletedCount = 0;
+    task.isAutoCreated = false;
+    task.completed = false;
 
-      // Decrement completed count on root
-      const rootTask = task.recurringParentId
-        ? await this.taskRepo.findById(parentId, userId)
-        : task;
+    let promotedInstance: Task | undefined;
 
+    if (isRoot && nextInstance) {
+      nextInstance.recurringParentId = null;
+      nextInstance.recurringCompletedCount = Math.max(0, originalCount - 1);
+      nextInstance.isAutoCreated = false;
+      promotedInstance = await this.taskRepo.save(nextInstance);
+    } else if (!isRoot) {
+      const rootTask = await this.taskRepo.findById(parentId, userId);
       if (rootTask) {
         rootTask.recurringCompletedCount = Math.max(
           0,
-          rootTask.recurringCompletedCount - 1,
+          (rootTask.recurringCompletedCount ?? 0) - 1,
         );
-        if (rootTask.id !== task.id) {
-          await this.taskRepo.save(rootTask);
-        }
+        await this.taskRepo.save(rootTask);
       }
     }
 
-    task.completed = false;
     const saved = await this.taskRepo.save(task);
-    return { task: saved, deletedInstanceId };
+    return { task: saved, nextInstance: promotedInstance };
   }
 
   async updatePomodoroConfig(

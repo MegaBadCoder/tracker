@@ -28,7 +28,7 @@ export class GoalService {
   constructor(
     private goalRepo: GoalRepositoryPort,
     private scheduleRepo: ScheduleRepositoryPort,
-  ) { }
+  ) {}
 
   async create(
     userId: number,
@@ -124,9 +124,7 @@ export class GoalService {
   ): Promise<Schedule> {
     const question = await this.goalRepo.findQuestionById(questionId);
     if (!question) {
-      throw new NotFoundException(
-        `Question #${questionId} not found`,
-      );
+      throw new NotFoundException(`Question #${questionId} not found`);
     }
     return this.scheduleRepo.createNewVersion(questionId, {
       ...data,

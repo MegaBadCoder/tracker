@@ -599,8 +599,10 @@ const props = withDefaults(defineProps<{
   task: Task | null
   open: boolean
   editable?: boolean
+  autofocusTitle?: boolean
 }>(), {
   editable: true,
+  autofocusTitle: false,
 })
 
 const effectiveEditable = computed(() => props.editable && !props.task?.isOverdue)
@@ -733,9 +735,15 @@ const localShortBreak = ref(POMODORO_DEFAULTS.shortBreak)
 const localLongBreak = ref(POMODORO_DEFAULTS.longBreak)
 const localLongBreakInterval = ref(POMODORO_DEFAULTS.longBreakInterval)
 
+// Suppresses auto-emit watchers while we're rehydrating local state from props.task.
+// Without this, syncing localDueDate/localDeadline below would trigger their watchers
+// and emit a redundant PATCH on every dialog open.
+const isInitializing = ref(false)
+
 // Sync local state when task changes
 watch(() => props.task, (task) => {
   if (task) {
+    isInitializing.value = true
     localTitle.value = task.title
     localDescription.value = task.description || ''
     localChecklist.value = task.checklist?.items
@@ -756,12 +764,22 @@ watch(() => props.task, (task) => {
     localLongBreak.value = task.longBreak ?? POMODORO_DEFAULTS.longBreak
     localLongBreakInterval.value = task.longBreakInterval ?? POMODORO_DEFAULTS.longBreakInterval
     descriptionExpanded.value = false
-    nextTick(checkDescriptionOverflow)
+    nextTick(() => {
+      checkDescriptionOverflow()
+      isInitializing.value = false
+    })
   }
 }, { immediate: true })
 
 watch(localDescription, () => nextTick(checkDescriptionOverflow))
-watch(() => props.open, (open) => { if (open) nextTick(checkDescriptionOverflow) })
+watch(() => props.open, (open) => {
+  if (open) {
+    nextTick(checkDescriptionOverflow)
+    if (props.autofocusTitle) {
+      nextTick(() => titleRef.value?.el?.focus())
+    }
+  }
+})
 
 const dueDateCalendarValue = computed(() => toCalendarDateValue(localDueDate.value))
 
@@ -782,10 +800,12 @@ function onDueTimeChange() {
 
 // Watch sidebar fields for auto-emit
 watch(localDueDate, (val) => {
+  if (isInitializing.value) return
   emitUpdate({ dueDate: val })
 })
 
 watch(localDeadline, (val) => {
+  if (isInitializing.value) return
   emitUpdate({ deadline: val })
 })
 

@@ -41,9 +41,7 @@ describe('ProjectService', () => {
       create: jest
         .fn()
         .mockImplementation((data) => Promise.resolve(makeProject(data))),
-      save: jest
-        .fn()
-        .mockImplementation((project) => Promise.resolve(project)),
+      save: jest.fn().mockImplementation((project) => Promise.resolve(project)),
       delete: jest.fn().mockResolvedValue(true),
       reorder: jest.fn().mockResolvedValue(undefined),
     };
@@ -287,9 +285,9 @@ describe('ProjectService', () => {
     });
 
     it('бросает NotFoundException если проект не найден', async () => {
-      await expect(
-        service.update(1, 'nope', { title: 'X' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update(1, 'nope', { title: 'X' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('бросает BadRequestException при parentId = собственный id', async () => {
@@ -356,9 +354,7 @@ describe('ProjectService', () => {
     });
 
     it('бросает BadRequestException если массив пустой', async () => {
-      await expect(service.reorder(1, [])).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.reorder(1, [])).rejects.toThrow(BadRequestException);
     });
   });
 });

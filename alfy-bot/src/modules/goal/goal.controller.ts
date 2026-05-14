@@ -32,7 +32,7 @@ interface AuthRequest extends Request {
 @UseGuards(JwtAuthGuard)
 @Controller('goals')
 export class GoalController {
-  constructor(private readonly goalService: GoalService) { }
+  constructor(private readonly goalService: GoalService) {}
 
   @Get()
   @ApiOperation({ summary: 'Список целей пользователя' })

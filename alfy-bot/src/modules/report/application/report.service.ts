@@ -23,7 +23,7 @@ export class ReportService {
     private answerRepo: ReportAnswerRepositoryPort,
     private goalService: GoalService,
     private scheduleService: ScheduleService,
-  ) { }
+  ) {}
 
   async addAnswer(
     userId: number,
@@ -70,8 +70,12 @@ export class ReportService {
    * Проверяет, заполнены ли все обязательные due-вопросы на дату.
    * Принимает опциональный goal, чтобы не делать лишний запрос.
    */
-  async isDateFilled(goalId: number, date: string, preloadedGoal?: Goal): Promise<boolean> {
-    const goal = preloadedGoal ?? await this.goalService.findById(goalId);
+  async isDateFilled(
+    goalId: number,
+    date: string,
+    preloadedGoal?: Goal,
+  ): Promise<boolean> {
+    const goal = preloadedGoal ?? (await this.goalService.findById(goalId));
     if (!goal) return false;
 
     const targetDate = new Date(date);
@@ -240,10 +244,10 @@ export class ReportService {
 
       const isDue = schedule
         ? this.scheduleService.isScheduleDueOnDate(
-          schedule,
-          toLocalISO(question.createdAt),
-          cursor,
-        )
+            schedule,
+            toLocalISO(question.createdAt),
+            cursor,
+          )
         : true;
 
       if (isDue) {

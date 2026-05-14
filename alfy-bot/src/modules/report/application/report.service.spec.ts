@@ -133,9 +133,7 @@ describe('ReportService', () => {
       goalService.findById.mockResolvedValue({
         id: 10,
         goal_start: '2026-02-17',
-        questions: [
-          { id: 1, is_active: true, can_skip: true },
-        ],
+        questions: [{ id: 1, is_active: true, can_skip: true }],
       });
 
       const result = await service.isDateFilled(10, '2026-02-20');
@@ -153,9 +151,7 @@ describe('ReportService', () => {
         goal_start: '2026-02-17',
         questions: [q1, q2],
       });
-      answerRepo.findByQuestionsAndDate.mockResolvedValue([
-        { question_id: 1 },
-      ]);
+      answerRepo.findByQuestionsAndDate.mockResolvedValue([{ question_id: 1 }]);
 
       const result = await service.getUnansweredQuestions(10, '2026-02-20');
       expect(result).toEqual([q2]);
@@ -167,9 +163,7 @@ describe('ReportService', () => {
         goal_start: '2026-02-17',
         questions: [{ id: 1, is_active: true, order_index: 0 }],
       });
-      answerRepo.findByQuestionsAndDate.mockResolvedValue([
-        { question_id: 1 },
-      ]);
+      answerRepo.findByQuestionsAndDate.mockResolvedValue([{ question_id: 1 }]);
 
       const result = await service.getUnansweredQuestions(10, '2026-02-20');
       expect(result).toEqual([]);

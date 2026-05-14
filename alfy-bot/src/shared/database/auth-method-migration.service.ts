@@ -18,7 +18,7 @@ export class AuthMethodMigrationService implements OnApplicationBootstrap {
 
     const users: Array<{ id: number; telegramId: number }> =
       await this.dataSource.query(
-        `SELECT id, telegramId FROM user WHERE telegramId IS NOT NULL`,
+        'SELECT id, telegramId FROM user WHERE telegramId IS NOT NULL',
       );
 
     if (users.length === 0) {
@@ -29,14 +29,14 @@ export class AuthMethodMigrationService implements OnApplicationBootstrap {
     let migrated = 0;
     for (const user of users) {
       const existing = await this.dataSource.query(
-        `SELECT id FROM auth_method WHERE provider = 'telegram' AND providerUserId = ?`,
+        'SELECT id FROM auth_method WHERE provider = \'telegram\' AND providerUserId = ?',
         [String(user.telegramId)],
       );
 
       if (existing.length > 0) continue;
 
       await this.dataSource.query(
-        `INSERT INTO auth_method (userId, provider, providerUserId, emailVerified) VALUES (?, 'telegram', ?, 0)`,
+        'INSERT INTO auth_method (userId, provider, providerUserId, emailVerified) VALUES (?, \'telegram\', ?, 0)',
         [user.id, String(user.telegramId)],
       );
       migrated++;
@@ -47,10 +47,7 @@ export class AuthMethodMigrationService implements OnApplicationBootstrap {
     );
   }
 
-  private async columnExists(
-    table: string,
-    column: string,
-  ): Promise<boolean> {
+  private async columnExists(table: string, column: string): Promise<boolean> {
     const cols: Array<{ name: string }> = await this.dataSource.query(
       `PRAGMA table_info(${table})`,
     );
