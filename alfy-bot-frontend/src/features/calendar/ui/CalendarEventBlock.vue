@@ -1,5 +1,6 @@
 <template>
   <div
+    data-calendar-event-block
     :class="[
       'absolute left-0.5 right-0.5 rounded-md px-2 py-1 text-xs overflow-hidden border',
       hidden ? 'invisible' : isOverdue ? 'cursor-not-allowed' : isVirtual ? 'cursor-default' : 'cursor-grab',

@@ -21,7 +21,13 @@
     </div>
 
     <!-- Track -->
-    <div ref="trackRef" class="relative" :style="{ width: trackWidth + 'px', height: '1440px' }">
+    <div
+      ref="trackRef"
+      class="relative"
+      :style="{ width: trackWidth + 'px', height: '1440px' }"
+      style="touch-action: none"
+      @pointerdown="onCreatePointerDown"
+    >
       <!-- Hour lines -->
       <div class="absolute inset-0 pointer-events-none">
         <div
@@ -76,6 +82,16 @@
         <div class="font-medium truncate">{{ draggedEvent.title }}</div>
         <div class="text-[10px] opacity-70">{{ overlayTimeLabel }}</div>
       </div>
+
+      <!-- Create slot overlay ghost -->
+      <div
+        v-if="showCreateOverlay"
+        :style="[createOverlayStyle, { height: createOverlayHeight + 'px' }]"
+        class="rounded-md px-2 py-1 text-xs overflow-hidden border border-primary/40 bg-primary/15 text-primary pointer-events-none opacity-90 z-50 cursor-grabbing"
+      >
+        <div class="font-medium truncate">Новая задача</div>
+        <div class="text-[10px] opacity-70">{{ createOverlayTimeLabel }}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -86,6 +102,7 @@ import { isSameDay } from 'date-fns'
 import type { CalendarEvent, CalendarDropPayload } from '../model/types'
 import { isToday } from '../lib/week'
 import { getPriorityEventClasses } from '../lib/calendar-styles'
+import { useCreateSlotDrag } from '../lib/use-create-slot-drag'
 import { usePointerDnd } from '../lib/use-pointer-dnd'
 import DayColumn from './DayColumn.vue'
 
@@ -99,6 +116,7 @@ const props = defineProps<{
   gridRef: HTMLElement | null
   onTaskMoved: (taskId: string, newDate: Date, startMinutes: number) => Promise<void>
   onTaskResized: (taskId: string, durationMinutes: number) => Promise<void>
+  onSlotCreate: (date: Date, startMinutes: number, durationMinutes: number) => Promise<void>
 }>()
 
 const emit = defineEmits<{
@@ -117,6 +135,20 @@ const { showOverlay, draggedTaskId, draggedEvent, overlayStyle, overlayHeight, o
   onMoved: (taskId, newDate, startMinutes) => props.onTaskMoved(taskId, newDate, startMinutes),
   onClicked: (event) => emit('open', event),
   onResized: (taskId, durationMinutes) => props.onTaskResized(taskId, durationMinutes),
+})
+
+const {
+  showOverlay: showCreateOverlay,
+  overlayStyle: createOverlayStyle,
+  overlayHeight: createOverlayHeight,
+  overlayTimeLabel: createOverlayTimeLabel,
+  onPointerDown: onCreatePointerDown,
+} = useCreateSlotDrag({
+  trackEl: trackRef,
+  dayOffset: (d: Date) => props.dayOffset(d),
+  dateFromX: (x: number) => props.dateFromX(x),
+  dayWidth: props.dayWidth,
+  onCreated: (date, startMinutes, durationMinutes) => props.onSlotCreate(date, startMinutes, durationMinutes),
 })
 
 const ghostClasses = computed(() => {

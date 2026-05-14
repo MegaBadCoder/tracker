@@ -66,6 +66,7 @@
           :grid-ref="gridRef"
           :on-task-moved="onTaskMoved"
           :on-task-resized="onTaskResized"
+          :on-slot-create="onSlotCreate"
           @drop="onDrop"
           @open="onEventOpen"
           @toggle="onToggleTask"
@@ -91,6 +92,7 @@ import HourGrid from './HourGrid.vue'
 
 const emit = defineEmits<{
   'open-task': [task: import('@/features/tasks/model/types').Task]
+  'create-task': [payload: { date: Date; startMinutes: number; durationMinutes: number }]
 }>()
 
 const taskStore = useTaskStore()
@@ -178,6 +180,10 @@ function onEventOpen(event: CalendarEvent) {
 function onDrop(payload: CalendarDropPayload) {
   if (payload.isVirtual) return
   applyTaskMove(payload.taskId, payload.newDate, payload.startMinutes)
+}
+
+async function onSlotCreate(date: Date, startMinutes: number, durationMinutes: number) {
+  emit('create-task', { date, startMinutes, durationMinutes })
 }
 
 onMounted(() => {
