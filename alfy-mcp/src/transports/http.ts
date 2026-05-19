@@ -1,20 +1,21 @@
 import http from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Config } from '../config.js';
 import { tokenFromHeaderOrEnv } from '../config.js';
 import { AlfyRestClient } from '../rest-client.js';
+import { createServer } from '../server.js';
 
 /**
  * Starts an HTTP server implementing the MCP Streamable HTTP transport.
- * Each request creates a stateless transport instance, scoped to the per-request API token.
+ * Each request creates a stateless transport instance and a per-request McpServer
+ * scoped to the per-request API token.
  *
  * Endpoint: POST /mcp  (MCP JSON-RPC)
  * GET  /mcp  (SSE stream for server-initiated notifications)
  *
  * The token is extracted from the Authorization: Bearer header or ALFY_API_TOKEN env var.
  */
-export async function startHttpTransport(server: McpServer, config: Config): Promise<void> {
+export async function startHttpTransport(config: Config): Promise<void> {
   const httpServer = http.createServer(async (req, res) => {
     const url = req.url ?? '';
 
@@ -45,8 +46,9 @@ export async function startHttpTransport(server: McpServer, config: Config): Pro
       return;
     }
 
-    // Create per-request REST client (scoped to the token)
-    const _restClient = new AlfyRestClient(config.apiBase, token);
+    // Create per-request REST client and McpServer (scoped to the token)
+    const restClient = new AlfyRestClient(config.apiBase, token);
+    const server = createServer(restClient);
 
     // Stateless transport: each request gets a fresh transport (no session state)
     const transport = new StreamableHTTPServerTransport({
