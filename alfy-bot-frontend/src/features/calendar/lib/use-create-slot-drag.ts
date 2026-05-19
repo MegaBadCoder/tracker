@@ -113,9 +113,9 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
 
       const onUp = async () => {
         cleanup()
-        // Long-press alone (no stretch) must not create a task — require
-        // actual growth beyond the initial SNAP_MIN sentinel.
-        const wasDrag = overlayHeight.value > SNAP_MIN
+        // wasDrag: showOverlay = true means either (mouse) the 3px threshold
+        // fired, or (touch) the 350ms long-press fired. Both are intentional.
+        const wasDrag = showOverlay.value
         const duration = overlayHeight.value
         showOverlay.value = false
         if (wasDrag) {

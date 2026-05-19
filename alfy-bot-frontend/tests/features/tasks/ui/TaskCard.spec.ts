@@ -29,11 +29,11 @@ describe('TaskCard', () => {
     expect(wrapper.text()).toContain('Тестовая задача')
   })
 
-  it('рендерит priority dot и chip с корректным label', () => {
+  it('рендерит priority chip с корректным label и иконкой', () => {
     const task = apiPayloadToTask({ priority: 'high' })
     const wrapper = mount(TaskCard, { props: { task } })
 
-    expect(wrapper.find('.bg-red-500').exists()).toBe(true)
+    expect(wrapper.find('.text-red-500').exists()).toBe(true)
     expect(wrapper.text()).toContain(PRIORITY_LABELS.high)
   })
 
@@ -41,9 +41,9 @@ describe('TaskCard', () => {
     const wrapperMed = mount(TaskCard, { props: { task: apiPayloadToTask({ priority: 'medium' }) } })
     const wrapperLow = mount(TaskCard, { props: { task: apiPayloadToTask({ priority: 'low' }) } })
 
-    expect(wrapperMed.find('.bg-yellow-500').exists()).toBe(true)
+    expect(wrapperMed.find('.text-yellow-500').exists()).toBe(true)
     expect(wrapperMed.text()).toContain(PRIORITY_LABELS.medium)
-    expect(wrapperLow.find('.bg-green-500').exists()).toBe(true)
+    expect(wrapperLow.find('.text-green-500').exists()).toBe(true)
     expect(wrapperLow.text()).toContain(PRIORITY_LABELS.low)
   })
 
