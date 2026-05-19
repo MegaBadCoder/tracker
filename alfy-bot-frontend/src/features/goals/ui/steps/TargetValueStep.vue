@@ -14,7 +14,7 @@ const value = ref<string>(props.state.pending.targetValue ?? '')
 const error = ref<string>('')
 
 function onSubmit() {
-  const trimmed = value.value.trim()
+  const trimmed = String(value.value ?? '').trim()
   if (trimmed.length === 0) {
     error.value = 'Введи число'
     return
@@ -61,7 +61,7 @@ function onSkip() {
       <Button variant="secondary" @click="onSkip">
         Пропустить
       </Button>
-      <Button :disabled="value.trim().length === 0" @click="onSubmit">
+      <Button :disabled="String(value ?? '').trim().length === 0" @click="onSubmit">
         Далее
       </Button>
     </div>
