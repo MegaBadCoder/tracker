@@ -67,14 +67,25 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
     const initialClientY = e.clientY
     const pointerId = e.pointerId
 
-    const startDrag = () => {
+    const startDrag = (isTouch: boolean) => {
       startMinutes.value = initialMinutes
       overlayTop.value = initialMinutes
       overlayLeft.value = options.dayOffset(initialDate) + 2
       overlayHeight.value = SNAP_MIN
-      showOverlay.value = false
+      // On touch: long-press already disambiguated intent — show overlay now
+      // so user gets visual confirmation alongside the haptic.
+      // On mouse: keep threshold-gated reveal so a plain click is a no-op.
+      showOverlay.value = isTouch
 
       track.setPointerCapture(pointerId)
+
+      // setPointerCapture doesn't cancel the browser's pan gesture, and
+      // touch-action can't switch mid-gesture. Block native scroll explicitly
+      // for the touch path by intercepting touchmove with preventDefault.
+      const blockTouchScroll = (ev: TouchEvent) => ev.preventDefault()
+      if (isTouch) {
+        document.addEventListener('touchmove', blockTouchScroll, { passive: false })
+      }
 
       const onMove = (ev: PointerEvent) => {
         const r = track.getBoundingClientRect()
@@ -95,11 +106,16 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
         track.removeEventListener('pointermove', onMove)
         track.removeEventListener('pointerup', onUp)
         track.removeEventListener('pointercancel', onCancel)
+        if (isTouch) {
+          document.removeEventListener('touchmove', blockTouchScroll)
+        }
       }
 
       const onUp = async () => {
         cleanup()
-        const wasDrag = showOverlay.value
+        // Long-press alone (no stretch) must not create a task — require
+        // actual growth beyond the initial SNAP_MIN sentinel.
+        const wasDrag = overlayHeight.value > SNAP_MIN
         const duration = overlayHeight.value
         showOverlay.value = false
         if (wasDrag) {
@@ -118,7 +134,7 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
     }
 
     if (e.pointerType === 'mouse') {
-      startDrag()
+      startDrag(false)
       return
     }
 
@@ -129,7 +145,7 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
       timerFired = true
       cleanupWait()
       triggerHaptic()
-      startDrag()
+      startDrag(true)
     }, LONG_PRESS_DELAY_MS)
 
     function onWaitMove(ev: PointerEvent) {
