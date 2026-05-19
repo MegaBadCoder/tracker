@@ -463,7 +463,7 @@ function onCancelGoalAction() {
 
     <AlertDialog
       :open="pendingTypeChange !== null"
-      @update:open="(o: boolean) => { if (!o) onCancelTypeChange() }"
+      @update:open="(o: boolean) => { if (!o) pendingTypeChange = null }"
     >
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -484,7 +484,7 @@ function onCancelGoalAction() {
 
     <AlertDialog
       :open="goalActionPending !== null"
-      @update:open="(o: boolean) => { if (!o) onCancelGoalAction() }"
+      @update:open="(o: boolean) => { if (!o) goalActionPending = null }"
     >
       <AlertDialogContent>
         <AlertDialogHeader>
