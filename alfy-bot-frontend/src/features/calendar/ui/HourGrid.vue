@@ -25,7 +25,6 @@
       ref="trackRef"
       class="relative"
       :style="{ width: trackWidth + 'px', height: '1440px' }"
-      style="touch-action: none"
       @pointerdown="onCreatePointerDown"
     >
       <!-- Hour lines -->
