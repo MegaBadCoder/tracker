@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import type { Observable } from 'rxjs';
 import { ApiTokenAuthGuard } from './api-token-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
@@ -15,7 +16,9 @@ export class JwtOrApiTokenGuard implements CanActivate {
     private readonly jwtGuard: JwtAuthGuard,
   ) {}
 
-  canActivate(context: ExecutionContext): Promise<boolean> | boolean {
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
     const request = context.switchToHttp().getRequest<{
       headers: Record<string, string>;
     }>();
