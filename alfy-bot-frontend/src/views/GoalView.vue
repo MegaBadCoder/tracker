@@ -47,6 +47,10 @@ const loading = ref(true)
 
 const editingQuestion = ref<Question | null>(null)
 const deletingQuestion = ref<Question | null>(null)
+// Снимок Question, захваченный при клике trash-иконки. Используется в onConfirmDelete,
+// т.к. reka-ui AlertDialog emit'ит `update:open(false)` ДО `@click` action-кнопки,
+// что обнуляет deletingQuestion до запуска confirm-хендлера.
+let pendingDeletion: Question | null = null
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 
@@ -132,14 +136,20 @@ async function onSaveEdit(v: QuestionWithScheduleItem) {
   }
 }
 
+function openDeleteDialog(q: Question) {
+  pendingDeletion = q
+  deletingQuestion.value = q
+}
+
 async function onConfirmDelete() {
-  const q = deletingQuestion.value
+  const q = pendingDeletion
   if (!q)
     return
   saving.value = true
   try {
     await deleteQuestion(q.id)
     await reloadGoal()
+    pendingDeletion = null
     deletingQuestion.value = null
   }
   catch (e: unknown) {
@@ -225,7 +235,7 @@ async function onConfirmDelete() {
               class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-destructive/10 active:bg-destructive/10 text-muted-foreground hover:text-destructive"
               :aria-label="`Удалить вопрос: ${q.question}`"
               :data-testid="`delete-question-${q.id}`"
-              @click.stop="deletingQuestion = q"
+              @click.stop="openDeleteDialog(q)"
             >
               <Trash2 class="h-4 w-4" />
             </button>

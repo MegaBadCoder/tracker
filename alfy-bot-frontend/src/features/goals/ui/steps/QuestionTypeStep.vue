@@ -27,6 +27,10 @@ const emit = defineEmits<{
 }>()
 
 const deleteIdx = ref<number | null>(null)
+// Снимок idx, захваченный при клике trash-иконки. Используется в onConfirmDelete,
+// потому что reka-ui AlertDialog emit'ит `update:open(false)` ДО `@click` action-кнопки,
+// что обнуляет deleteIdx до запуска confirm-хендлера.
+let pendingDeleteIdx: number | null = null
 
 const WEEKDAY_LABELS: Record<number, string> = {
   0: 'Вс',
@@ -62,9 +66,15 @@ function scheduleSummary(q: QuestionWithScheduleItem): string {
   return ''
 }
 
+function openDeleteDialog(idx: number) {
+  pendingDeleteIdx = idx
+  deleteIdx.value = idx
+}
+
 function onConfirmDelete() {
-  if (deleteIdx.value !== null) {
-    emit('removePendingQuestion', deleteIdx.value)
+  if (pendingDeleteIdx !== null) {
+    emit('removePendingQuestion', pendingDeleteIdx)
+    pendingDeleteIdx = null
     deleteIdx.value = null
   }
 }
@@ -108,7 +118,7 @@ function onConfirmDelete() {
             class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-destructive/10 active:bg-destructive/10 text-muted-foreground hover:text-destructive"
             :aria-label="`Удалить вопрос ${idx + 1}`"
             :data-testid="`delete-pending-${idx}`"
-            @click="deleteIdx = idx"
+            @click="openDeleteDialog(idx)"
           >
             <Trash2 class="h-4 w-4" />
           </button>
