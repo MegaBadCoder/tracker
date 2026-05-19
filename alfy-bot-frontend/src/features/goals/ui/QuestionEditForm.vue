@@ -280,7 +280,7 @@ function onCancel() {
         </Button>
       </div>
       <Input
-        v-model="draft.intervalDays"
+        v-model.number="draft.intervalDays"
         type="text"
         inputmode="numeric"
         placeholder="Своё значение"
