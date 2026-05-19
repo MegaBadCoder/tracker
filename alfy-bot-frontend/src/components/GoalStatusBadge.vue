@@ -15,9 +15,14 @@ const config: Record<GoalStatus, { label: string, classes: string, dot: string }
     dot: 'bg-gray-400',
   },
   archived: {
-    label: 'Архив',
+    label: 'В архиве',
     classes: 'text-slate-500 dark:text-slate-400',
     dot: 'bg-slate-400',
+  },
+  deleted: {
+    label: 'Удалена',
+    classes: 'text-rose-600 dark:text-rose-400',
+    dot: 'bg-rose-500',
   },
 }
 

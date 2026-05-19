@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { QuestionWithScheduleItem } from '../api/goals'
 import type { Goal, Question } from '../types'
-import { Pencil, Trash2 } from 'lucide-vue-next'
+import { Archive, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/PageContainer.vue'
@@ -15,6 +15,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Sheet,
   SheetContent,
@@ -25,6 +32,8 @@ import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
 import {
   deleteQuestion,
   fetchGoalById,
+  fetchQuestionAnswerCount,
+  updateGoal,
   updateQuestion,
   updateQuestionSchedule,
 } from '../api/goals'
@@ -53,6 +62,15 @@ const deletingQuestion = ref<Question | null>(null)
 let pendingDeletion: Question | null = null
 const saving = ref(false)
 const saveError = ref<string | null>(null)
+
+// Type-change warning state
+const pendingTypeChange = ref<{ value: QuestionWithScheduleItem, count: number } | null>(null)
+let pendingTypeChangeSnapshot: { value: QuestionWithScheduleItem, count: number } | null = null
+
+// Goal-level actions (archive / delete / restore)
+type GoalAction = 'archive' | 'delete' | 'restore'
+const goalActionPending = ref<GoalAction | null>(null)
+let pendingGoalAction: GoalAction | null = null
 
 async function reloadGoal() {
   goal.value = await fetchGoalById(id)
@@ -98,6 +116,35 @@ async function onSaveEdit(v: QuestionWithScheduleItem) {
   const q = editingQuestion.value
   if (!q)
     return
+  // Если меняется тип у вопроса с уже сохранёнными ответами — предупреждаем
+  // о неоднородной интерпретации (answer_text всегда, answer_number/_bool — по типу на момент ответа).
+  if (q.type !== v.type) {
+    saving.value = true
+    saveError.value = null
+    try {
+      const count = await fetchQuestionAnswerCount(q.id)
+      if (count > 0) {
+        const snapshot = { value: v, count }
+        pendingTypeChangeSnapshot = snapshot
+        pendingTypeChange.value = snapshot
+        return
+      }
+    }
+    catch (e: unknown) {
+      saveError.value = e instanceof Error ? e.message : 'Не удалось проверить ответы'
+      return
+    }
+    finally {
+      saving.value = false
+    }
+  }
+  await proceedSaveEdit(v)
+}
+
+async function proceedSaveEdit(v: QuestionWithScheduleItem) {
+  const q = editingQuestion.value
+  if (!q)
+    return
   saving.value = true
   saveError.value = null
   try {
@@ -136,6 +183,20 @@ async function onSaveEdit(v: QuestionWithScheduleItem) {
   }
 }
 
+async function onConfirmTypeChange() {
+  const snap = pendingTypeChangeSnapshot
+  if (!snap)
+    return
+  pendingTypeChangeSnapshot = null
+  pendingTypeChange.value = null
+  await proceedSaveEdit(snap.value)
+}
+
+function onCancelTypeChange() {
+  pendingTypeChangeSnapshot = null
+  pendingTypeChange.value = null
+}
+
 function openDeleteDialog(q: Question) {
   pendingDeletion = q
   deletingQuestion.value = q
@@ -159,6 +220,69 @@ async function onConfirmDelete() {
     saving.value = false
   }
 }
+
+// === Goal-level actions ===
+
+function openGoalAction(action: GoalAction) {
+  pendingGoalAction = action
+  goalActionPending.value = action
+}
+
+const GOAL_ACTION_STATUS: Record<GoalAction, 'active' | 'archived' | 'deleted'> = {
+  archive: 'archived',
+  delete: 'deleted',
+  restore: 'active',
+}
+
+const GOAL_ACTION_LABEL: Record<GoalAction, { title: string, body: string, confirm: string, confirmClass?: string }> = {
+  archive: {
+    title: 'Архивировать цель?',
+    body: 'Цель скроется из основного списка, её можно будет восстановить из вкладки «Архив».',
+    confirm: 'Архивировать',
+  },
+  delete: {
+    title: 'Удалить цель?',
+    body: 'Цель будет помечена как удалённая. Все ответы сохранятся в БД, но цель пропадёт из всех вкладок.',
+    confirm: 'Удалить',
+    confirmClass: 'bg-destructive text-white hover:bg-destructive/90',
+  },
+  restore: {
+    title: 'Восстановить цель?',
+    body: 'Цель снова станет активной и появится во вкладке «Активные».',
+    confirm: 'Восстановить',
+  },
+}
+
+async function onConfirmGoalAction() {
+  const action = pendingGoalAction
+  if (!action || !goal.value)
+    return
+  const target = GOAL_ACTION_STATUS[action]
+  saving.value = true
+  saveError.value = null
+  try {
+    await updateGoal(goal.value.id, { status: target })
+    pendingGoalAction = null
+    goalActionPending.value = null
+    if (action === 'restore') {
+      await reloadGoal()
+    }
+    else {
+      router.push('/')
+    }
+  }
+  catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'Не удалось обновить цель'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+function onCancelGoalAction() {
+  pendingGoalAction = null
+  goalActionPending.value = null
+}
 </script>
 
 <template>
@@ -169,7 +293,58 @@ async function onConfirmDelete() {
   <div v-else-if="goal">
     <AppHeader :title="goal.goal_name" :show-back="true">
       <template #right>
-        <GoalStatusBadge :status="goal.status" />
+        <div class="flex items-center gap-2">
+          <GoalStatusBadge :status="goal.status" />
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="flex-shrink-0"
+                aria-label="Действия с целью"
+                data-testid="goal-actions-trigger"
+              >
+                <MoreVertical class="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <template v-if="goal.status === 'active' || goal.status === 'completed'">
+                <DropdownMenuItem data-testid="goal-action-archive" @click="openGoalAction('archive')">
+                  <Archive class="w-4 h-4 mr-2" />
+                  Архивировать
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  class="text-destructive focus:text-destructive"
+                  data-testid="goal-action-delete"
+                  @click="openGoalAction('delete')"
+                >
+                  <Trash2 class="w-4 h-4 mr-2" />
+                  Удалить
+                </DropdownMenuItem>
+              </template>
+              <template v-else-if="goal.status === 'archived'">
+                <DropdownMenuItem data-testid="goal-action-restore" @click="openGoalAction('restore')">
+                  <RotateCcw class="w-4 h-4 mr-2" />
+                  Восстановить
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  class="text-destructive focus:text-destructive"
+                  data-testid="goal-action-delete"
+                  @click="openGoalAction('delete')"
+                >
+                  <Trash2 class="w-4 h-4 mr-2" />
+                  Удалить
+                </DropdownMenuItem>
+              </template>
+              <template v-else-if="goal.status === 'deleted'">
+                <DropdownMenuItem data-testid="goal-action-restore" @click="openGoalAction('restore')">
+                  <RotateCcw class="w-4 h-4 mr-2" />
+                  Восстановить
+                </DropdownMenuItem>
+              </template>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </template>
     </AppHeader>
 
@@ -281,6 +456,53 @@ async function onConfirmDelete() {
             @click="onConfirmDelete"
           >
             Удалить
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog
+      :open="pendingTypeChange !== null"
+      @update:open="(o: boolean) => { if (!o) onCancelTypeChange() }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Сменить тип вопроса?</AlertDialogTitle>
+          <AlertDialogDescription>
+            У этого вопроса уже {{ pendingTypeChange?.count }} сохранённых ответов.
+            Они останутся в БД, но новый тип может изменить их интерпретацию на графиках и в аналитике.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="onCancelTypeChange">Отмена</AlertDialogCancel>
+          <AlertDialogAction data-testid="confirm-type-change" @click="onConfirmTypeChange">
+            Продолжить
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog
+      :open="goalActionPending !== null"
+      @update:open="(o: boolean) => { if (!o) onCancelGoalAction() }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {{ goalActionPending ? GOAL_ACTION_LABEL[goalActionPending].title : '' }}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ goalActionPending ? GOAL_ACTION_LABEL[goalActionPending].body : '' }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="onCancelGoalAction">Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            :class="goalActionPending ? GOAL_ACTION_LABEL[goalActionPending].confirmClass : ''"
+            data-testid="confirm-goal-action"
+            @click="onConfirmGoalAction"
+          >
+            {{ goalActionPending ? GOAL_ACTION_LABEL[goalActionPending].confirm : '' }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

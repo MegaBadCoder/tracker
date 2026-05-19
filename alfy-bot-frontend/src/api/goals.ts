@@ -24,7 +24,7 @@ export interface QuestionWithScheduleItem {
 }
 
 export interface UpdateGoalDto {
-  status?: 'active' | 'completed' | 'deleted'
+  status?: 'active' | 'completed' | 'archived' | 'deleted'
   goal_name?: string
 }
 
@@ -97,4 +97,9 @@ export async function updateGoal(
 ): Promise<Goal> {
   const { data } = await api.patch<Goal>(`/goals/${goalId}`, dto)
   return data
+}
+
+export async function fetchQuestionAnswerCount(questionId: number): Promise<number> {
+  const { data } = await api.get<{ count: number }>(`/questions/${questionId}/answer-count`)
+  return data.count
 }
