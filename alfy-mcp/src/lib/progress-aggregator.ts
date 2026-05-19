@@ -16,7 +16,7 @@ export interface GoalSummary {
 }
 
 export interface TaskSummary {
-  id: number;
+  id: string;
   title: string;
   completed: boolean;
   dueDate: string | null;

@@ -40,8 +40,11 @@ describe('ReportService', () => {
   });
 
   describe('addAnswer', () => {
+    const ownGoal = { id: 10, user_id: 1, goal_name: 'g' };
+
     it('должен сохранить ответ с normalized answer_number для типа number', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, type: 'number' });
+      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'number' });
+      goalService.findById.mockResolvedValue(ownGoal);
 
       await service.addAnswer(1, 5, '2026-02-20', '42');
 
@@ -58,7 +61,8 @@ describe('ReportService', () => {
     });
 
     it('должен нормализовать answer_number для типа rating с запятой', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, type: 'rating' });
+      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'rating' });
+      goalService.findById.mockResolvedValue(ownGoal);
 
       await service.addAnswer(1, 5, '2026-02-20', '4,5');
 
@@ -74,7 +78,8 @@ describe('ReportService', () => {
     });
 
     it('должен нормализовать answer_bool для yes_no — "да"', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, type: 'yes_no' });
+      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'yes_no' });
+      goalService.findById.mockResolvedValue(ownGoal);
 
       await service.addAnswer(1, 5, '2026-02-20', 'Да');
 
@@ -88,12 +93,32 @@ describe('ReportService', () => {
       );
     });
 
-    it('должен бросить ошибку если вопрос не найден', async () => {
+    it('должен бросить NotFoundException если вопрос не найден', async () => {
       goalService.findQuestionById.mockResolvedValue(null);
 
       await expect(
         service.addAnswer(1, 999, '2026-02-20', 'test'),
-      ).rejects.toThrow('Question not found');
+      ).rejects.toThrow(/not found/i);
+      expect(answerRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('должен бросить ForbiddenException если вопрос принадлежит другому пользователю', async () => {
+      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'number' });
+      goalService.findById.mockResolvedValue({ id: 10, user_id: 999, goal_name: 'other' });
+
+      await expect(
+        service.addAnswer(1, 5, '2026-02-20', '42'),
+      ).rejects.toThrow(/forbidden/i);
+      expect(answerRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('должен бросить NotFoundException если родительская цель не найдена', async () => {
+      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'number' });
+      goalService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.addAnswer(1, 5, '2026-02-20', '42'),
+      ).rejects.toThrow(/goal not found/i);
       expect(answerRepo.save).not.toHaveBeenCalled();
     });
   });

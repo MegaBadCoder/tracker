@@ -8,7 +8,7 @@ function toText(data: unknown): { content: [{ type: 'text'; text: string }] } {
 }
 
 interface TaskItem {
-  id: number;
+  id: string;
   title: string;
   completed: boolean;
   dueDate: string | null;
@@ -55,7 +55,7 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
     {
       description: 'Get a single task by ID (fetches list and filters by id — fail loud if not found)',
       inputSchema: {
-        id: z.number().int().positive().describe('Task ID'),
+        id: z.string().uuid().describe('Task UUID'),
       },
     },
     async ({ id }) => {
@@ -107,7 +107,7 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
     {
       description: 'Update task fields',
       inputSchema: {
-        id: z.number().int().positive().describe('Task ID'),
+        id: z.string().uuid().describe('Task UUID'),
         title: z.string().optional().describe('New title'),
         description: z.string().optional().describe('New description'),
         priority: z.enum(['high', 'medium', 'low']).optional().describe('New priority'),
@@ -135,7 +135,7 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
     {
       description: 'Mark a task as completed',
       inputSchema: {
-        id: z.number().int().positive().describe('Task ID'),
+        id: z.string().uuid().describe('Task UUID'),
       },
     },
     async ({ id }) => {
@@ -149,7 +149,7 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
     {
       description: 'Delete a task. Throws 404 if task does not exist.',
       inputSchema: {
-        id: z.number().int().positive().describe('Task ID'),
+        id: z.string().uuid().describe('Task UUID'),
       },
     },
     async ({ id }) => {

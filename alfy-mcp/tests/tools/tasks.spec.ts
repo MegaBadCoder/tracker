@@ -29,10 +29,16 @@ function makeServer() {
   return server;
 }
 
+const ID_A = '00000000-0000-4000-8000-000000000001';
+const ID_B = '00000000-0000-4000-8000-000000000002';
+const ID_C = '00000000-0000-4000-8000-000000000003';
+const ID_NEW = '00000000-0000-4000-8000-000000000010';
+const ID_NONE = '00000000-0000-4000-8000-000000000999';
+
 const sampleTasks = [
-  { id: 1, title: 'Task A', completed: false, dueDate: '2026-05-20T00:00:00.000Z', projectId: 'proj-1' },
-  { id: 2, title: 'Task B', completed: true, dueDate: null, projectId: 'proj-1' },
-  { id: 3, title: 'Task C', completed: false, dueDate: '2026-05-15T00:00:00.000Z', projectId: 'proj-2' },
+  { id: ID_A, title: 'Task A', completed: false, dueDate: '2026-05-20T00:00:00.000Z', projectId: 'proj-1' },
+  { id: ID_B, title: 'Task B', completed: true, dueDate: null, projectId: 'proj-1' },
+  { id: ID_C, title: 'Task C', completed: false, dueDate: '2026-05-15T00:00:00.000Z', projectId: 'proj-2' },
 ];
 
 describe('task tools', () => {
@@ -76,17 +82,15 @@ describe('task tools', () => {
       const result = await server.callTool('list_tasks', { status: 'completed' });
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toHaveLength(1);
-      expect(parsed[0].id).toBe(2);
+      expect(parsed[0].id).toBe(ID_B);
     });
 
     it('filters by due_from (inclusive)', async () => {
       client.get.mockResolvedValueOnce(sampleTasks);
-      // Task A has dueDate 2026-05-20, Task C has 2026-05-15; from 2026-05-16 → only A
       const result = await server.callTool('list_tasks', { due_from: '2026-05-16' });
       const parsed = JSON.parse(result.content[0].text);
-      // Only tasks with dueDate >= due_from — task with no dueDate is excluded too
       expect(parsed.every((t: { dueDate: string | null }) => t.dueDate !== null)).toBe(true);
-      expect(parsed.some((t: { id: number }) => t.id === 1)).toBe(true);
+      expect(parsed.some((t: { id: string }) => t.id === ID_A)).toBe(true);
     });
   });
 
@@ -97,23 +101,23 @@ describe('task tools', () => {
 
     it('finds a task by id from list', async () => {
       client.get.mockResolvedValueOnce(sampleTasks);
-      const result = await server.callTool('get_task', { id: 1 });
+      const result = await server.callTool('get_task', { id: ID_A });
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.id).toBe(1);
+      expect(parsed.id).toBe(ID_A);
       expect(parsed.title).toBe('Task A');
     });
 
     it('throws RestError(404) when task not found', async () => {
       client.get.mockResolvedValueOnce(sampleTasks);
-      await expect(server.callTool('get_task', { id: 999 }))
+      await expect(server.callTool('get_task', { id: ID_NONE }))
         .rejects.toMatchObject({ status: 404 });
     });
 
     it('calls GET /tasks (not /tasks/:id)', async () => {
       client.get.mockResolvedValueOnce(sampleTasks);
-      await server.callTool('get_task', { id: 1 });
+      await server.callTool('get_task', { id: ID_A });
       expect(client.get).toHaveBeenCalledWith('/tasks');
-      expect(client.get).not.toHaveBeenCalledWith('/tasks/1');
+      expect(client.get).not.toHaveBeenCalledWith(`/tasks/${ID_A}`);
     });
   });
 
@@ -123,13 +127,13 @@ describe('task tools', () => {
     });
 
     it('calls POST /tasks with the body', async () => {
-      client.post.mockResolvedValueOnce({ id: 10 });
+      client.post.mockResolvedValueOnce({ id: ID_NEW });
       await server.callTool('create_task', { title: 'New task' });
       expect(client.post).toHaveBeenCalledWith('/tasks', expect.objectContaining({ title: 'New task' }));
     });
 
     it('returns created task as JSON', async () => {
-      const created = { id: 10, title: 'New task' };
+      const created = { id: ID_NEW, title: 'New task' };
       client.post.mockResolvedValueOnce(created);
       const result = await server.callTool('create_task', { title: 'New task' });
       const parsed = JSON.parse(result.content[0].text);
@@ -143,14 +147,14 @@ describe('task tools', () => {
     });
 
     it('calls PATCH /tasks/:id with body', async () => {
-      client.patch.mockResolvedValueOnce({ id: 1, title: 'Updated' });
-      await server.callTool('update_task', { id: 1, title: 'Updated' });
-      expect(client.patch).toHaveBeenCalledWith('/tasks/1', expect.objectContaining({ title: 'Updated' }));
+      client.patch.mockResolvedValueOnce({ id: ID_A, title: 'Updated' });
+      await server.callTool('update_task', { id: ID_A, title: 'Updated' });
+      expect(client.patch).toHaveBeenCalledWith(`/tasks/${ID_A}`, expect.objectContaining({ title: 'Updated' }));
     });
 
     it('omits id from patch body', async () => {
-      client.patch.mockResolvedValueOnce({ id: 1 });
-      await server.callTool('update_task', { id: 1, title: 'Updated' });
+      client.patch.mockResolvedValueOnce({ id: ID_A });
+      await server.callTool('update_task', { id: ID_A, title: 'Updated' });
       const body = (client.patch as ReturnType<typeof vi.fn>).mock.calls[0][1];
       expect(body).not.toHaveProperty('id');
     });
@@ -162,15 +166,15 @@ describe('task tools', () => {
     });
 
     it('calls PATCH /tasks/:id with completed: true', async () => {
-      client.patch.mockResolvedValueOnce({ id: 1, completed: true });
-      await server.callTool('complete_task', { id: 1 });
-      expect(client.patch).toHaveBeenCalledWith('/tasks/1', { completed: true });
+      client.patch.mockResolvedValueOnce({ id: ID_A, completed: true });
+      await server.callTool('complete_task', { id: ID_A });
+      expect(client.patch).toHaveBeenCalledWith(`/tasks/${ID_A}`, { completed: true });
     });
 
     it('returns the updated task as JSON', async () => {
-      const updated = { id: 1, completed: true };
+      const updated = { id: ID_A, completed: true };
       client.patch.mockResolvedValueOnce(updated);
-      const result = await server.callTool('complete_task', { id: 1 });
+      const result = await server.callTool('complete_task', { id: ID_A });
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.completed).toBe(true);
     });
@@ -183,13 +187,13 @@ describe('task tools', () => {
 
     it('calls DELETE /tasks/:id', async () => {
       client.del.mockResolvedValueOnce(null);
-      await server.callTool('delete_task', { id: 1 });
-      expect(client.del).toHaveBeenCalledWith('/tasks/1');
+      await server.callTool('delete_task', { id: ID_A });
+      expect(client.del).toHaveBeenCalledWith(`/tasks/${ID_A}`);
     });
 
     it('returns ok: true on success', async () => {
       client.del.mockResolvedValueOnce(null);
-      const result = await server.callTool('delete_task', { id: 1 });
+      const result = await server.callTool('delete_task', { id: ID_A });
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.ok).toBe(true);
     });
@@ -197,7 +201,7 @@ describe('task tools', () => {
     it('propagates RestError(404) when REST returns 404', async () => {
       const { RestError } = await import('../../src/rest-client.js');
       client.del.mockRejectedValueOnce(new RestError(404, 'Not found'));
-      await expect(server.callTool('delete_task', { id: 999 }))
+      await expect(server.callTool('delete_task', { id: ID_NONE }))
         .rejects.toBeInstanceOf(RestError);
     });
   });

@@ -23,10 +23,10 @@ const completedGoal: GoalSummary = {
   questions: [],
 };
 
-const pendingTask: TaskSummary = { id: 1, title: 'A', completed: false, dueDate: '2026-05-20T00:00:00.000Z' };
-const completedTask: TaskSummary = { id: 2, title: 'B', completed: true, dueDate: '2026-05-19T00:00:00.000Z' };
-const overdueTask: TaskSummary = { id: 3, title: 'C', completed: false, dueDate: '2026-05-10T00:00:00.000Z' };
-const noDateTask: TaskSummary = { id: 4, title: 'D', completed: false, dueDate: null };
+const pendingTask: TaskSummary = { id: 't-0000-0000-0000-000000000001', title: 'A', completed: false, dueDate: '2026-05-20T00:00:00.000Z' };
+const completedTask: TaskSummary = { id: 't-0000-0000-0000-000000000002', title: 'B', completed: true, dueDate: '2026-05-19T00:00:00.000Z' };
+const overdueTask: TaskSummary = { id: 't-0000-0000-0000-000000000003', title: 'C', completed: false, dueDate: '2026-05-10T00:00:00.000Z' };
+const noDateTask: TaskSummary = { id: 't-0000-0000-0000-000000000004', title: 'D', completed: false, dueDate: null };
 
 // Analytics for question 10: today + yesterday filled
 const analyticsQ10: AnalyticsEntry[] = [
