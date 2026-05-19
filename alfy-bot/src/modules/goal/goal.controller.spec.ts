@@ -174,6 +174,28 @@ describe('GoalController', () => {
       expect(goalService.update).not.toHaveBeenCalled();
       expect(result).toBe(updated);
     });
+
+    it('форвардит status="archived" в updateGoalStatus', async () => {
+      const userId = 42;
+      const goalId = 7;
+      const owned = makeGoal({ id: goalId, user_id: userId, status: 'active' });
+      const updated = makeGoal({ id: goalId, user_id: userId, status: 'archived' });
+      goalService.findById
+        .mockResolvedValueOnce(owned)
+        .mockResolvedValueOnce(updated);
+      goalService.updateGoalStatus.mockResolvedValue(undefined);
+
+      const dto: UpdateGoalDto = { status: 'archived' };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      const result = await controller.update(req as never, goalId, dto);
+
+      expect(goalService.updateGoalStatus).toHaveBeenCalledWith(
+        goalId,
+        'archived',
+      );
+      expect(result).toBe(updated);
+    });
   });
 
   describe('assertOwnedGoal (negative)', () => {

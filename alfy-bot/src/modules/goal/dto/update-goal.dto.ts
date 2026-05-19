@@ -5,10 +5,10 @@ import type { GoalStatus } from '../../../shared/constants/goal-statuses';
 export class UpdateGoalDto {
   @ApiPropertyOptional({
     example: 'completed',
-    enum: ['active', 'completed', 'deleted'],
+    enum: ['active', 'completed', 'archived', 'deleted'],
   })
   @IsOptional()
-  @IsIn(['active', 'completed', 'deleted'])
+  @IsIn(['active', 'completed', 'archived', 'deleted'])
   status?: GoalStatus;
 
   @ApiPropertyOptional({ example: 'Новое имя цели' })

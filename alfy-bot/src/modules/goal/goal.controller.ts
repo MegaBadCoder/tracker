@@ -49,7 +49,7 @@ export class GoalController {
   @ApiQuery({
     name: 'status',
     required: false,
-    enum: ['active', 'completed'],
+    enum: ['active', 'completed', 'archived', 'deleted'],
     description:
       'Фильтр по статусу. Без параметра — все цели (кроме удалённых)',
   })

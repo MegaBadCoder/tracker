@@ -35,4 +35,6 @@ export abstract class ReportAnswerRepositoryPort {
     startDate: string,
     endDate: string,
   ): Promise<ReportAnswer[]>;
+
+  abstract countByQuestion(questionId: number): Promise<number>;
 }

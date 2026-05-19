@@ -87,4 +87,8 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
       order: { scheduled_date: 'ASC' },
     });
   }
+
+  async countByQuestion(questionId: number): Promise<number> {
+    return this.repo.count({ where: { question_id: questionId } });
+  }
 }
