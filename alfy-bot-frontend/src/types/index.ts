@@ -1,4 +1,4 @@
-export type GoalStatus = 'active' | 'completed' | 'archived'
+export type GoalStatus = 'active' | 'completed' | 'archived' | 'deleted'
 export type GoalType = 'SIMPLE' | 'SMART' | 'GLOBAL'
 export type QuestionType = 'number' | 'text' | 'rating' | 'emoji_rating' | 'yes_no' | 'time_spent'
 export type FrequencyType = 'daily' | 'weekly_days' | 'interval'

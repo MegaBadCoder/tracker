@@ -132,4 +132,21 @@ export class QuestionController {
   ): Promise<void> {
     await this.questionService.deactivate(id, req.user.sub);
   }
+
+  @Get(':id/answer-count')
+  @ApiOperation({
+    summary: 'Количество сохранённых ответов на вопрос',
+    description:
+      'Используется фронтом, чтобы предупредить о неоднородности интерпретации при смене типа вопроса.',
+  })
+  @ApiOkResponse({ schema: { example: { count: 12 } } })
+  @ApiNotFoundResponse({ description: 'Вопрос не найден' })
+  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
+  async getAnswerCount(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ count: number }> {
+    const count = await this.questionService.countAnswers(id, req.user.sub);
+    return { count };
+  }
 }
