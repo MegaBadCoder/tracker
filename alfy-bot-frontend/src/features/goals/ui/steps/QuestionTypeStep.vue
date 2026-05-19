@@ -7,6 +7,7 @@ import { QUESTION_TYPE_OPTIONS } from './question-types'
 defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
   (e: 'selectQuestionType', t: QuestionType): void
+  (e: 'finishQuestions'): void
   (e: 'back'): void
 }>()
 </script>
@@ -35,7 +36,14 @@ const emit = defineEmits<{
       </Button>
     </div>
 
-    <div>
+    <div class="flex gap-2 flex-wrap">
+      <Button
+        v-if="state.questionsToAdd.length > 0"
+        variant="default"
+        @click="emit('finishQuestions')"
+      >
+        ✅ Готово, сохранить
+      </Button>
       <Button variant="outline" @click="emit('back')">
         ⬅️ Назад
       </Button>

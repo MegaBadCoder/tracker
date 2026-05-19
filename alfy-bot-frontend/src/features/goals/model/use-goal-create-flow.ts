@@ -96,6 +96,7 @@ export interface GoalCreateFlow {
     confirmWeekly: () => void
     setInterval: (n: number) => void
     addQuestion: () => void
+    finishQuestions: () => void
     back: () => void
     cancel: () => void
   }
@@ -168,9 +169,18 @@ export function useGoalCreateFlow(): GoalCreateFlow {
       state.value.pending = {}
       state.value.step = 'q_type'
     }
+    else if (state.value.questionsToAdd.length > 0) {
+      state.value.step = 'saving'
+    }
     else {
       state.value.step = 'done'
     }
+  }
+
+  function finishQuestions(): void {
+    if (state.value.questionsToAdd.length === 0)
+      return
+    state.value.step = 'saving'
   }
 
   function selectQuestionType(t: QuestionType): void {
@@ -413,6 +423,7 @@ export function useGoalCreateFlow(): GoalCreateFlow {
       confirmWeekly,
       setInterval,
       addQuestion,
+      finishQuestions,
       back,
       cancel,
     },

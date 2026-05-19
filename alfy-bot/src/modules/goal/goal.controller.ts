@@ -98,7 +98,14 @@ export class GoalController {
     @Request() req: AuthRequest,
     @Body() dto: CreateGoalDto,
   ): Promise<GoalDto> {
-    if (Date.parse(dto.goal_end) <= Date.parse(dto.goal_start)) {
+    const startMs = Date.parse(dto.goal_start);
+    const endMs = Date.parse(dto.goal_end);
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+      throw new BadRequestException(
+        'goal_start или goal_end не является валидной датой',
+      );
+    }
+    if (endMs <= startMs) {
       throw new BadRequestException('goal_end должен быть позже goal_start');
     }
 

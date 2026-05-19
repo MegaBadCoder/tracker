@@ -325,4 +325,77 @@ describe('useGoalCreateFlow — state machine', () => {
     expect(flow.state.value.step).toBe('q_type')
     expect(flow.state.value.pending.question).toBeUndefined()
   })
+
+  it('finishQuestions() → "saving" если есть добавленные вопросы', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(true)
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Что?')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+    expect(flow.state.value.questionsToAdd.length).toBe(1)
+    expect(flow.state.value.step).toBe('q_type')
+    flow.go.finishQuestions()
+    expect(flow.state.value.step).toBe('saving')
+  })
+
+  it('finishQuestions() без вопросов — no-op (защита от случайного клика)', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.finishQuestions()
+    expect(flow.state.value.step).toBe('name')
+  })
+
+  it('offerQuestions(false) после добавленных вопросов → "saving" (не теряем их)', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(true)
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+    // back в questions_offer
+    flow.go.back()
+    expect(flow.state.value.step).toBe('questions_offer')
+    flow.go.offerQuestions(false)
+    expect(flow.state.value.step).toBe('saving')
+  })
+
+  it('offerQuestions(false) без добавленных вопросов → "done" (зеркало бота)', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(false)
+    expect(flow.state.value.step).toBe('done')
+  })
 })

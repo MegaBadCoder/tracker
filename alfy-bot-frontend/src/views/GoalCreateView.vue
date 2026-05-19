@@ -128,6 +128,7 @@ const stepListeners = {
   toggleWeekday: go.toggleWeekday,
   confirmWeekly: go.confirmWeekly,
   setInterval: go.setInterval,
+  finishQuestions: go.finishQuestions,
   back: go.back,
 }
 </script>

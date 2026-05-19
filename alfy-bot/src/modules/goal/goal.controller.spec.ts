@@ -101,6 +101,20 @@ describe('GoalController', () => {
       );
       expect(goalService.create).not.toHaveBeenCalled();
     });
+
+    it('бросает BadRequestException на семантически невалидной дате (regex прошёл, Date.parse → NaN)', async () => {
+      const dto: CreateGoalDto = {
+        goal_name: 'X',
+        goal_start: '2026-02-01',
+        goal_end: '2026-13-01',
+      };
+      const req = { user: { sub: 42 } } as AuthRequestLike;
+
+      await expect(controller.create(req as never, dto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(goalService.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /goals/:id/questions (addQuestions)', () => {
