@@ -24,7 +24,9 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
+import { ReportService } from '../report/application/report.service';
 import { QuestionService } from './application/question.service';
+import { AnswerQuestionDto } from './dto/answer-question.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { UpdateScheduleDto } from '../goal/dto/update-schedule.dto';
@@ -40,7 +42,10 @@ interface AuthRequest extends Request {
 @UseGuards(JwtAuthGuard)
 @Controller('questions')
 export class QuestionController {
-  constructor(private readonly questionService: QuestionService) {}
+  constructor(
+    private readonly questionService: QuestionService,
+    private readonly reportService: ReportService,
+  ) {}
 
   @Get('habits')
   @ApiOperation({ summary: 'Все активные привычки пользователя с историей' })
@@ -101,6 +106,24 @@ export class QuestionController {
       days_of_week: dto.days_of_week,
       interval_days: dto.interval_days,
     }) as unknown as Promise<ScheduleDto>;
+  }
+
+  @Post(':id/answers')
+  @ApiOperation({ summary: 'Отметить ответ на вопрос за дату' })
+  @ApiCreatedResponse({ schema: { example: { ok: true } } })
+  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
+  async answerQuestion(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AnswerQuestionDto,
+  ): Promise<{ ok: true }> {
+    await this.reportService.addAnswer(
+      req.user.sub,
+      id,
+      dto.scheduled_date,
+      dto.answer,
+    );
+    return { ok: true };
   }
 
   @Patch(':id')
