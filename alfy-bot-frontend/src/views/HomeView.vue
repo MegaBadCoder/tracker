@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref, watch, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import AppHeader from '../components/AppHeader.vue'
 import GoalCard from '../components/GoalCard.vue'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import { fetchGoals } from '../api/goals'
 import type { Goal, GoalStatus } from '../types'
 import PageContainer from '@/components/PageContainer.vue'
 
 type Filter = 'all' | GoalStatus
 
+const router = useRouter()
 const goals = ref<Goal[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -37,27 +40,33 @@ watch(filter, load, { immediate: true })
   <AppHeader title="Мои цели" :on-menu-click="openSidebar" />
 
   <PageContainer>
-    <!-- filters -->
-    <Tabs
-      :model-value="filter"
-      class="mb-6"
-      @update:model-value="(v: string | number) => filter = v as Filter"
-    >
-      <TabsList>
-        <TabsTrigger value="all">
-          Все
-        </TabsTrigger>
-        <TabsTrigger value="active">
-          Активные
-        </TabsTrigger>
-        <TabsTrigger value="completed">
-          Завершённые
-        </TabsTrigger>
-        <TabsTrigger value="archived">
-          Архив
-        </TabsTrigger>
-      </TabsList>
-    </Tabs>
+    <!-- filters + create -->
+    <div class="mb-6 flex flex-row items-center justify-between gap-2">
+      <Tabs
+        :model-value="filter"
+        @update:model-value="(v: string | number) => filter = v as Filter"
+      >
+        <TabsList>
+          <TabsTrigger value="all">
+            Все
+          </TabsTrigger>
+          <TabsTrigger value="active">
+            Активные
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            Завершённые
+          </TabsTrigger>
+          <TabsTrigger value="archived">
+            Архив
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <Button class="flex-shrink-0" @click="router.push({ name: 'goal-create' })">
+        <span class="sm:hidden">+</span>
+        <span class="hidden sm:inline">+ Создать цель</span>
+      </Button>
+    </div>
 
     <!-- grid -->
     <div v-if="loading" class="py-20 text-center text-muted-foreground">
