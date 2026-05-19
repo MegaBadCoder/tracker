@@ -1,6 +1,6 @@
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { ReportService } from '../report/application/report.service';
 import { QuestionService } from './application/question.service';
 import { AnswerQuestionDto } from './dto/answer-question.dto';
@@ -32,7 +32,7 @@ describe('QuestionController — POST /:id/answers', () => {
         { provide: ReportService, useValue: reportService },
       ],
     })
-      .overrideGuard(JwtAuthGuard)
+      .overrideGuard(JwtOrApiTokenGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

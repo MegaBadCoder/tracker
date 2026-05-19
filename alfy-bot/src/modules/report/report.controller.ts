@@ -15,7 +15,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { ReportService } from './application/report.service';
 import { AnalyticsEntryDto } from './dto/question-analytics.dto';
@@ -26,7 +26,7 @@ interface AuthRequest extends Request {
 
 @ApiTags('analytics')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtOrApiTokenGuard)
 @Controller('questions')
 export class ReportController {
   constructor(private readonly reportService: ReportService) {}
