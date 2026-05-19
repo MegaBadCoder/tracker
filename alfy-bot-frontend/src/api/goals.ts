@@ -45,12 +45,24 @@ export async function fetchQuestion(questionId: number): Promise<Question> {
   return data
 }
 
+export interface UpdateQuestionDto {
+  question?: string
+  type?: QuestionType
+  can_skip?: boolean
+  is_habit?: boolean
+  target_value?: string | null
+}
+
 export async function updateQuestion(
   questionId: number,
-  dto: { is_habit?: boolean, question?: string },
+  dto: UpdateQuestionDto,
 ): Promise<Question> {
   const { data } = await api.patch<Question>(`/questions/${questionId}`, dto)
   return data
+}
+
+export async function deleteQuestion(questionId: number): Promise<void> {
+  await api.delete(`/questions/${questionId}`)
 }
 
 export async function updateQuestionSchedule(

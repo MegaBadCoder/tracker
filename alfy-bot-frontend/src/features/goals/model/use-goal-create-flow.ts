@@ -96,6 +96,8 @@ export interface GoalCreateFlow {
     confirmWeekly: () => void
     setInterval: (n: number) => void
     addQuestion: () => void
+    updateQuestion: (index: number, value: QuestionWithScheduleItem) => void
+    removeQuestion: (index: number) => void
     finishQuestions: () => void
     back: () => void
     cancel: () => void
@@ -292,6 +294,18 @@ export function useGoalCreateFlow(): GoalCreateFlow {
     state.value.step = 'q_type'
   }
 
+  function updateQuestion(index: number, value: QuestionWithScheduleItem): void {
+    if (index < 0 || index >= state.value.questionsToAdd.length)
+      return
+    state.value.questionsToAdd.splice(index, 1, value)
+  }
+
+  function removeQuestion(index: number): void {
+    if (index < 0 || index >= state.value.questionsToAdd.length)
+      return
+    state.value.questionsToAdd.splice(index, 1)
+  }
+
   function back(): void {
     switch (state.value.step) {
       case 'type':
@@ -423,6 +437,8 @@ export function useGoalCreateFlow(): GoalCreateFlow {
       confirmWeekly,
       setInterval,
       addQuestion,
+      updateQuestion,
+      removeQuestion,
       finishQuestions,
       back,
       cancel,

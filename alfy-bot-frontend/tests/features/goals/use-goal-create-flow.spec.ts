@@ -398,4 +398,153 @@ describe('useGoalCreateFlow — state machine', () => {
     flow.go.offerQuestions(false)
     expect(flow.state.value.step).toBe('done')
   })
+
+  it('updateQuestion(idx, value) подменяет элемент целиком и не меняет state.step', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(true)
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q1')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+    expect(flow.state.value.questionsToAdd.length).toBe(1)
+    const stepBefore = flow.state.value.step
+
+    flow.go.updateQuestion(0, {
+      question: 'Q1-edited',
+      type: 'number',
+      canSkip: true,
+      scheduleType: 'daily',
+      targetValue: '100',
+    })
+
+    expect(flow.state.value.step).toBe(stepBefore)
+    expect(flow.state.value.questionsToAdd.length).toBe(1)
+    expect(flow.state.value.questionsToAdd[0]).toEqual({
+      question: 'Q1-edited',
+      type: 'number',
+      canSkip: true,
+      scheduleType: 'daily',
+      targetValue: '100',
+    })
+  })
+
+  it('removeQuestion(idx) вырезает элемент, не меняет state.step и не мутирует соседей', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(true)
+
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q1')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q2')
+    flow.go.setCanSkip(true)
+    flow.go.selectSchedule('daily')
+
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q3')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+
+    expect(flow.state.value.questionsToAdd.length).toBe(3)
+    const q1Snapshot = { ...flow.state.value.questionsToAdd[0]! }
+    const q3Snapshot = { ...flow.state.value.questionsToAdd[2]! }
+    const stepBefore = flow.state.value.step
+
+    flow.go.removeQuestion(1)
+
+    expect(flow.state.value.step).toBe(stepBefore)
+    expect(flow.state.value.questionsToAdd.length).toBe(2)
+    expect(flow.state.value.questionsToAdd[0]).toEqual(q1Snapshot)
+    expect(flow.state.value.questionsToAdd[1]).toEqual(q3Snapshot)
+  })
+
+  it('updateQuestion с idx вне диапазона — no-op', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(true)
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q1')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+
+    const snapshot = { ...flow.state.value.questionsToAdd[0]! }
+    const stepBefore = flow.state.value.step
+    const lenBefore = flow.state.value.questionsToAdd.length
+
+    flow.go.updateQuestion(-1, {
+      question: 'X', type: 'text', canSkip: false, scheduleType: 'daily',
+    })
+    flow.go.updateQuestion(99, {
+      question: 'Y', type: 'text', canSkip: false, scheduleType: 'daily',
+    })
+
+    expect(flow.state.value.step).toBe(stepBefore)
+    expect(flow.state.value.questionsToAdd.length).toBe(lenBefore)
+    expect(flow.state.value.questionsToAdd[0]).toEqual(snapshot)
+  })
+
+  it('removeQuestion с idx вне диапазона — no-op', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
+      status: 'active', createdAt: '', questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Ц')
+    flow.go.selectStartPreset('today')
+    flow.go.selectEndPreset('week')
+    flow.go.setPointA(false)
+    await flow.submit.createGoal()
+    flow.go.offerQuestions(true)
+    flow.go.selectQuestionType('text')
+    flow.go.submitQuestionText('Q1')
+    flow.go.setCanSkip(false)
+    flow.go.selectSchedule('daily')
+
+    const snapshot = { ...flow.state.value.questionsToAdd[0]! }
+    const stepBefore = flow.state.value.step
+    const lenBefore = flow.state.value.questionsToAdd.length
+
+    flow.go.removeQuestion(-1)
+    flow.go.removeQuestion(99)
+
+    expect(flow.state.value.step).toBe(stepBefore)
+    expect(flow.state.value.questionsToAdd.length).toBe(lenBefore)
+    expect(flow.state.value.questionsToAdd[0]).toEqual(snapshot)
+  })
 })
