@@ -76,7 +76,7 @@ npx vue-tsc --noEmit -p tsconfig.app.json       # тип-чек без билд�
 
 `alfy-bot-frontend/src/` устроен как feature-sliced:
 
-- `features/<name>/{api,lib,model,ui}/` — самодостаточные фичи: `tasks`, `calendar`, `projects`, `task-timer`. `model/` обычно содержит Pinia-стор и типы, `lib/` — чистые утилиты, `ui/` — Vue-компоненты, `api/` — HTTP-клиенты для бэка.
+- `features/<name>/{api,lib,model,ui}/` — самодостаточные фичи: `tasks`, `calendar`, `projects`, `task-timer`, `goals`. `model/` обычно содержит Pinia-стор и типы (для `goals` — composable state-машины создания), `lib/` — чистые утилиты, `ui/` — Vue-компоненты, `api/` — HTTP-клиенты для бэка.
 - `components/ui/` — shadcn-vue примитивы (см. ниже).
 - `components/` (корень) — общие layout/виджеты (`AppLayout`, `AppHeader`, `AppSidebar`, чарты).
 - `views/` — страницы, подключённые в `router/index.ts`.
