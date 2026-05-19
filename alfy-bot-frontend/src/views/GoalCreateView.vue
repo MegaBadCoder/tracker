@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
+import type { QuestionWithScheduleItem } from '@/api/goals'
 import { markRaw, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
@@ -16,7 +17,14 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { useGoalCreateFlow } from '@/features/goals/model/use-goal-create-flow'
+import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
 import CanSkipStep from '@/features/goals/ui/steps/CanSkipStep.vue'
 import CreateProgressStep from '@/features/goals/ui/steps/CreateProgressStep.vue'
 import EndDateStep from '@/features/goals/ui/steps/EndDateStep.vue'
@@ -37,6 +45,7 @@ import WeeklyDaysStep from '@/features/goals/ui/steps/WeeklyDaysStep.vue'
 const router = useRouter()
 const { state, go, submit } = useGoalCreateFlow()
 const error = ref<string>('')
+const editingPendingIdx = ref<number | null>(null)
 
 const stepMap: Record<string, Component> = markRaw({
   type: TypeStep,
@@ -130,6 +139,19 @@ const stepListeners = {
   setInterval: go.setInterval,
   finishQuestions: go.finishQuestions,
   back: go.back,
+  editPendingQuestion: (idx: number) => {
+    editingPendingIdx.value = idx
+  },
+  removePendingQuestion: (idx: number) => {
+    go.removeQuestion(idx)
+  },
+}
+
+function onSavePending(v: QuestionWithScheduleItem) {
+  if (editingPendingIdx.value === null)
+    return
+  go.updateQuestion(editingPendingIdx.value, v)
+  editingPendingIdx.value = null
 }
 </script>
 
@@ -178,5 +200,22 @@ const stepListeners = {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+
+    <Sheet
+      :open="editingPendingIdx !== null"
+      @update:open="(o: boolean) => { if (!o) editingPendingIdx = null }"
+    >
+      <SheetContent class="overflow-y-auto p-6">
+        <SheetHeader class="px-0">
+          <SheetTitle>Редактировать вопрос</SheetTitle>
+        </SheetHeader>
+        <QuestionEditForm
+          v-if="editingPendingIdx !== null"
+          :initial="state.questionsToAdd[editingPendingIdx]!"
+          @save="onSavePending"
+          @cancel="editingPendingIdx = null"
+        />
+      </SheetContent>
+    </Sheet>
   </PageContainer>
 </template>

@@ -1,6 +1,19 @@
 <script setup lang="ts">
+import type { QuestionWithScheduleItem } from '@/api/goals'
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
 import type { QuestionType } from '@/types'
+import { Pencil, Trash2 } from 'lucide-vue-next'
+import { ref } from 'vue'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { QUESTION_TYPE_OPTIONS } from './question-types'
 
@@ -9,14 +22,99 @@ const emit = defineEmits<{
   (e: 'selectQuestionType', t: QuestionType): void
   (e: 'finishQuestions'): void
   (e: 'back'): void
+  (e: 'editPendingQuestion', idx: number): void
+  (e: 'removePendingQuestion', idx: number): void
 }>()
+
+const deleteIdx = ref<number | null>(null)
+
+const WEEKDAY_LABELS: Record<number, string> = {
+  0: 'Вс',
+  1: 'Пн',
+  2: 'Вт',
+  3: 'Ср',
+  4: 'Чт',
+  5: 'Пт',
+  6: 'Сб',
+}
+
+function typeLabel(t: QuestionType): string {
+  return QUESTION_TYPE_OPTIONS.find(o => o.type === t)?.label ?? t
+}
+
+function scheduleSummary(q: QuestionWithScheduleItem): string {
+  if (q.scheduleType === 'daily')
+    return 'Каждый день'
+  if (q.scheduleType === 'weekly_days') {
+    const days = (q.selectedDays ?? [])
+      .slice()
+      .sort((a, b) => {
+        // отсортировать с Пн в начале (1..6), Вс в конце (0)
+        const norm = (d: number) => (d === 0 ? 7 : d)
+        return norm(a) - norm(b)
+      })
+      .map(d => WEEKDAY_LABELS[d] ?? String(d))
+      .join(', ')
+    return `По дням: ${days}`
+  }
+  if (q.scheduleType === 'interval')
+    return `Раз в ${q.intervalDays ?? '?'} дней`
+  return ''
+}
+
+function onConfirmDelete() {
+  if (deleteIdx.value !== null) {
+    emit('removePendingQuestion', deleteIdx.value)
+    deleteIdx.value = null
+  }
+}
 </script>
 
 <template>
   <div class="space-y-4">
-    <p v-if="state.questionsToAdd.length > 0" class="text-sm text-muted-foreground">
-      Добавлено вопросов: {{ state.questionsToAdd.length }}
-    </p>
+    <section v-if="state.questionsToAdd.length > 0" class="space-y-2">
+      <h3 class="text-sm font-semibold text-foreground">
+        Добавленные вопросы
+      </h3>
+      <div class="space-y-2">
+        <div
+          v-for="(q, idx) in state.questionsToAdd"
+          :key="idx"
+          class="flex items-center gap-3 bg-card border border-border rounded-xl px-3 py-2"
+          :data-testid="`pending-question-${idx}`"
+        >
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-foreground truncate">
+              {{ q.question }}
+            </p>
+            <div class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              <span class="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5">
+                {{ typeLabel(q.type) }}
+              </span>
+              <span>{{ scheduleSummary(q) }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent active:bg-accent text-muted-foreground hover:text-foreground"
+            :aria-label="`Редактировать вопрос ${idx + 1}`"
+            :data-testid="`edit-pending-${idx}`"
+            @click="emit('editPendingQuestion', idx)"
+          >
+            <Pencil class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-destructive/10 active:bg-destructive/10 text-muted-foreground hover:text-destructive"
+            :aria-label="`Удалить вопрос ${idx + 1}`"
+            :data-testid="`delete-pending-${idx}`"
+            @click="deleteIdx = idx"
+          >
+            <Trash2 class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </section>
 
     <h2 class="text-lg font-semibold">
       Выбери тип вопроса:
@@ -48,5 +146,30 @@ const emit = defineEmits<{
         ⬅️ Назад
       </Button>
     </div>
+
+    <AlertDialog
+      :open="deleteIdx !== null"
+      @update:open="(o: boolean) => { if (!o) deleteIdx = null }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Удалить вопрос?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <template v-if="deleteIdx !== null">
+              Вопрос «{{ state.questionsToAdd[deleteIdx]?.question }}» будет удалён из списка.
+            </template>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Отмена</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-white hover:bg-destructive/90"
+            @click="onConfirmDelete"
+          >
+            Удалить
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
