@@ -8,6 +8,7 @@ env:
   REGISTRY: ${{ secrets.REGISTRY_URL }}
   BACKEND_IMAGE: ${{ secrets.REGISTRY_URL }}/alfy-backend
   FRONTEND_IMAGE: ${{ secrets.REGISTRY_URL }}/alfy-frontend
+  MCP_IMAGE: ${{ secrets.REGISTRY_URL }}/alfy-mcp
 
 jobs:
   build-and-push:
@@ -31,6 +32,11 @@ jobs:
             -t $FRONTEND_IMAGE:${{ github.sha }} -t $FRONTEND_IMAGE:latest \
             ./alfy-bot-frontend
           docker push $FRONTEND_IMAGE --all-tags
+
+      - name: Build & push alfy-mcp
+        run: |
+          docker build -t $MCP_IMAGE:${{ github.sha }} -t $MCP_IMAGE:latest ./alfy-mcp
+          docker push $MCP_IMAGE --all-tags
 
   deploy:
     needs: build-and-push

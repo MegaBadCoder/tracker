@@ -1,0 +1,96 @@
+name: CI
+
+# Pre-merge checks для PR в main: lint + test + build для всех пакетов.
+# Без деплоя, без push в Docker Registry. Деплой делает deploy.yml на push в main.
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (alfy-bot)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alfy-bot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: alfy-bot/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint -- --max-warnings=0
+        continue-on-error: true
+
+      - name: Test
+        run: npm test
+
+      - name: Build (nest)
+        run: npm run build
+
+  frontend:
+    name: Frontend (alfy-bot-frontend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alfy-bot-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: alfy-bot-frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Type check
+        run: npx vue-tsc --noEmit -p tsconfig.app.json
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build (vite)
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:3002
+          VITE_BOT_USERNAME: ci
+
+  mcp:
+    name: MCP server (alfy-mcp)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: alfy-mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: alfy-mcp/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Test
+        run: npm test
+
+      - name: Build (tsc)
+        run: npm run build
