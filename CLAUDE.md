@@ -94,6 +94,7 @@ npx vue-tsc --noEmit -p tsconfig.app.json       # тип-чек без билд�
 
 - **Кастомный движок на PointerEvents** в `features/tasks/lib/dnd/` (`useTaskDnd`, `useDragSource`, `useDropTarget`, `useReorderList`) + `<TaskDragGhost />` через teleport в `App.vue`. Используется для: reorder задач в Inbox (`TasksView`) и в проекте-list-без-колонок (`ProjectView` когда `columns.length === 0`), drop задач на проекты/Inbox в сайдбаре. Жесты: drag-handle (немедленно) + long-press 350ms на mobile + threshold 5px на desktop.
 - **`vuedraggable`** в `features/projects/ui/BoardView.vue`, `BoardColumn.vue`, `ProjectTreeNav.vue`. Используется для: задач внутри колонок board-view, переупорядочивания самих колонок, переупорядочивания проектов в сайдбаре. Не трогать без явной задачи.
+- **Drag-create в календаре** — `features/calendar/lib/use-create-slot-drag.ts` (рисование задачи по сетке часов). Использует те же константы (`LONG_PRESS_DELAY_MS=350`, `TOUCH_DRAG_THRESHOLD_PX=8`), что и `features/tasks/lib/dnd/use-drag-source.ts`, чтобы на mobile сохранять нативный scroll до осознанного long-press. На desktop drag стартует мгновенно.
 
 # UI conventions — shadcn-vue
 
