@@ -48,7 +48,10 @@ export class QuestionWithScheduleItem {
   @IsInt({ each: true })
   selectedDays?: number[];
 
-  @ApiPropertyOptional({ example: 3, description: 'Интервал в днях. Для interval.' })
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Интервал в днях. Для interval.',
+  })
   @IsOptional()
   @IsInt()
   @Min(1)

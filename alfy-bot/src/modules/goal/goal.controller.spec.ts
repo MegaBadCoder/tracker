@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Goal, Question } from '../../shared/entities';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { GoalService } from './application/goal.service';
 import { AddQuestionsDto } from './dto/add-questions.dto';
 import { CreateGoalDto } from './dto/create-goal.dto';
@@ -63,7 +63,7 @@ describe('GoalController', () => {
       controllers: [GoalController],
       providers: [{ provide: GoalService, useValue: goalService }],
     })
-      .overrideGuard(JwtAuthGuard)
+      .overrideGuard(JwtOrApiTokenGuard)
       .useValue({ canActivate: () => true })
       .compile();
 
@@ -121,7 +121,9 @@ describe('GoalController', () => {
     it('форвардит в addQuestionsWithSchedules после assertOwnedGoal', async () => {
       const userId = 42;
       const goalId = 7;
-      goalService.findById.mockResolvedValue(makeGoal({ id: goalId, user_id: userId }));
+      goalService.findById.mockResolvedValue(
+        makeGoal({ id: goalId, user_id: userId }),
+      );
       const savedQuestions: Question[] = [
         Object.assign(new Question(), { id: 100 }),
       ];
@@ -156,7 +158,11 @@ describe('GoalController', () => {
       const userId = 42;
       const goalId = 7;
       const owned = makeGoal({ id: goalId, user_id: userId, status: 'active' });
-      const updated = makeGoal({ id: goalId, user_id: userId, status: 'completed' });
+      const updated = makeGoal({
+        id: goalId,
+        user_id: userId,
+        status: 'completed',
+      });
       goalService.findById
         .mockResolvedValueOnce(owned)
         .mockResolvedValueOnce(updated);
@@ -179,7 +185,11 @@ describe('GoalController', () => {
       const userId = 42;
       const goalId = 7;
       const owned = makeGoal({ id: goalId, user_id: userId, status: 'active' });
-      const updated = makeGoal({ id: goalId, user_id: userId, status: 'archived' });
+      const updated = makeGoal({
+        id: goalId,
+        user_id: userId,
+        status: 'archived',
+      });
       goalService.findById
         .mockResolvedValueOnce(owned)
         .mockResolvedValueOnce(updated);

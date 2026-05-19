@@ -25,7 +25,7 @@ import {
 } from '@nestjs/swagger';
 import type { GoalStatus } from '../../shared/constants/goal-statuses';
 import { Goal } from '../../shared/entities';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { GoalService } from './application/goal.service';
 import { AddQuestionsDto } from './dto/add-questions.dto';
@@ -39,7 +39,7 @@ interface AuthRequest extends Request {
 
 @ApiTags('goals')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtOrApiTokenGuard)
 @Controller('goals')
 export class GoalController {
   constructor(private readonly goalService: GoalService) {}
@@ -176,10 +176,7 @@ export class GoalController {
     return updated as GoalDto;
   }
 
-  private async assertOwnedGoal(
-    req: AuthRequest,
-    id: number,
-  ): Promise<Goal> {
+  private async assertOwnedGoal(req: AuthRequest, id: number): Promise<Goal> {
     const goal = await this.goalService.findById(id);
     if (!goal || goal.user_id !== req.user.sub) {
       throw new NotFoundException(`Goal #${id} not found`);

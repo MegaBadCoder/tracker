@@ -4,14 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Repository layout
 
-Монорепо из двух приложений + общая инфраструктура:
+Монорепо из трёх приложений + общая инфраструктура:
 
-- `alfy-bot/` — NestJS-бэкенд (порт 3002): REST API под `/api`, Swagger на `/api/docs`, Telegram-бот (telegraf), TypeORM + SQLite (`data/database.sqlite`, `synchronize: true`), JWT-аутентификация, web-push.
+- `alfy-bot/` — NestJS-бэкенд (порт 3002): REST API под `/api`, Swagger на `/api/docs`, Telegram-бот (telegraf), TypeORM + SQLite (`data/database.sqlite`, `synchronize: true`), JWT + API-token auth (`JwtOrApiTokenGuard`), web-push.
 - `alfy-bot-frontend/` — Vue 3 + Vite + TS + Tailwind v4 + Pinia + vue-router. PWA (`vite-plugin-pwa`, кастомный `sw.ts`). Запускается как обычный SPA и как Telegram WebApp.
-- `docker-compose.yml` + `Caddyfile` — прод: Caddy на 80/443 раздаёт `tracker.rocketup.tech`, проксирует `/api/*` на backend, остальное на frontend (nginx).
+- `alfy-mcp/` — MCP-сервер (порт 3003, ESM, Node 22+): тонкая обёртка над REST `alfy-bot` для Claude Desktop/Code и удалённых MCP-клиентов. Транспорты: stdio + Streamable HTTP (endpoint `/mcp`). Auth — API-токены, выдаваемые ботом (`/mcp_token <name>`). Не ходит в БД напрямую.
+- `docker-compose.yml` + `Caddyfile` — прод: Caddy на 80/443 раздаёт `tracker.rocketup.tech`, проксирует `/api/*` на backend, `/mcp` + `/mcp/*` на alfy-mcp, остальное на frontend (nginx).
 - `scripts/tunnels.sh` — Cloudflare Quick Tunnels для dev (см. README).
 
-Бэк и фронт деплоятся независимо в Docker-реестр (`REGISTRY_URL` в `.env`).
+Все три деплоятся независимо в Docker-реестр (`REGISTRY_URL` в `.env`).
 
 # Commands
 
@@ -45,6 +46,18 @@ npx vue-tsc --noEmit -p tsconfig.app.json       # тип-чек без билд�
 ```
 
 Тесты лежат в `alfy-bot-frontend/tests/` (зеркалят структуру `src/`), env — `happy-dom`, MSW для моков сети.
+
+## MCP server (`alfy-mcp/`)
+
+```bash
+npm run dev:stdio           # tsx src/cli.ts --stdio (для Claude Desktop/Code)
+npm run dev:http            # tsx src/cli.ts --http (порт 3003, endpoint /mcp)
+npm run build               # tsc → dist/
+npm run test                # vitest run
+npm run lint                # eslint .
+```
+
+ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `StreamableHTTPServerTransport`). Auth — API-токены через бот (`/mcp_token <name>`), хранятся как bcrypt-хеш + 10-char prefix-index в БД (`api_token` entity). Tools — тонкая обёртка над REST `alfy-bot` (1 HTTP-вызов на tool, кроме `get_progress` — 3 параллельных). См. `alfy-mcp/README.md` для подключения из клиентов.
 
 ## Dev (Telegram WebApp через публичные URL)
 

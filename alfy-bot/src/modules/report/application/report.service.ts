@@ -32,7 +32,12 @@ export class ReportService {
     answerText: string,
   ): Promise<void> {
     const question = await this.goalService.findQuestionById(questionId);
-    if (!question) throw new Error('Question not found');
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
 
     const normalized = this.normalizeAnswer(answerText, question.type);
 

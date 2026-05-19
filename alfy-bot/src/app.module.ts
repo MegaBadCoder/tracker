@@ -28,6 +28,7 @@ import {
   PushSubscription,
   Project,
   ProjectColumn,
+  ApiToken,
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
@@ -54,6 +55,7 @@ import { SharedModule } from './shared/shared.module';
         PushSubscription,
         Project,
         ProjectColumn,
+        ApiToken,
       ],
       synchronize: true,
     }),

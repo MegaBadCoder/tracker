@@ -2,7 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, Length, Matches } from 'class-validator';
 
 export class CreateGoalDto {
-  @ApiProperty({ example: 'Читать 30 минут в день', minLength: 1, maxLength: 200 })
+  @ApiProperty({
+    example: 'Читать 30 минут в день',
+    minLength: 1,
+    maxLength: 200,
+  })
   @IsString()
   @Length(1, 200)
   goal_name: string;
