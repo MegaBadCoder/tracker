@@ -22,6 +22,14 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
     scheduledDate: string,
     data: AnswerData,
   ): Promise<ReportAnswer> {
+    const existing = await this.findByQuestionAndDate(questionId, scheduledDate);
+    if (existing) {
+      existing.answer_text = data.answer_text;
+      existing.answer_number = data.answer_number;
+      existing.answer_bool = data.answer_bool;
+      existing.photo_key = data.photo_key ?? null;
+      return this.repo.save(existing);
+    }
     const answer = this.repo.create({
       user_id: userId,
       question_id: questionId,

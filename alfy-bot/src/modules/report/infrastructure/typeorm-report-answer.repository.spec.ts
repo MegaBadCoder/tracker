@@ -89,6 +89,87 @@ describe('TypeOrmReportAnswerRepository', () => {
       const row = await repo.findOne({ where: { id: result.id } });
       expect(row!.photo_key).toBeNull();
     });
+
+    it('updates existing row when (question_id, scheduled_date) already exists — only one row remains', async () => {
+      await sut.save(1, 50, '2024-05-01', {
+        answer_text: 'first',
+        answer_number: null,
+        answer_bool: null,
+      });
+
+      await sut.save(1, 50, '2024-05-01', {
+        answer_text: 'updated',
+        answer_number: 42,
+        answer_bool: null,
+      });
+
+      const all = await repo.find({ where: { question_id: 50, scheduled_date: '2024-05-01' } });
+      expect(all.length).toBe(1);
+      expect(all[0].answer_text).toBe('updated');
+      expect(all[0].answer_number).toBe(42);
+    });
+
+    it('updates photo_key from null to a key string on existing row', async () => {
+      await sut.save(1, 51, '2024-05-02', {
+        answer_text: 'no photo yet',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: null,
+      });
+
+      const updated = await sut.save(1, 51, '2024-05-02', {
+        answer_text: 'now has photo',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: 'uploads/new.jpg',
+      });
+
+      expect(updated.photo_key).toBe('uploads/new.jpg');
+      const all = await repo.find({ where: { question_id: 51, scheduled_date: '2024-05-02' } });
+      expect(all.length).toBe(1);
+      expect(all[0].photo_key).toBe('uploads/new.jpg');
+    });
+
+    it('updates photo_key from one key to another on existing row', async () => {
+      await sut.save(1, 52, '2024-05-03', {
+        answer_text: 'photo v1',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: 'uploads/old.jpg',
+      });
+
+      const updated = await sut.save(1, 52, '2024-05-03', {
+        answer_text: 'photo v2',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: 'uploads/new.jpg',
+      });
+
+      expect(updated.photo_key).toBe('uploads/new.jpg');
+      const all = await repo.find({ where: { question_id: 52, scheduled_date: '2024-05-03' } });
+      expect(all.length).toBe(1);
+      expect(all[0].photo_key).toBe('uploads/new.jpg');
+    });
+
+    it('does NOT change createdAt on update', async () => {
+      const first = await sut.save(1, 53, '2024-05-04', {
+        answer_text: 'original',
+        answer_number: null,
+        answer_bool: null,
+      });
+      const originalCreatedAt = first.createdAt;
+
+      // Small delay to ensure time difference would be visible if createdAt were reset
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      const updated = await sut.save(1, 53, '2024-05-04', {
+        answer_text: 'changed',
+        answer_number: null,
+        answer_bool: null,
+      });
+
+      expect(updated.createdAt.getTime()).toBe(originalCreatedAt.getTime());
+    });
   });
 
   describe('findByQuestionAndDate', () => {
