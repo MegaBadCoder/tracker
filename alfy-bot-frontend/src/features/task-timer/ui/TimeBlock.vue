@@ -71,7 +71,7 @@ onUnmounted(() => {
     <div
       v-if="store.phase > 0"
       :class="[
-        'timer-block z-[1000]',
+        'timer-block z-[1000] pointer-events-auto',
         timerColorClass,
         isFullscreen ? 'timer-fullscreen' : 'timer-compact group'
       ]"
