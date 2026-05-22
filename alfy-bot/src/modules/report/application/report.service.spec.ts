@@ -332,6 +332,39 @@ describe('ReportService', () => {
         service.addPhotoAnswer(1, 5, '2026-05-22', photo),
       ).resolves.toBeUndefined();
     });
+
+    it('удаляет только что загруженный ключ если save() падает (no orphan)', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findByQuestionAndDate.mockResolvedValue(null);
+      answerRepo.save.mockRejectedValue(new Error('DB locked'));
+
+      await expect(
+        service.addPhotoAnswer(1, 5, '2026-05-22', photo),
+      ).rejects.toThrow(/DB locked/);
+
+      expect(storage.upload).toHaveBeenCalledTimes(1);
+      expect(storage.delete).toHaveBeenCalledTimes(1);
+      const newKey = (storage.upload as jest.Mock).mock.calls[0][0] as string;
+      expect((storage.delete as jest.Mock).mock.calls[0][0]).toBe(newKey);
+    });
+
+    it('НЕ удаляет старый ключ если save() падает (старая фото остаётся доступной)', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      const oldKey = 'goal-reports/1/5/old.jpg';
+      answerRepo.findByQuestionAndDate.mockResolvedValue({ photo_key: oldKey });
+      answerRepo.save.mockRejectedValue(new Error('DB locked'));
+
+      await expect(
+        service.addPhotoAnswer(1, 5, '2026-05-22', photo),
+      ).rejects.toThrow(/DB locked/);
+
+      const deleteCalls = (storage.delete as jest.Mock).mock.calls.map(
+        (c: unknown[]) => c[0],
+      );
+      expect(deleteCalls).not.toContain(oldKey);
+    });
   });
 
   describe('getPhotoGallery', () => {

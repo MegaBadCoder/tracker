@@ -219,22 +219,28 @@ export class ReportService {
     const ext = this.mimeToExt(photo.mime);
     const key = `goal-reports/${userId}/${questionId}/${scheduledDate}-${randomUUID()}.${ext}`;
 
-    await this.storage.upload(key, photo.buffer, photo.mime);
-
     const existing = await this.answerRepo.findByQuestionAndDate(
       questionId,
       scheduledDate,
     );
-    if (existing?.photo_key && existing.photo_key !== key) {
-      await this.storage.delete(existing.photo_key).catch(() => undefined);
+
+    await this.storage.upload(key, photo.buffer, photo.mime);
+
+    try {
+      await this.answerRepo.save(userId, questionId, scheduledDate, {
+        answer_text: '',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: key,
+      });
+    } catch (e) {
+      await this.storage.delete(key).catch(() => undefined);
+      throw e;
     }
 
-    await this.answerRepo.save(userId, questionId, scheduledDate, {
-      answer_text: '',
-      answer_number: null,
-      answer_bool: null,
-      photo_key: key,
-    });
+    if (existing?.photo_key) {
+      await this.storage.delete(existing.photo_key).catch(() => undefined);
+    }
   }
 
   async getPhotoGallery(
