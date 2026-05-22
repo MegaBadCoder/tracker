@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, LogOut, Monitor, Moon, Palette, Sun } from 'lucide-vue-next'
+import { ChevronDown, LogOut, Monitor, Moon, Sun } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useUserStore } from '@/stores/user-store'
@@ -96,23 +96,20 @@ function handleLogout() {
         {{ link.label }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
-          <Palette class="h-4 w-4" />
-          Тема
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent class="w-40">
-          <DropdownMenuItem
-            v-for="opt in THEME_OPTIONS"
-            :key="opt.value"
-            :class="theme === opt.value ? 'bg-accent' : ''"
-            @click="setTheme(opt.value)"
-          >
-            <component :is="opt.icon" class="h-4 w-4" />
-            {{ opt.label }}
-          </DropdownMenuItem>
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+      <DropdownMenuLabel class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+        Тема
+      </DropdownMenuLabel>
+      <DropdownMenuRadioGroup :model-value="theme" @update:model-value="(v) => setTheme(v as Theme)">
+        <DropdownMenuRadioItem
+          v-for="opt in THEME_OPTIONS"
+          :key="opt.value"
+          :value="opt.value"
+          class="min-h-11 sm:min-h-0 cursor-pointer"
+        >
+          <component :is="opt.icon" class="h-4 w-4" />
+          {{ opt.label }}
+        </DropdownMenuRadioItem>
+      </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="handleLogout">
         <LogOut class="h-4 w-4" />
