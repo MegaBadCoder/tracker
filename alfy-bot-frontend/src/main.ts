@@ -4,10 +4,12 @@ import { createApp } from 'vue'
 import { authorize } from './api/auth'
 import { useUserStore } from './stores/user-store'
 import { initPushSubscription } from './composables/usePushSubscription'
+import { initTheme } from './composables/useTheme'
 import App from './App.vue'
 import router from './router'
 import './style.css'
 
+initTheme()
 registerSW({ immediate: true })
 
 const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID

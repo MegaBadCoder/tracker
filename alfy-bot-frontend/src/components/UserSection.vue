@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, LogOut } from 'lucide-vue-next'
+import { ChevronDown, LogOut, Monitor, Moon, Palette, Sun } from 'lucide-vue-next'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useUserStore } from '@/stores/user-store'
+import { useTheme, type Theme } from '@/composables/useTheme'
 import type { NavLink } from '@/types/navigation'
 
 const props = defineProps<{
@@ -40,6 +44,13 @@ function hashColor(name: string): string {
 const userStore = useUserStore()
 const route = useRoute()
 const router = useRouter()
+const { theme, setTheme } = useTheme()
+
+const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: 'system', label: 'Системная', icon: Monitor },
+  { value: 'light', label: 'Светлая', icon: Sun },
+  { value: 'dark', label: 'Тёмная', icon: Moon },
+]
 
 const avatarColorClass = hashColor(userStore.displayName || 'User')
 
@@ -84,6 +95,24 @@ function handleLogout() {
         <component :is="link.icon" class="h-4 w-4" />
         {{ link.label }}
       </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <Palette class="h-4 w-4" />
+          Тема
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent class="w-40">
+          <DropdownMenuItem
+            v-for="opt in THEME_OPTIONS"
+            :key="opt.value"
+            :class="theme === opt.value ? 'bg-accent' : ''"
+            @click="setTheme(opt.value)"
+          >
+            <component :is="opt.icon" class="h-4 w-4" />
+            {{ opt.label }}
+          </DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="handleLogout">
         <LogOut class="h-4 w-4" />
