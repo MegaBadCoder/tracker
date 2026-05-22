@@ -533,13 +533,10 @@ export class ReportScene {
   @On('photo')
   async handlePhoto(@Ctx() ctx: SceneContext) {
     if (!this.isCurrentQuestionPhoto(ctx)) return;
-    if (!ctx.message || !('photo' in ctx.message) || !ctx.message.photo)
-      return;
+    if (!ctx.message || !('photo' in ctx.message) || !ctx.message.photo) return;
 
-    const mediaGroupId =
-      'media_group_id' in ctx.message
-        ? (ctx.message as any).media_group_id
-        : undefined;
+    const mediaGroupId = (ctx.message as { media_group_id?: string })
+      .media_group_id;
     if (mediaGroupId && ctx.session.lastMediaGroupId === mediaGroupId) return;
     if (mediaGroupId) ctx.session.lastMediaGroupId = mediaGroupId;
 
