@@ -26,6 +26,7 @@ interface SessionData extends Scenes.SceneSessionData {
   preselectedGoalId?: number;
   pendingCurrentGoalId?: number;
   availableGoals?: Goal[];
+  lastMediaGroupId?: string;
 }
 
 interface SceneContext extends Context {
@@ -62,7 +63,10 @@ export class ReportScene {
     const currentIndex = ctx.session.currentQuestionIndex ?? 0;
     const totalQuestions = ctx.session.questions?.length ?? 0;
     const progressText = `📊 Вопрос ${currentIndex + 1} из ${totalQuestions}\n\n`;
-    const questionText = progressText + question.question;
+    const questionText =
+      question.type === 'photo'
+        ? progressText + `📷 ${question.question}\n\nПришли фото`
+        : progressText + question.question;
 
     const buttons = generateQuestionButtons(question.type as QuestionType);
 
@@ -112,6 +116,33 @@ export class ReportScene {
     await this.moveToNextQuestion(ctx);
   }
 
+  private async processPhotoAnswer(
+    ctx: SceneContext,
+    buffer: Buffer,
+    mime: string,
+  ) {
+    if (
+      !ctx.session.userId ||
+      !ctx.session.targetDate ||
+      ctx.session.currentQuestionIndex === undefined ||
+      !ctx.session.questions
+    )
+      return;
+
+    const currentQuestion =
+      ctx.session.questions[ctx.session.currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    await this.reportService.addPhotoAnswer(
+      ctx.session.userId,
+      currentQuestion.id,
+      ctx.session.targetDate,
+      { buffer, mime },
+    );
+
+    await this.moveToNextQuestion(ctx);
+  }
+
   private async moveToNextQuestion(ctx: SceneContext) {
     if (
       !ctx.session.questions ||
@@ -140,6 +171,7 @@ export class ReportScene {
   }
 
   private async finishReport(ctx: SceneContext) {
+    ctx.session.lastMediaGroupId = undefined;
     await ctx.reply('✅ Отчет сохранен!');
 
     if (ctx.session.pendingCurrentGoalId) {
@@ -376,6 +408,7 @@ export class ReportScene {
     ctx.session.targetDate = targetDate;
     ctx.session.questions = unanswered;
     ctx.session.currentQuestionIndex = 0;
+    ctx.session.lastMediaGroupId = undefined;
 
     if (unanswered.length === 0) {
       await ctx.reply('✅ Все вопросы на эту дату уже отвечены!');
@@ -459,6 +492,11 @@ export class ReportScene {
       ctx.session.questions?.[ctx.session.currentQuestionIndex ?? -1];
     const qType = question?.type as QuestionType;
 
+    if (qType === 'photo') {
+      await ctx.reply('📷 Нужно фото. Пришли фотографию.');
+      return;
+    }
+
     if (qType === 'number' && isNaN(parseFloat(answer))) {
       await ctx.reply('❌ Введи число. Попробуй ещё раз.');
       return;
@@ -490,5 +528,68 @@ export class ReportScene {
         '⚠️ Что-то пошло не так. Попробуй ещё раз или введи /cancel',
       );
     }
+  }
+
+  @On('photo')
+  async handlePhoto(@Ctx() ctx: SceneContext) {
+    if (!this.isCurrentQuestionPhoto(ctx)) return;
+    if (!ctx.message || !('photo' in ctx.message) || !ctx.message.photo)
+      return;
+
+    const mediaGroupId =
+      'media_group_id' in ctx.message
+        ? (ctx.message as any).media_group_id
+        : undefined;
+    if (mediaGroupId && ctx.session.lastMediaGroupId === mediaGroupId) return;
+    if (mediaGroupId) ctx.session.lastMediaGroupId = mediaGroupId;
+
+    const photos = ctx.message.photo;
+    const best = photos[photos.length - 1];
+
+    try {
+      const link = await ctx.telegram.getFileLink(best.file_id);
+      const res = await fetch(link.toString());
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await this.processPhotoAnswer(ctx, buffer, 'image/jpeg');
+    } catch (e) {
+      console.error('handlePhoto error:', e);
+      await ctx.reply('⚠️ Не удалось обработать фото. Попробуй ещё раз.');
+    }
+  }
+
+  @On('document')
+  async handleDocumentImage(@Ctx() ctx: SceneContext) {
+    if (!this.isCurrentQuestionPhoto(ctx)) return;
+    if (!ctx.message || !('document' in ctx.message) || !ctx.message.document)
+      return;
+
+    const doc = ctx.message.document;
+    const mime = doc.mime_type ?? '';
+    if (!mime.startsWith('image/')) {
+      await ctx.reply('❌ Только фото. Пришли изображение.');
+      return;
+    }
+
+    try {
+      const link = await ctx.telegram.getFileLink(doc.file_id);
+      const res = await fetch(link.toString());
+      if (!res.ok) throw new Error(`fetch ${res.status}`);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await this.processPhotoAnswer(ctx, buffer, mime);
+    } catch (e) {
+      console.error('handleDocumentImage error:', e);
+      await ctx.reply('⚠️ Не удалось обработать файл. Попробуй ещё раз.');
+    }
+  }
+
+  private isCurrentQuestionPhoto(ctx: SceneContext): boolean {
+    if (
+      !ctx.session.questions ||
+      ctx.session.currentQuestionIndex === undefined
+    )
+      return false;
+    const q = ctx.session.questions[ctx.session.currentQuestionIndex];
+    return q?.type === 'photo';
   }
 }
