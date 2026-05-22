@@ -3,12 +3,14 @@ import { ReportService } from './report.service';
 import { ReportAnswerRepositoryPort } from '../domain/report-answer-repository.port';
 import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
+import { StoragePort } from '../../../shared/storage/domain/storage.port';
 
 describe('ReportService', () => {
   let service: ReportService;
   let answerRepo: Record<string, jest.Mock>;
   let goalService: Record<string, jest.Mock>;
   let scheduleService: Record<string, jest.Mock>;
+  let storage: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     answerRepo = {
@@ -16,6 +18,8 @@ describe('ReportService', () => {
       findByQuestionAndDateRange: jest.fn().mockResolvedValue([]),
       findByQuestionsAndDate: jest.fn().mockResolvedValue([]),
       countByQuestionsAndDate: jest.fn().mockResolvedValue(0),
+      findByQuestionAndDate: jest.fn().mockResolvedValue(null),
+      findPhotosByQuestion: jest.fn().mockResolvedValue([]),
     };
 
     goalService = {
@@ -27,12 +31,19 @@ describe('ReportService', () => {
       isQuestionDueOnDateHistorical: jest.fn().mockReturnValue(true),
     };
 
+    storage = {
+      upload: jest.fn().mockResolvedValue(undefined),
+      getSignedReadUrl: jest.fn().mockResolvedValue('https://example.com/signed'),
+      delete: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReportService,
         { provide: ReportAnswerRepositoryPort, useValue: answerRepo },
         { provide: GoalService, useValue: goalService },
         { provide: ScheduleService, useValue: scheduleService },
+        { provide: StoragePort, useValue: storage },
       ],
     }).compile();
 
@@ -191,6 +202,163 @@ describe('ReportService', () => {
       answerRepo.findByQuestionsAndDate.mockResolvedValue([{ question_id: 1 }]);
 
       const result = await service.getUnansweredQuestions(10, '2026-02-20');
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('addPhotoAnswer', () => {
+    const ownGoal = { id: 10, user_id: 1, goal_name: 'g' };
+    const photoQuestion = { id: 5, goal_id: 10, type: 'photo' };
+    const photo = { buffer: Buffer.from('img'), mime: 'image/jpeg' };
+
+    it('happy path: загружает фото и сохраняет photo_key', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findByQuestionAndDate.mockResolvedValue(null);
+
+      await service.addPhotoAnswer(1, 5, '2026-05-22', photo);
+
+      expect(storage.upload).toHaveBeenCalledWith(
+        expect.stringMatching(/^goal-reports\/1\/5\/2026-05-22-/),
+        photo.buffer,
+        photo.mime,
+      );
+      expect(answerRepo.save).toHaveBeenCalledWith(
+        1,
+        5,
+        '2026-05-22',
+        expect.objectContaining({
+          answer_text: '',
+          answer_number: null,
+          answer_bool: null,
+          photo_key: expect.stringMatching(/^goal-reports\/1\/5\/2026-05-22-/),
+        }),
+      );
+    });
+
+    it('удаляет старый S3 объект при повторной загрузке', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findByQuestionAndDate.mockResolvedValue({
+        photo_key: 'goal-reports/1/5/old-key.jpg',
+      });
+
+      await service.addPhotoAnswer(1, 5, '2026-05-22', photo);
+
+      expect(storage.delete).toHaveBeenCalledWith('goal-reports/1/5/old-key.jpg');
+    });
+
+    it('НЕ вызывает storage.delete когда нет существующего photo_key', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findByQuestionAndDate.mockResolvedValue(null);
+
+      await service.addPhotoAnswer(1, 5, '2026-05-22', photo);
+
+      expect(storage.delete).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException если type !== photo', async () => {
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'text',
+      });
+      goalService.findById.mockResolvedValue(ownGoal);
+
+      await expect(
+        service.addPhotoAnswer(1, 5, '2026-05-22', photo),
+      ).rejects.toThrow(/not of type photo/i);
+    });
+
+    it('бросает BadRequestException при неподдерживаемом mime', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+
+      await expect(
+        service.addPhotoAnswer(1, 5, '2026-05-22', {
+          buffer: Buffer.from('gif'),
+          mime: 'image/gif',
+        }),
+      ).rejects.toThrow(/unsupported image type/i);
+    });
+
+    it('бросает ForbiddenException если goal.user_id !== userId', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue({ id: 10, user_id: 999 });
+
+      await expect(
+        service.addPhotoAnswer(1, 5, '2026-05-22', photo),
+      ).rejects.toThrow(/forbidden/i);
+    });
+
+    it('не падает если storage.delete бросает ошибку (best-effort)', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findByQuestionAndDate.mockResolvedValue({
+        photo_key: 'goal-reports/1/5/old-key.jpg',
+      });
+      storage.delete.mockRejectedValue(new Error('S3 error'));
+
+      await expect(
+        service.addPhotoAnswer(1, 5, '2026-05-22', photo),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('getPhotoGallery', () => {
+    const ownGoal = { id: 10, user_id: 1 };
+    const photoQuestion = { id: 5, goal_id: 10, type: 'photo' };
+
+    it('возвращает массив с presigned URL в том же порядке', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findPhotosByQuestion.mockResolvedValue([
+        { scheduled_date: '2026-05-22', photo_key: 'key1.jpg' },
+        { scheduled_date: '2026-05-21', photo_key: 'key2.jpg' },
+      ]);
+      storage.getSignedReadUrl
+        .mockResolvedValueOnce('https://s3.example.com/key1')
+        .mockResolvedValueOnce('https://s3.example.com/key2');
+
+      const result = await service.getPhotoGallery(1, 5, 50, 0);
+
+      expect(result).toEqual([
+        { scheduled_date: '2026-05-22', url: 'https://s3.example.com/key1' },
+        { scheduled_date: '2026-05-21', url: 'https://s3.example.com/key2' },
+      ]);
+      expect(storage.getSignedReadUrl).toHaveBeenCalledWith('key1.jpg', 3600);
+      expect(storage.getSignedReadUrl).toHaveBeenCalledWith('key2.jpg', 3600);
+    });
+
+    it('бросает BadRequestException если type !== photo', async () => {
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'text',
+      });
+      goalService.findById.mockResolvedValue(ownGoal);
+
+      await expect(service.getPhotoGallery(1, 5, 50, 0)).rejects.toThrow(
+        /not of type photo/i,
+      );
+    });
+
+    it('бросает ForbiddenException если goal.user_id !== userId', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue({ id: 10, user_id: 999 });
+
+      await expect(service.getPhotoGallery(1, 5, 50, 0)).rejects.toThrow(
+        /forbidden/i,
+      );
+    });
+
+    it('возвращает пустой массив если нет фото', async () => {
+      goalService.findQuestionById.mockResolvedValue(photoQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      answerRepo.findPhotosByQuestion.mockResolvedValue([]);
+
+      const result = await service.getPhotoGallery(1, 5, 50, 0);
       expect(result).toEqual([]);
     });
   });

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -10,10 +11,15 @@ import {
   Post,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -22,13 +28,16 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { memoryStorage } from 'multer';
 import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { ReportService } from '../report/application/report.service';
 import { QuestionService } from './application/question.service';
 import { AnswerQuestionDto } from './dto/answer-question.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { PhotoGalleryEntryDto } from './dto/photo-gallery-response.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { UploadPhotoAnswerDto } from './dto/upload-photo-answer.dto';
 import { UpdateScheduleDto } from '../goal/dto/update-schedule.dto';
 import { HabitWithHistoryDto } from './dto/habit-response.dto';
 import { QuestionDto, ScheduleDto } from '../goal/dto/goal-response.dto';
@@ -126,6 +135,44 @@ export class QuestionController {
     return { ok: true };
   }
 
+  @Post(':id/answers/photo')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (req, file, cb) =>
+        /^image\//.test(file.mimetype)
+          ? cb(null, true)
+          : cb(new BadRequestException('Only images are allowed'), false),
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        photo: { type: 'string', format: 'binary' },
+        scheduled_date: { type: 'string', example: '2026-05-22' },
+      },
+      required: ['photo', 'scheduled_date'],
+    },
+  })
+  @ApiOperation({ summary: 'Загрузить фото-ответ на photo-вопрос' })
+  @ApiCreatedResponse({ schema: { example: { ok: true } } })
+  async uploadPhotoAnswer(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UploadPhotoAnswerDto,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ ok: true }> {
+    if (!file) throw new BadRequestException('photo file is required');
+    await this.reportService.addPhotoAnswer(req.user.sub, id, dto.scheduled_date, {
+      buffer: file.buffer,
+      mime: file.mimetype,
+    });
+    return { ok: true };
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Обновить вопрос' })
   @ApiOkResponse({ type: QuestionDto })
@@ -171,5 +218,26 @@ export class QuestionController {
   ): Promise<{ count: number }> {
     const count = await this.questionService.countAnswers(id, req.user.sub);
     return { count };
+  }
+
+  @Get(':id/photo-gallery')
+  @ApiOperation({
+    summary: 'Галерея фото-ответов (DESC по дате, presigned URL TTL 1ч)',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiOkResponse({ type: [PhotoGalleryEntryDto] })
+  async getPhotoGallery(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
+  ): Promise<PhotoGalleryEntryDto[]> {
+    return this.reportService.getPhotoGallery(
+      req.user.sub,
+      id,
+      limit,
+      offset,
+    ) as Promise<PhotoGalleryEntryDto[]>;
   }
 }
