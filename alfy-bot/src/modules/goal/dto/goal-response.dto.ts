@@ -40,7 +40,7 @@ export class QuestionDto {
 
   @ApiProperty({
     example: 'number',
-    enum: ['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent'],
+    enum: ['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent', 'photo'],
   })
   type: string;
 

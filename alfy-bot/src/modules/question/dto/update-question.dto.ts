@@ -9,11 +9,11 @@ export class UpdateQuestionDto {
 
   @ApiPropertyOptional({
     example: 'number',
-    enum: ['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent'],
+    enum: ['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent', 'photo'],
   })
   @IsString()
   @IsOptional()
-  @IsIn(['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent'])
+  @IsIn(['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent', 'photo'])
   type?: string;
 
   @ApiPropertyOptional({ example: false })
