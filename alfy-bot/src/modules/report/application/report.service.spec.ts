@@ -33,7 +33,9 @@ describe('ReportService', () => {
 
     storage = {
       upload: jest.fn().mockResolvedValue(undefined),
-      getSignedReadUrl: jest.fn().mockResolvedValue('https://example.com/signed'),
+      getSignedReadUrl: jest
+        .fn()
+        .mockResolvedValue('https://example.com/signed'),
       delete: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -54,7 +56,11 @@ describe('ReportService', () => {
     const ownGoal = { id: 10, user_id: 1, goal_name: 'g' };
 
     it('должен сохранить ответ с normalized answer_number для типа number', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'number' });
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'number',
+      });
       goalService.findById.mockResolvedValue(ownGoal);
 
       await service.addAnswer(1, 5, '2026-02-20', '42');
@@ -72,7 +78,11 @@ describe('ReportService', () => {
     });
 
     it('должен нормализовать answer_number для типа rating с запятой', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'rating' });
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'rating',
+      });
       goalService.findById.mockResolvedValue(ownGoal);
 
       await service.addAnswer(1, 5, '2026-02-20', '4,5');
@@ -89,7 +99,11 @@ describe('ReportService', () => {
     });
 
     it('должен нормализовать answer_bool для yes_no — "да"', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'yes_no' });
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'yes_no',
+      });
       goalService.findById.mockResolvedValue(ownGoal);
 
       await service.addAnswer(1, 5, '2026-02-20', 'Да');
@@ -114,22 +128,34 @@ describe('ReportService', () => {
     });
 
     it('должен бросить ForbiddenException если вопрос принадлежит другому пользователю', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'number' });
-      goalService.findById.mockResolvedValue({ id: 10, user_id: 999, goal_name: 'other' });
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'number',
+      });
+      goalService.findById.mockResolvedValue({
+        id: 10,
+        user_id: 999,
+        goal_name: 'other',
+      });
 
-      await expect(
-        service.addAnswer(1, 5, '2026-02-20', '42'),
-      ).rejects.toThrow(/forbidden/i);
+      await expect(service.addAnswer(1, 5, '2026-02-20', '42')).rejects.toThrow(
+        /forbidden/i,
+      );
       expect(answerRepo.save).not.toHaveBeenCalled();
     });
 
     it('должен бросить NotFoundException если родительская цель не найдена', async () => {
-      goalService.findQuestionById.mockResolvedValue({ id: 5, goal_id: 10, type: 'number' });
+      goalService.findQuestionById.mockResolvedValue({
+        id: 5,
+        goal_id: 10,
+        type: 'number',
+      });
       goalService.findById.mockResolvedValue(null);
 
-      await expect(
-        service.addAnswer(1, 5, '2026-02-20', '42'),
-      ).rejects.toThrow(/goal not found/i);
+      await expect(service.addAnswer(1, 5, '2026-02-20', '42')).rejects.toThrow(
+        /goal not found/i,
+      );
       expect(answerRepo.save).not.toHaveBeenCalled();
     });
   });
@@ -245,7 +271,9 @@ describe('ReportService', () => {
 
       await service.addPhotoAnswer(1, 5, '2026-05-22', photo);
 
-      expect(storage.delete).toHaveBeenCalledWith('goal-reports/1/5/old-key.jpg');
+      expect(storage.delete).toHaveBeenCalledWith(
+        'goal-reports/1/5/old-key.jpg',
+      );
     });
 
     it('НЕ вызывает storage.delete когда нет существующего photo_key', async () => {

@@ -22,7 +22,10 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
     scheduledDate: string,
     data: AnswerData,
   ): Promise<ReportAnswer> {
-    const existing = await this.findByQuestionAndDate(questionId, scheduledDate);
+    const existing = await this.findByQuestionAndDate(
+      questionId,
+      scheduledDate,
+    );
     if (existing) {
       existing.answer_text = data.answer_text;
       existing.answer_number = data.answer_number;

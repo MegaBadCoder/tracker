@@ -44,7 +44,9 @@ function makeCtx(sessionOverrides: Record<string, any> = {}) {
     chat: { id: 789 },
     telegram: {
       editMessageText: jest.fn().mockResolvedValue(true),
-      getFileLink: jest.fn().mockResolvedValue({ toString: () => 'https://tg/file' }),
+      getFileLink: jest
+        .fn()
+        .mockResolvedValue({ toString: () => 'https://tg/file' }),
     },
   } as any;
 }

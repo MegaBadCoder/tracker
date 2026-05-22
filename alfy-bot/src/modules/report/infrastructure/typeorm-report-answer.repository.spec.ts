@@ -103,7 +103,9 @@ describe('TypeOrmReportAnswerRepository', () => {
         answer_bool: null,
       });
 
-      const all = await repo.find({ where: { question_id: 50, scheduled_date: '2024-05-01' } });
+      const all = await repo.find({
+        where: { question_id: 50, scheduled_date: '2024-05-01' },
+      });
       expect(all.length).toBe(1);
       expect(all[0].answer_text).toBe('updated');
       expect(all[0].answer_number).toBe(42);
@@ -125,7 +127,9 @@ describe('TypeOrmReportAnswerRepository', () => {
       });
 
       expect(updated.photo_key).toBe('uploads/new.jpg');
-      const all = await repo.find({ where: { question_id: 51, scheduled_date: '2024-05-02' } });
+      const all = await repo.find({
+        where: { question_id: 51, scheduled_date: '2024-05-02' },
+      });
       expect(all.length).toBe(1);
       expect(all[0].photo_key).toBe('uploads/new.jpg');
     });
@@ -146,7 +150,9 @@ describe('TypeOrmReportAnswerRepository', () => {
       });
 
       expect(updated.photo_key).toBe('uploads/new.jpg');
-      const all = await repo.find({ where: { question_id: 52, scheduled_date: '2024-05-03' } });
+      const all = await repo.find({
+        where: { question_id: 52, scheduled_date: '2024-05-03' },
+      });
       expect(all.length).toBe(1);
       expect(all[0].photo_key).toBe('uploads/new.jpg');
     });

@@ -166,10 +166,15 @@ export class QuestionController {
     @UploadedFile() file: Express.Multer.File,
   ): Promise<{ ok: true }> {
     if (!file) throw new BadRequestException('photo file is required');
-    await this.reportService.addPhotoAnswer(req.user.sub, id, dto.scheduled_date, {
-      buffer: file.buffer,
-      mime: file.mimetype,
-    });
+    await this.reportService.addPhotoAnswer(
+      req.user.sub,
+      id,
+      dto.scheduled_date,
+      {
+        buffer: file.buffer,
+        mime: file.mimetype,
+      },
+    );
     return { ok: true };
   }
 

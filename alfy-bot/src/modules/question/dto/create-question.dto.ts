@@ -15,10 +15,26 @@ export class CreateQuestionDto {
 
   @ApiProperty({
     example: 'number',
-    enum: ['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent', 'photo'],
+    enum: [
+      'text',
+      'rating',
+      'emoji_rating',
+      'yes_no',
+      'number',
+      'time_spent',
+      'photo',
+    ],
   })
   @IsString()
-  @IsIn(['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent', 'photo'])
+  @IsIn([
+    'text',
+    'rating',
+    'emoji_rating',
+    'yes_no',
+    'number',
+    'time_spent',
+    'photo',
+  ])
   type: string;
 
   @ApiPropertyOptional({ example: false, default: false })
