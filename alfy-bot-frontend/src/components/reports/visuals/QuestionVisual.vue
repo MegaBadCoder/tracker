@@ -2,10 +2,12 @@
 import { computed } from 'vue'
 import type { Question } from '../../../types'
 import type { DataPoint } from '../../../utils/reportAnswer'
+import type { PhotoGalleryEntry } from '../../../api/reports'
 import NumericVisual from './NumericVisual.vue'
 import YesNoVisual from './YesNoVisual.vue'
 import EmojiRatingVisual from './EmojiRatingVisual.vue'
 import TextLogVisual from './TextLogVisual.vue'
+import PhotoGalleryVisual from './PhotoGalleryVisual.vue'
 
 export type { DataPoint }
 
@@ -14,6 +16,7 @@ const props = defineProps<{
   dataPoints: DataPoint[]
   accent: string
   highlightIndex?: number
+  photoEntries?: PhotoGalleryEntry[]
 }>()
 
 const isNumeric = (t: string) => ['number', 'rating', 'time_spent'].includes(t)
@@ -27,8 +30,13 @@ const targetValue = computed(() => {
 </script>
 
 <template>
+  <PhotoGalleryVisual
+    v-if="question.type === 'photo'"
+    :question-text="question.question"
+    :entries="photoEntries ?? []"
+  />
   <NumericVisual
-    v-if="isNumeric(question.type)"
+    v-else-if="isNumeric(question.type)"
     :question-text="question.question"
     :data-points="dataPoints"
     :accent="accent"
