@@ -71,7 +71,7 @@ onUnmounted(() => {
     <div
       v-if="store.phase > 0"
       :class="[
-        'timer-block z-[1000]',
+        'timer-block z-[1000] pointer-events-auto',
         timerColorClass,
         isFullscreen ? 'timer-fullscreen' : 'timer-compact group'
       ]"
@@ -200,16 +200,14 @@ onUnmounted(() => {
 }
 
 /* ── Dark mode overrides ── */
-@media (prefers-color-scheme: dark) {
-  .timer-work.timer-compact {
-    background-color: oklch(0.25 0.06 25);
-    border-color: oklch(0.35 0.08 25);
-  }
+.dark .timer-work.timer-compact {
+  background-color: oklch(0.25 0.06 25);
+  border-color: oklch(0.35 0.08 25);
+}
 
-  .timer-break.timer-compact {
-    background-color: oklch(0.25 0.06 250);
-    border-color: oklch(0.35 0.08 250);
-  }
+.dark .timer-break.timer-compact {
+  background-color: oklch(0.25 0.06 250);
+  border-color: oklch(0.35 0.08 250);
 }
 
 /* ── Phase name (fullscreen) ── */

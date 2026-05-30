@@ -14,6 +14,11 @@ vi.mock('@/api/client', () => ({
   },
 }))
 
+vi.mock('vue-router', () => ({
+  RouterLink: { template: '<a><slot /></a>' },
+  useRoute: () => ({ params: {} }),
+}))
+
 describe('ProjectTreeNav', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
