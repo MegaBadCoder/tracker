@@ -59,10 +59,31 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: BOT_TOKEN,JWT_SECRET,REGISTRY_URL,REGISTRY_USER,REGISTRY_PASSWORD,WEBAPP_URL,BOT_USERNAME,SMTP_HOST,SMTP_PORT,SMTP_SECURE,SMTP_USER,SMTP_PASS,EMAIL_FROM
+          envs: BOT_TOKEN,JWT_SECRET,REGISTRY_URL,REGISTRY_USER,REGISTRY_PASSWORD,WEBAPP_URL,BOT_USERNAME,SMTP_ENV,S3_ENV
           script: |
-            printf 'BOT_TOKEN=%s\nJWT_SECRET=%s\nPORT=3002\nNODE_ENV=production\nREGISTRY_URL=%s\nWEBAPP_URL=%s\nBOT_USERNAME=%s\nSMTP_HOST=%s\nSMTP_PORT=%s\nSMTP_SECURE=%s\nSMTP_USER=%s\nSMTP_PASS=%s\nEMAIL_FROM=%s\n' \
-              "$BOT_TOKEN" "$JWT_SECRET" "$REGISTRY_URL" "$WEBAPP_URL" "$BOT_USERNAME" "$SMTP_HOST" "$SMTP_PORT" "$SMTP_SECURE" "$SMTP_USER" "$SMTP_PASS" "$EMAIL_FROM" > ~/alfy/.env
+            install -d ~/alfy
+            append_env_block() {
+              local block="$1" line
+              [ -z "$block" ] && return 0
+              while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in
+                  ''|'#'*) continue ;;
+                  [A-Za-z_][A-Za-z0-9_]*=*)
+                    printf '%s\n' "$line"
+                    ;;
+                  *)
+                    echo "Invalid env line (expected KEY=value): $line" >&2
+                    return 1
+                    ;;
+                esac
+              done <<< "$block"
+            }
+            {
+              printf 'BOT_TOKEN=%s\nJWT_SECRET=%s\nPORT=3002\nNODE_ENV=production\nREGISTRY_URL=%s\nWEBAPP_URL=%s\nBOT_USERNAME=%s\n' \
+                "$BOT_TOKEN" "$JWT_SECRET" "$REGISTRY_URL" "$WEBAPP_URL" "$BOT_USERNAME"
+              append_env_block "$SMTP_ENV"
+              append_env_block "$S3_ENV"
+            } > ~/alfy/.env
             echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_URL" -u "$REGISTRY_USER" --password-stdin
             cd ~/alfy
             docker compose pull
@@ -75,9 +96,6 @@ jobs:
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           WEBAPP_URL: ${{ secrets.WEBAPP_URL }}
           BOT_USERNAME: ${{ secrets.BOT_USERNAME }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          # Multiline .env blocks (KEY=value per line). Copy sections from .env.example.
+          SMTP_ENV: ${{ secrets.SMTP_ENV }}
+          S3_ENV: ${{ secrets.S3_ENV }}
