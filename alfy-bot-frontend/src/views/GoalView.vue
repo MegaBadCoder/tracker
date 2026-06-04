@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { QuestionWithScheduleItem } from '../api/goals'
+import type { GoalReportStatus } from '../api/reports'
 import type { Goal, Question } from '../types'
-import { Archive, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { Archive, Check, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/PageContainer.vue'
@@ -28,6 +29,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { toLocalISODate } from '@/features/goals/lib/dates'
 import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
 import {
   deleteQuestion,
@@ -37,6 +39,7 @@ import {
   updateQuestion,
   updateQuestionSchedule,
 } from '../api/goals'
+import { fetchGoalReportStatus } from '../api/reports'
 import AppHeader from '../components/AppHeader.vue'
 import GoalStatusBadge from '../components/GoalStatusBadge.vue'
 import SummaryCard from '../components/SummaryCard.vue'
@@ -80,9 +83,35 @@ async function reloadGoal() {
   goal.value = await fetchGoalById(id)
 }
 
+// Статус сегодняшнего отчёта — чтобы не предлагать повторно заполнять уже сданный.
+const reportStatus = ref<GoalReportStatus | null>(null)
+
+async function loadReportStatus() {
+  if (goal.value?.status !== 'active') {
+    reportStatus.value = null
+    return
+  }
+  try {
+    reportStatus.value = await fetchGoalReportStatus(id, toLocalISODate(new Date()))
+  }
+  catch {
+    reportStatus.value = null
+  }
+}
+
+// Состояние CTA отчёта: 'pending' — есть неотвеченные; 'done' — всё заполнено;
+// 'none' — на сегодня вопросов нет (или статус не загрузился).
+const reportState = computed<'pending' | 'done' | 'none'>(() => {
+  const s = reportStatus.value
+  if (!s || s.questions.length === 0)
+    return 'none'
+  return s.allDone ? 'done' : 'pending'
+})
+
 onMounted(async () => {
   try {
     await reloadGoal()
+    await loadReportStatus()
   }
   catch {
     router.replace('/not-found')
@@ -355,7 +384,7 @@ function onCancelGoalAction() {
     <PageContainer class="space-y-8">
       <!-- report CTA -->
       <Button
-        v-if="goal.status === 'active'"
+        v-if="goal.status === 'active' && reportState === 'pending'"
         size="lg"
         class="w-full"
         data-testid="goal-report-cta"
@@ -363,6 +392,14 @@ function onCancelGoalAction() {
       >
         Сделать отчёт по цели
       </Button>
+      <div
+        v-else-if="goal.status === 'active' && reportState === 'done'"
+        class="flex items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground"
+        data-testid="goal-report-done"
+      >
+        <Check class="size-4 text-green-500" />
+        Отчёт на сегодня заполнен
+      </div>
 
       <!-- summary -->
       <section>
