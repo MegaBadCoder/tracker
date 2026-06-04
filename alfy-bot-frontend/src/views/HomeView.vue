@@ -57,6 +57,17 @@ onMounted(loadReportQueue)
   <AppHeader title="Мои цели" :on-menu-click="openSidebar" />
 
   <PageContainer>
+    <!-- reports CTA: на мобиле — отдельной строкой над фильтрами; на десктопе inline в ряду -->
+    <Button
+      v-if="reportQueue.length"
+      variant="secondary"
+      class="mb-3 w-full sm:hidden"
+      data-testid="fill-reports-today-mobile"
+      @click="router.push({ name: 'goalsReportToday' })"
+    >
+      Заполнить отчёты за сегодня ({{ reportQueue.length }})
+    </Button>
+
     <!-- filters + create -->
     <div class="mb-6 flex flex-row items-center justify-between gap-2">
       <Tabs
@@ -83,11 +94,11 @@ onMounted(loadReportQueue)
         <Button
           v-if="reportQueue.length"
           variant="secondary"
+          class="hidden sm:inline-flex"
           data-testid="fill-reports-today"
           @click="router.push({ name: 'goalsReportToday' })"
         >
-          <span class="sm:hidden">Отчёты ({{ reportQueue.length }})</span>
-          <span class="hidden sm:inline">Заполнить отчёты за сегодня ({{ reportQueue.length }})</span>
+          Заполнить отчёты за сегодня ({{ reportQueue.length }})
         </Button>
 
         <Button @click="router.push({ name: 'goal-create' })">

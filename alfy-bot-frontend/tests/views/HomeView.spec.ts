@@ -34,7 +34,7 @@ describe('homeView — кнопка заполнения отчётов', () => 
     vi.mocked(fetchReportQueue).mockReset()
   })
 
-  it('показывает кнопку при непустой очереди отчётов', async () => {
+  it('показывает кнопку при непустой очереди отчётов (desktop + mobile варианты)', async () => {
     const queue: ReportQueueItem[] = [
       { goalId: 1, goalName: 'A', pendingCount: 1 },
       { goalId: 2, goalName: 'B', pendingCount: 3 },
@@ -44,9 +44,12 @@ describe('homeView — кнопка заполнения отчётов', () => 
     const wrapper = mountHome()
     await flushPromises()
 
-    const btn = wrapper.find('[data-testid="fill-reports-today"]')
-    expect(btn.exists()).toBe(true)
-    expect(btn.text()).toContain('(2)')
+    const desktop = wrapper.find('[data-testid="fill-reports-today"]')
+    const mobile = wrapper.find('[data-testid="fill-reports-today-mobile"]')
+    expect(desktop.exists()).toBe(true)
+    expect(mobile.exists()).toBe(true)
+    expect(desktop.text()).toContain('(2)')
+    expect(mobile.text()).toContain('(2)')
   })
 
   it('не показывает кнопку при пустой очереди', async () => {
@@ -56,6 +59,7 @@ describe('homeView — кнопка заполнения отчётов', () => 
     await flushPromises()
 
     expect(wrapper.find('[data-testid="fill-reports-today"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="fill-reports-today-mobile"]').exists()).toBe(false)
   })
 
   it('фейл очереди не ломает экран и скрывает кнопку', async () => {
@@ -65,6 +69,7 @@ describe('homeView — кнопка заполнения отчётов', () => 
     await flushPromises()
 
     expect(wrapper.find('[data-testid="fill-reports-today"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="fill-reports-today-mobile"]').exists()).toBe(false)
     // список целей по-прежнему отрисовался (нет ошибки экрана)
     expect(wrapper.text()).not.toContain('Не удалось загрузить цели')
   })
