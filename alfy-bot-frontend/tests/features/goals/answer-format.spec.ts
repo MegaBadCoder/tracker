@@ -36,7 +36,16 @@ describe('answer-format — bot-identical answer strings', () => {
     expect(numberAnswer(' 42 ')).toBe('42')
   })
 
+  it('numberAnswer accepts a number (input[type=number] emits a number via v-model)', () => {
+    expect(numberAnswer(123132)).toBe('123132')
+    expect(numberAnswer(0)).toBe('0')
+  })
+
   it('textAnswer trims the raw input', () => {
     expect(textAnswer(' hi ')).toBe('hi')
+  })
+
+  it('textAnswer accepts a number defensively', () => {
+    expect(textAnswer(5)).toBe('5')
   })
 })

@@ -28,12 +28,15 @@ export function timeSpentAnswer(label: string): string {
   return label
 }
 
-/** Число (`number`) → введённое значение строкой, обрезанное по краям. */
-export function numberAnswer(raw: string): string {
-  return raw.trim()
+/**
+ * Число (`number`) → введённое значение строкой, обрезанное по краям.
+ * Принимает `number`: `<input type="number">` отдаёт через v-model число, не строку.
+ */
+export function numberAnswer(raw: string | number): string {
+  return String(raw).trim()
 }
 
 /** Текст (`text`) → введённый текст, обрезанный по краям. */
-export function textAnswer(raw: string): string {
-  return raw.trim()
+export function textAnswer(raw: string | number): string {
+  return String(raw).trim()
 }

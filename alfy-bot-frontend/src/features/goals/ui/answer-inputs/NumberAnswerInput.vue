@@ -8,7 +8,8 @@ const emit = defineEmits<{
   (e: 'submit', answer: string): void
 }>()
 
-const raw = ref('')
+// `<input type="number">` через shadcn Input/useVModel отдаёт number, не string.
+const raw = ref<string | number>('')
 
 const canSubmit = computed(() => numberAnswer(raw.value).length > 0)
 
