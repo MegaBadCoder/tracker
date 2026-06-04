@@ -5,5 +5,7 @@ export interface UserProfile {
   photoUrl?: string
   phone?: string
   timezone?: string
+  language?: string
+  firstDayOfWeek?: number
   hasEmailAuth?: boolean
 }
