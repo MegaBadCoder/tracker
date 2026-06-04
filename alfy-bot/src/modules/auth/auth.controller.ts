@@ -105,4 +105,30 @@ export class AuthController {
     );
     return { timezone };
   }
+
+  @Patch('language')
+  @UseGuards(JwtAuthGuard)
+  async updateLanguage(
+    @Request() req: AuthRequest,
+    @Body() body: { language: string },
+  ) {
+    const language = await this.authService.updateLanguage(
+      req.user.sub,
+      body.language,
+    );
+    return { language };
+  }
+
+  @Patch('first-day-of-week')
+  @UseGuards(JwtAuthGuard)
+  async updateFirstDayOfWeek(
+    @Request() req: AuthRequest,
+    @Body() body: { firstDayOfWeek: number },
+  ) {
+    const firstDayOfWeek = await this.authService.updateFirstDayOfWeek(
+      req.user.sub,
+      body.firstDayOfWeek,
+    );
+    return { firstDayOfWeek };
+  }
 }

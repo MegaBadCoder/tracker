@@ -1,5 +1,6 @@
 tracker.rocketup.tech {
-	handle /mcp /mcp/* {
+	@mcp path /mcp /mcp/*
+	handle @mcp {
 		reverse_proxy alfy-mcp:3003 {
 			flush_interval -1
 		}

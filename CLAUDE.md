@@ -146,6 +146,14 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 - Утилиты дат (`recurrence.ts`, `dateTime.ts`) используют локальные методы (`getDay`, `setDate`), не UTC.
 - Календарь и виртуальные проекции считаются в локальном времени — никаких явных конверсий.
 
+# Locale & first day of week (frontend)
+
+Локаль дат/календарей и первый день недели берутся из настроек пользователя (`User.language`, `User.firstDayOfWeek` — зеркало `timezone` на бэке). Единый реактивный источник на фронте — `composables/useLocale.ts`. Это только локаль дат/календарей, полного i18n всего UI нет.
+
+- Любой reka-ui `<Calendar>` обязан получать `:locale="intlLocale"` + `:week-starts-on="weekStartsOn"` из `useLocale`, иначе он на дефолтах reka-ui (англ./воскресенье).
+- Форматтеры дат (`features/tasks/lib/formatters.ts`, `features/calendar/lib/week.ts`) читают `dateFnsLocale.value` / `weekStartsOn.value` из `useLocale`, а не хардкодят `date-fns/locale`. `.value` читается в рендере → реактивный ре-рендер при смене настройки.
+- Менять настройку — через `user-store.updateLanguage` / `updateFirstDayOfWeek` (пушат в `setLocalePrefs`). Дефолты: `ru`, понедельник (`1`).
+
 Add as a new top-level ## Workflow Discipline section near the top of CLAUDE.md\n\n## Workflow Discipline
 - When user invokes a new task (e.g. /up:make), START that task immediately. Do NOT divert to finalize or close prior tasks unless explicitly asked.
 - Always verify the correct git worktree/branch BEFORE editing files. Run `git branch --show-current` and `pwd` first when working on branch-specific features.
