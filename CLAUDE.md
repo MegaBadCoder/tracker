@@ -85,6 +85,8 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 
 Глобально включены: `ValidationPipe({ whitelist: true, transform: true })`, префикс `/api`, CORS только для `localhost`, Swagger Bearer auth.
 
+**Route-коллизии под общим префиксом.** Несколько контроллеров могут делить один префикс (например `@Controller('goals')` в `GoalModule` и в `ReportModule`). Тогда `@Get(':id')` одного контроллера перехватывает одиночный литерал (`goals/report-queue`) другого, и `ParseIntPipe` отдаёт 400. Порядок матчинга = import-порядку модулей в `AppModule` — полагаться на него хрупко. Express 5 / path-to-regexp v8 **не поддерживают** inline-regex `:id(\d+)` (приложение не стартует). Решение: давать литеральным маршрутам **многосегментный** путь, который одиночный `:id` не может захватить (`goals/reports/queue`, не `goals/report-queue`). Регрессия — `alfy-bot/test/web-goal-reports-routing.e2e-spec.ts`.
+
 # Frontend architecture (FSD-like)
 
 `alfy-bot-frontend/src/` устроен как feature-sliced:

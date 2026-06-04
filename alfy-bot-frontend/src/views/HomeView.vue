@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, inject } from 'vue'
+import type { Goal, GoalStatus } from '../types'
+import type { ReportQueueItem } from '@/api/reports'
+import { inject, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { fetchReportQueue } from '@/api/reports'
+import PageContainer from '@/components/PageContainer.vue'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { toLocalISODate } from '@/features/goals/lib/dates'
+import { fetchGoals } from '../api/goals'
 import AppHeader from '../components/AppHeader.vue'
 import GoalCard from '../components/GoalCard.vue'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { fetchGoals } from '../api/goals'
-import type { Goal, GoalStatus } from '../types'
-import PageContainer from '@/components/PageContainer.vue'
 
 type Filter = 'all' | GoalStatus
 
@@ -17,6 +20,19 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const openSidebar = inject<() => void>('openSidebar')
 const filter = ref<Filter>('all')
+
+// Очередь отчётов за сегодня — второстепенная фича: её фейл НЕ должен ломать
+// список целей. При ошибке просто не показываем кнопку (reportQueue=[]).
+const reportQueue = ref<ReportQueueItem[]>([])
+
+async function loadReportQueue() {
+  try {
+    reportQueue.value = await fetchReportQueue(toLocalISODate(new Date()))
+  }
+  catch {
+    reportQueue.value = []
+  }
+}
 
 async function load() {
   loading.value = true
@@ -34,12 +50,24 @@ async function load() {
 }
 
 watch(filter, load, { immediate: true })
+onMounted(loadReportQueue)
 </script>
 
 <template>
   <AppHeader title="Мои цели" :on-menu-click="openSidebar" />
 
   <PageContainer>
+    <!-- reports CTA: на мобиле — отдельной строкой над фильтрами; на десктопе inline в ряду -->
+    <Button
+      v-if="reportQueue.length"
+      variant="secondary"
+      class="mb-3 w-full sm:hidden"
+      data-testid="fill-reports-today-mobile"
+      @click="router.push({ name: 'goalsReportToday' })"
+    >
+      Заполнить отчёты за сегодня ({{ reportQueue.length }})
+    </Button>
+
     <!-- filters + create -->
     <div class="mb-6 flex flex-row items-center justify-between gap-2">
       <Tabs
@@ -62,10 +90,22 @@ watch(filter, load, { immediate: true })
         </TabsList>
       </Tabs>
 
-      <Button class="flex-shrink-0" @click="router.push({ name: 'goal-create' })">
-        <span class="sm:hidden">+</span>
-        <span class="hidden sm:inline">+ Создать цель</span>
-      </Button>
+      <div class="flex flex-shrink-0 items-center gap-2">
+        <Button
+          v-if="reportQueue.length"
+          variant="secondary"
+          class="hidden sm:inline-flex"
+          data-testid="fill-reports-today"
+          @click="router.push({ name: 'goalsReportToday' })"
+        >
+          Заполнить отчёты за сегодня ({{ reportQueue.length }})
+        </Button>
+
+        <Button @click="router.push({ name: 'goal-create' })">
+          <span class="sm:hidden">+</span>
+          <span class="hidden sm:inline">+ Создать цель</span>
+        </Button>
+      </div>
     </div>
 
     <!-- grid -->

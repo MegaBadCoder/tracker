@@ -25,6 +25,7 @@ describe('ReportService', () => {
     goalService = {
       findQuestionById: jest.fn(),
       findById: jest.fn(),
+      findActiveByUser: jest.fn(),
     };
 
     scheduleService = {
@@ -345,8 +346,8 @@ describe('ReportService', () => {
 
       expect(storage.upload).toHaveBeenCalledTimes(1);
       expect(storage.delete).toHaveBeenCalledTimes(1);
-      const newKey = (storage.upload as jest.Mock).mock.calls[0][0] as string;
-      expect((storage.delete as jest.Mock).mock.calls[0][0]).toBe(newKey);
+      const newKey = storage.upload.mock.calls[0][0] as string;
+      expect(storage.delete.mock.calls[0][0]).toBe(newKey);
     });
 
     it('НЕ удаляет старый ключ если save() падает (старая фото остаётся доступной)', async () => {
@@ -360,10 +361,167 @@ describe('ReportService', () => {
         service.addPhotoAnswer(1, 5, '2026-05-22', photo),
       ).rejects.toThrow(/DB locked/);
 
-      const deleteCalls = (storage.delete as jest.Mock).mock.calls.map(
-        (c: unknown[]) => c[0],
-      );
+      const deleteCalls = storage.delete.mock.calls.map((c: unknown[]) => c[0]);
       expect(deleteCalls).not.toContain(oldKey);
+    });
+  });
+
+  describe('getGoalReportStatus', () => {
+    const ownGoal = {
+      id: 10,
+      user_id: 1,
+      goal_start: '2026-02-17',
+      goal_end: '2026-05-01',
+      questions: [
+        {
+          id: 1,
+          is_active: true,
+          can_skip: false,
+          order_index: 1,
+          question: 'Q1',
+          type: 'number',
+          target_value: '30',
+        },
+        {
+          id: 2,
+          is_active: true,
+          can_skip: true,
+          order_index: 0,
+          question: 'Q2',
+          type: 'text',
+          target_value: null,
+        },
+      ],
+    };
+
+    it('помечает answered корректно и сортирует по order_index', async () => {
+      goalService.findById.mockResolvedValue(ownGoal);
+      scheduleService.isQuestionDueOnDateHistorical.mockReturnValue(true);
+      answerRepo.findByQuestionsAndDate.mockResolvedValue([
+        {
+          question_id: 2,
+          answer_text: 'hello',
+          answer_number: null,
+          answer_bool: null,
+        },
+      ]);
+      answerRepo.countByQuestionsAndDate.mockResolvedValue(0);
+
+      const result = await service.getGoalReportStatus(1, 10, '2026-02-20');
+
+      expect(result.goalId).toBe(10);
+      expect(result.date).toBe('2026-02-20');
+      // отсортировано по order_index: q2 (0), затем q1 (1)
+      expect(result.questions.map((q) => q.questionId)).toEqual([2, 1]);
+
+      const q2 = result.questions.find((q) => q.questionId === 2)!;
+      expect(q2.answered).toBe(true);
+      expect(q2.answer_text).toBe('hello');
+
+      const q1 = result.questions.find((q) => q.questionId === 1)!;
+      expect(q1.answered).toBe(false);
+      expect(q1.answer_text).toBeNull();
+      expect(q1.target_value).toBe('30');
+    });
+
+    it('allDone=true только когда все !can_skip due-вопросы отвечены', async () => {
+      goalService.findById.mockResolvedValue(ownGoal);
+      scheduleService.isQuestionDueOnDateHistorical.mockReturnValue(true);
+      // q1 (обязательный) отвечен, q2 (можно пропустить) не отвечен
+      answerRepo.findByQuestionsAndDate.mockResolvedValue([
+        {
+          question_id: 1,
+          answer_text: '42',
+          answer_number: 42,
+          answer_bool: null,
+        },
+      ]);
+
+      const result = await service.getGoalReportStatus(1, 10, '2026-02-20');
+      expect(result.allDone).toBe(true);
+    });
+
+    it('allDone=false когда обязательный due-вопрос не отвечен', async () => {
+      goalService.findById.mockResolvedValue(ownGoal);
+      scheduleService.isQuestionDueOnDateHistorical.mockReturnValue(true);
+      answerRepo.findByQuestionsAndDate.mockResolvedValue([
+        {
+          question_id: 2,
+          answer_text: 'hi',
+          answer_number: null,
+          answer_bool: null,
+        },
+      ]);
+
+      const result = await service.getGoalReportStatus(1, 10, '2026-02-20');
+      expect(result.allDone).toBe(false);
+    });
+
+    it('бросает Forbidden если цель не принадлежит пользователю', async () => {
+      goalService.findById.mockResolvedValue({ ...ownGoal, user_id: 999 });
+
+      await expect(
+        service.getGoalReportStatus(1, 10, '2026-02-20'),
+      ).rejects.toThrow(/forbidden/i);
+    });
+
+    it('бросает NotFound если цель не найдена', async () => {
+      goalService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.getGoalReportStatus(1, 10, '2026-02-20'),
+      ).rejects.toThrow(/not found/i);
+    });
+
+    it('не включает вопрос, который не due на дату', async () => {
+      goalService.findById.mockResolvedValue(ownGoal);
+      // q1 due, q2 не due
+      scheduleService.isQuestionDueOnDateHistorical.mockImplementation(
+        (q: { id: number }) => q.id === 1,
+      );
+      answerRepo.findByQuestionsAndDate.mockResolvedValue([]);
+
+      const result = await service.getGoalReportStatus(1, 10, '2026-02-20');
+      expect(result.questions.map((q) => q.questionId)).toEqual([1]);
+    });
+  });
+
+  describe('getReportQueue', () => {
+    it('включает только цели с unanswered due и считает pendingCount', async () => {
+      const goalA = { id: 10, user_id: 1, goal_start: '2026-02-17' };
+      const goalB = { id: 20, user_id: 1, goal_start: '2026-02-17' };
+      goalService.findActiveByUser.mockResolvedValue([goalA, goalB]);
+
+      const getUnanswered = jest
+        .spyOn(service, 'getUnansweredQuestions')
+        .mockImplementation((goalId: number) => {
+          if (goalId === 10)
+            return Promise.resolve([{ id: 1 }, { id: 2 }] as never);
+          return Promise.resolve([] as never);
+        });
+
+      // goalName берётся из имени цели
+      (goalA as Record<string, unknown>).goal_name = 'Goal A';
+      (goalB as Record<string, unknown>).goal_name = 'Goal B';
+
+      const result = await service.getReportQueue(1, '2026-02-20');
+
+      expect(getUnanswered).toHaveBeenCalledWith(10, '2026-02-20');
+      expect(getUnanswered).toHaveBeenCalledWith(20, '2026-02-20');
+      expect(result).toEqual([
+        { goalId: 10, goalName: 'Goal A', pendingCount: 2 },
+      ]);
+    });
+
+    it('возвращает пустой список когда всё заполнено', async () => {
+      const goalA = { id: 10, user_id: 1, goal_name: 'A' };
+      goalService.findActiveByUser.mockResolvedValue([goalA]);
+      jest
+        .spyOn(service, 'getUnansweredQuestions')
+        .mockResolvedValue([] as never);
+
+      const result = await service.getReportQueue(1, '2026-02-20');
+      expect(result).toEqual([]);
     });
   });
 

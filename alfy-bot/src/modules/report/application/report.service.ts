@@ -11,13 +11,35 @@ import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportAnswerRepositoryPort } from '../domain/report-answer-repository.port';
 import { AnalyticsEntryDto } from '../dto/question-analytics.dto';
+import { toLocalISO } from '../lib/date';
 
 const NUMERIC_TYPES = new Set(['number', 'rating']);
 const NOT_FILLED_TEXT = 'Не было заполнено';
 
-/** Форматирует Date в 'YYYY-MM-DD' по локальному времени (без UTC-сдвига) */
-function toLocalISO(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export interface QuestionReportItem {
+  questionId: number;
+  question: string;
+  type: string;
+  can_skip: boolean;
+  target_value: string | null;
+  answered: boolean;
+  answer_text: string | null;
+  answer_number: number | null;
+  answer_bool: boolean | null;
+}
+
+export interface GoalReportStatus {
+  goalId: number;
+  date: string;
+  lastUnfilledDate: string | null;
+  questions: QuestionReportItem[];
+  allDone: boolean;
+}
+
+export interface ReportQueueItem {
+  goalId: number;
+  goalName: string;
+  pendingCount: number;
 }
 
 @Injectable()
@@ -197,6 +219,87 @@ export class ReportService {
     }
 
     return null;
+  }
+
+  /**
+   * Статус отчёта по цели на конкретную дату: due-вопросы, отмеченные
+   * как answered/unanswered, плюс последняя незаполненная дата и флаг allDone.
+   * Read-only. Owner-check внутри.
+   */
+  async getGoalReportStatus(
+    userId: number,
+    goalId: number,
+    date: string,
+  ): Promise<GoalReportStatus> {
+    const goal = await this.goalService.findById(goalId);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
+
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const dueQuestions = (goal.questions || [])
+      .filter((q) => q.is_active)
+      .filter((q) =>
+        this.scheduleService.isQuestionDueOnDateHistorical(q, targetDate),
+      )
+      .sort((a, b) => a.order_index - b.order_index);
+
+    const dueIds = dueQuestions.map((q) => q.id);
+    const existing =
+      dueIds.length > 0
+        ? await this.answerRepo.findByQuestionsAndDate(dueIds, date)
+        : [];
+    const answerByQuestion = new Map(existing.map((a) => [a.question_id, a]));
+
+    const questions: QuestionReportItem[] = dueQuestions.map((q) => {
+      const answer = answerByQuestion.get(q.id);
+      return {
+        questionId: q.id,
+        question: q.question,
+        type: q.type,
+        can_skip: q.can_skip,
+        target_value: q.target_value,
+        answered: answer !== undefined,
+        answer_text: answer ? answer.answer_text : null,
+        answer_number: answer ? answer.answer_number : null,
+        answer_bool: answer ? answer.answer_bool : null,
+      };
+    });
+
+    const allDone = questions
+      .filter((q) => !q.can_skip)
+      .every((q) => q.answered);
+
+    const lastUnfilledDate = await this.findLastUnfilledDate(goalId);
+
+    return { goalId, date, lastUnfilledDate, questions, allDone };
+  }
+
+  /**
+   * Очередь целей пользователя, для которых на дату есть неотвеченные
+   * due-вопросы. Зеркалит фильтр offerNextGoal, но параметризован датой.
+   * Read-only.
+   */
+  async getReportQueue(
+    userId: number,
+    date: string,
+  ): Promise<ReportQueueItem[]> {
+    const goals = await this.goalService.findActiveByUser(userId);
+
+    const queue: ReportQueueItem[] = [];
+    for (const goal of goals) {
+      const unanswered = await this.getUnansweredQuestions(goal.id, date);
+      if (unanswered.length > 0) {
+        queue.push({
+          goalId: goal.id,
+          goalName: goal.goal_name,
+          pendingCount: unanswered.length,
+        });
+      }
+    }
+
+    return queue;
   }
 
   async addPhotoAnswer(

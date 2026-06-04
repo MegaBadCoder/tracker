@@ -30,8 +30,12 @@ export type Step
     | 'saving'
     | 'done'
 
-export type StartPreset = 'today' | 'tomorrow' | 'week' | 'custom'
-export type EndPreset = 'week' | 'month' | 'three_months' | 'six_months' | 'year' | 'custom'
+export type StartPresetKey = 'today' | 'tomorrow' | 'week' | 'custom'
+export type EndPresetKey = 'weeks_12' | 'weeks_24' | 'months_6' | 'year_1' | 'custom'
+
+// Обратная совместимость по именам для существующих импортов.
+export type StartPreset = StartPresetKey
+export type EndPreset = EndPresetKey
 
 export interface FlowState {
   step: Step
@@ -55,23 +59,21 @@ function presetStartDate(preset: Exclude<StartPreset, 'custom'>): Date {
   return d
 }
 
-function presetEndDate(start: Date, preset: Exclude<EndPreset, 'custom'>): Date {
+// Зеркало `DATE_DURATIONS` бота: 12 недель / 24 недели / 6 мес / 1 год.
+function presetEndDate(start: Date, preset: Exclude<EndPresetKey, 'custom'>): Date {
   const d = new Date(start)
   d.setHours(0, 0, 0, 0)
   switch (preset) {
-    case 'week':
-      d.setDate(d.getDate() + 7)
+    case 'weeks_12':
+      d.setDate(d.getDate() + 12 * 7)
       break
-    case 'month':
-      d.setMonth(d.getMonth() + 1)
+    case 'weeks_24':
+      d.setDate(d.getDate() + 24 * 7)
       break
-    case 'three_months':
-      d.setMonth(d.getMonth() + 3)
-      break
-    case 'six_months':
+    case 'months_6':
       d.setMonth(d.getMonth() + 6)
       break
-    case 'year':
+    case 'year_1':
       d.setFullYear(d.getFullYear() + 1)
       break
   }

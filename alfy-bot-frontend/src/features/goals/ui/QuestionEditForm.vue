@@ -149,8 +149,7 @@ function onCancel() {
           :data-testid="`type-${opt.type}`"
           @click="selectType(opt.type)"
         >
-          <span class="mr-2">{{ opt.emoji }}</span>
-          <span>{{ opt.label }}</span>
+          {{ opt.label }}
         </Button>
       </div>
     </div>

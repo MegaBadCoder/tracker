@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import type { EndPreset, FlowState } from '@/features/goals/model/use-goal-create-flow'
+import type { EndPresetKey, FlowState } from '@/features/goals/model/use-goal-create-flow'
+import { ArrowLeft, Pencil } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { END_PRESETS } from './goal-create-options'
 
 defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
-  (e: 'selectEndPreset', preset: EndPreset, custom?: Date): void
+  (e: 'selectEndPreset', preset: EndPresetKey, custom?: Date): void
   (e: 'back'): void
 }>()
 
@@ -14,20 +16,7 @@ const showCustom = ref(false)
 const customValue = ref<string>('')
 const error = ref<string>('')
 
-interface EndPresetOption {
-  preset: Exclude<EndPreset, 'custom'>
-  label: string
-}
-
-const PRESETS: EndPresetOption[] = [
-  { preset: 'week', label: 'Через неделю' },
-  { preset: 'month', label: '1 мес' },
-  { preset: 'three_months', label: '3 мес' },
-  { preset: 'six_months', label: '6 мес' },
-  { preset: 'year', label: '1 год' },
-]
-
-function pickPreset(p: Exclude<EndPreset, 'custom'>) {
+function pickPreset(p: Exclude<EndPresetKey, 'custom'>) {
   error.value = ''
   emit('selectEndPreset', p)
 }
@@ -59,15 +48,16 @@ function submitCustom() {
 
     <div class="flex flex-wrap gap-2">
       <Button
-        v-for="opt in PRESETS"
-        :key="opt.preset"
+        v-for="opt in END_PRESETS"
+        :key="opt.key"
         variant="outline"
-        @click="pickPreset(opt.preset)"
+        @click="pickPreset(opt.key)"
       >
         {{ opt.label }}
       </Button>
       <Button variant="outline" @click="pickCustom">
-        ✏️ Своя дата
+        <Pencil class="size-4" />
+        Своя дата
       </Button>
     </div>
 
@@ -84,7 +74,8 @@ function submitCustom() {
 
     <div>
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
     </div>
   </div>

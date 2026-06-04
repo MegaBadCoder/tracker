@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module';
 import { GoalModule } from '../goal/goal.module';
 import { ReportService } from './application/report.service';
 import { ReportAnswerRepositoryPort } from './domain/report-answer-repository.port';
+import { GoalReportController } from './goal-report.controller';
 import { TypeOrmReportAnswerRepository } from './infrastructure/typeorm-report-answer.repository';
 import { ReportController } from './report.controller';
 
@@ -16,7 +17,7 @@ import { ReportController } from './report.controller';
     AuthModule,
     StorageModule,
   ],
-  controllers: [ReportController],
+  controllers: [GoalReportController, ReportController],
   providers: [
     {
       provide: ReportAnswerRepositoryPort,

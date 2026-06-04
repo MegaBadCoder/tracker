@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
+import { ArrowLeft } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 
 defineProps<{ state: FlowState }>()
@@ -26,7 +27,8 @@ const emit = defineEmits<{
 
     <div>
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
     </div>
   </div>
