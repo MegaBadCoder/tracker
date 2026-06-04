@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
+import { ArrowLeft } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,7 +45,8 @@ function onSubmit() {
 
     <div class="flex gap-2">
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
       <Button :disabled="text.trim().length === 0" @click="onSubmit">
         Далее

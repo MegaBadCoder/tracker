@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
 import type { FrequencyType } from '@/types'
+import { ArrowLeft } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
+import { SCHEDULE_LABELS } from './goal-create-options'
 
 defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
@@ -23,7 +25,7 @@ const emit = defineEmits<{
         class="justify-start"
         @click="emit('selectSchedule', 'daily')"
       >
-        Каждый день
+        {{ SCHEDULE_LABELS.daily }}
       </Button>
       <Button
         variant="outline"
@@ -31,7 +33,7 @@ const emit = defineEmits<{
         class="justify-start"
         @click="emit('selectSchedule', 'weekly_days')"
       >
-        Определённые дни недели
+        {{ SCHEDULE_LABELS.weekly_days }}
       </Button>
       <Button
         variant="outline"
@@ -39,13 +41,14 @@ const emit = defineEmits<{
         class="justify-start"
         @click="emit('selectSchedule', 'interval')"
       >
-        Через N дней
+        {{ SCHEDULE_LABELS.interval }}
       </Button>
     </div>
 
     <div>
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
     </div>
   </div>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
+import { ArrowLeft } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { INTERVAL_PRESETS } from './goal-create-options'
 
 defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
@@ -10,7 +12,6 @@ const emit = defineEmits<{
   (e: 'back'): void
 }>()
 
-const PRESETS = [2, 3, 7, 14]
 const customValue = ref<string>('')
 
 function pickPreset(n: number) {
@@ -33,12 +34,12 @@ function submitCustom() {
 
     <div class="flex flex-wrap gap-2">
       <Button
-        v-for="n in PRESETS"
-        :key="n"
+        v-for="opt in INTERVAL_PRESETS"
+        :key="opt.days"
         variant="outline"
-        @click="pickPreset(n)"
+        @click="pickPreset(opt.days)"
       >
-        Через {{ n }}
+        {{ opt.label }}
       </Button>
     </div>
 
@@ -59,7 +60,8 @@ function submitCustom() {
 
     <div>
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
     </div>
   </div>
