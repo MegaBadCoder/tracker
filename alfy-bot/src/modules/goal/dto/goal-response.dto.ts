@@ -80,18 +80,37 @@ export class GoalDto {
   @ApiProperty({ example: 'Читать 30 минут в день' })
   goal_name: string;
 
-  @ApiProperty({ example: '2026-02-01' })
-  goal_start: string;
+  @ApiPropertyOptional({ example: '2026-02-01', nullable: true })
+  goal_start: string | null;
 
-  @ApiProperty({ example: '2026-05-01' })
-  goal_end: string;
+  @ApiPropertyOptional({ example: '2026-05-01', nullable: true })
+  goal_end: string | null;
 
   @ApiProperty({ example: 'active', enum: ['active', 'completed', 'deleted'] })
   status: string;
+
+  @ApiProperty({
+    example: false,
+    description: 'Глобальная цель (без дат и вопросов, может иметь подцели)',
+  })
+  is_global: boolean;
+
+  @ApiPropertyOptional({
+    example: null,
+    description: 'ID родительской global-цели',
+    nullable: true,
+  })
+  parent_goal_id: number | null;
 
   @ApiProperty({ example: '2026-02-01T10:00:00.000Z' })
   createdAt: Date;
 
   @ApiProperty({ type: () => [QuestionDto] })
   questions: QuestionDto[];
+
+  @ApiPropertyOptional({
+    type: () => [GoalDto],
+    description: 'Подцели (только для global-целей)',
+  })
+  children?: GoalDto[];
 }
