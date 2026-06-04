@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReportAnswer } from '../../shared/entities';
+import { StorageModule } from '../../shared/storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
 import { GoalModule } from '../goal/goal.module';
 import { ReportService } from './application/report.service';
@@ -9,7 +10,12 @@ import { TypeOrmReportAnswerRepository } from './infrastructure/typeorm-report-a
 import { ReportController } from './report.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ReportAnswer]), GoalModule, AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([ReportAnswer]),
+    GoalModule,
+    AuthModule,
+    StorageModule,
+  ],
   controllers: [ReportController],
   providers: [
     {

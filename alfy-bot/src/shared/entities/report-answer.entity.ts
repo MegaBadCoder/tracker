@@ -35,6 +35,9 @@ export class ReportAnswer {
   @Column({ type: 'boolean', nullable: true })
   answer_bool: boolean | null;
 
+  @Column({ type: 'text', nullable: true })
+  photo_key: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
