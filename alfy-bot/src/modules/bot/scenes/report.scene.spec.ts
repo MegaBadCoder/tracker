@@ -42,7 +42,12 @@ function makeCtx(sessionOverrides: Record<string, any> = {}) {
     message: null,
     match: null,
     chat: { id: 789 },
-    telegram: { editMessageText: jest.fn().mockResolvedValue(true) },
+    telegram: {
+      editMessageText: jest.fn().mockResolvedValue(true),
+      getFileLink: jest
+        .fn()
+        .mockResolvedValue({ toString: () => 'https://tg/file' }),
+    },
   } as any;
 }
 
@@ -61,6 +66,7 @@ describe('ReportScene', () => {
 
     reportService = {
       addAnswer: jest.fn().mockResolvedValue(undefined),
+      addPhotoAnswer: jest.fn().mockResolvedValue(undefined),
       isDateFilled: jest.fn().mockResolvedValue(false),
       getUnansweredQuestions: jest.fn().mockResolvedValue([]),
       findLastUnfilledDate: jest.fn().mockResolvedValue(null),
@@ -317,6 +323,128 @@ describe('ReportScene', () => {
 
       expect(ctx.reply).toHaveBeenCalledWith('❌ Отчет отменен');
       expect(ctx.scene.leave).toHaveBeenCalled();
+    });
+  });
+
+  describe('photo handlers', () => {
+    const fakeArrayBuffer = new Uint8Array([1, 2, 3]).buffer;
+    const fetchOkMock = jest.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(fakeArrayBuffer),
+    });
+
+    beforeEach(() => {
+      global.fetch = fetchOkMock;
+      fetchOkMock.mockClear();
+    });
+
+    afterEach(() => {
+      delete (global as any).fetch;
+    });
+
+    function makePhotoSession() {
+      return {
+        userId: 1,
+        targetDate: '2026-05-22',
+        currentQuestionIndex: 0,
+        questions: [makeQuestion({ id: 42, type: 'photo' })],
+      };
+    }
+
+    it('happy photo path — вызывает addPhotoAnswer с image/jpeg', async () => {
+      const ctx = makeCtx(makePhotoSession());
+      ctx.message = {
+        photo: [{ file_id: 'small' }, { file_id: 'large' }],
+      };
+
+      await scene.handlePhoto(ctx);
+
+      expect(ctx.telegram.getFileLink).toHaveBeenCalledWith('large');
+      expect(global.fetch).toHaveBeenCalledWith('https://tg/file');
+      expect(reportService.addPhotoAnswer).toHaveBeenCalledWith(
+        1,
+        42,
+        '2026-05-22',
+        { buffer: expect.any(Buffer), mime: 'image/jpeg' },
+      );
+    });
+
+    it('document image — вызывает addPhotoAnswer с правильным mime', async () => {
+      const ctx = makeCtx(makePhotoSession());
+      ctx.message = {
+        document: { file_id: 'doc1', mime_type: 'image/png' },
+      };
+
+      await scene.handleDocumentImage(ctx);
+
+      expect(ctx.telegram.getFileLink).toHaveBeenCalledWith('doc1');
+      expect(reportService.addPhotoAnswer).toHaveBeenCalledWith(
+        1,
+        42,
+        '2026-05-22',
+        { buffer: expect.any(Buffer), mime: 'image/png' },
+      );
+    });
+
+    it('document non-image — отвечает "Только фото", addPhotoAnswer не вызывается', async () => {
+      const ctx = makeCtx(makePhotoSession());
+      ctx.message = {
+        document: { file_id: 'doc2', mime_type: 'application/pdf' },
+      };
+
+      await scene.handleDocumentImage(ctx);
+
+      expect(ctx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Только фото'),
+      );
+      expect(reportService.addPhotoAnswer).not.toHaveBeenCalled();
+    });
+
+    it('текст на photo-вопросе → reply "Нужно фото", addAnswer не вызывается', async () => {
+      const ctx = makeCtx(makePhotoSession());
+      ctx.message = { text: 'какой-то текст' };
+
+      await scene.handleTextAnswer(ctx);
+
+      expect(ctx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Нужно фото'),
+      );
+      expect(reportService.addAnswer).not.toHaveBeenCalled();
+    });
+
+    it('media_group dedup — второй вызов с тем же media_group_id игнорируется', async () => {
+      const ctx = makeCtx(makePhotoSession());
+      ctx.message = {
+        photo: [{ file_id: 'large' }],
+        media_group_id: 'grp_1',
+      };
+
+      await scene.handlePhoto(ctx);
+      // second photo in album — same media_group_id
+      ctx.message = {
+        photo: [{ file_id: 'large2' }],
+        media_group_id: 'grp_1',
+      };
+      await scene.handlePhoto(ctx);
+
+      expect(reportService.addPhotoAnswer).toHaveBeenCalledTimes(1);
+    });
+
+    it('photo handler игнорирует если текущий вопрос не photo', async () => {
+      const ctx = makeCtx({
+        userId: 1,
+        targetDate: '2026-05-22',
+        currentQuestionIndex: 0,
+        questions: [makeQuestion({ id: 42, type: 'text' })],
+      });
+      ctx.message = {
+        photo: [{ file_id: 'large' }],
+      };
+
+      await scene.handlePhoto(ctx);
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(reportService.addPhotoAnswer).not.toHaveBeenCalled();
     });
   });
 });
