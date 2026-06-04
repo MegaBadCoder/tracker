@@ -18,7 +18,10 @@ function makePointerEvent(
   init: Partial<PointerEventInit> & { target?: HTMLElement | null } = {},
 ): PointerEvent {
   const { target, ...rest } = init
-  const event = new PointerEvent(type, { button: 0, pointerId: 1, ...rest })
+  // Default pointerType='mouse' — touch/pen path is gated by long-press 350ms
+  // (see use-create-slot-drag.ts). Tests that exercise immediate-drag must
+  // run on the mouse branch.
+  const event = new PointerEvent(type, { button: 0, pointerId: 1, pointerType: 'mouse', ...rest })
   if (target !== undefined) {
     Object.defineProperty(event, 'target', { value: target, writable: false })
   }

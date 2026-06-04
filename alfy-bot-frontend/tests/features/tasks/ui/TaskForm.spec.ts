@@ -3,39 +3,47 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import type { Task } from '@/features/tasks/model/types'
 
+// TaskForm uses <ContentEditableInput> (div+contenteditable) instead of native
+// <input> for title/description. The contenteditable element emits 'input' on
+// textContent change.
+async function setTitle(wrapper: VueWrapper, value: string): Promise<void> {
+  const el = wrapper.find('[aria-label="Название задачи"]')
+  ;(el.element as HTMLElement).textContent = value
+  await el.trigger('input')
+  await wrapper.vm.$nextTick()
+}
+
+function submitBtn(wrapper: VueWrapper) {
+  return wrapper
+    .findAll('button')
+    .find((b: VueWrapper) => b.text().includes('Добавить задачу') || b.text().includes('Добавление'))
+}
+
 describe('TaskForm', () => {
   it('рендерит поле названия и кнопку добавления', () => {
     const wrapper = mount(TaskForm)
 
-    expect(wrapper.find('input[placeholder="Название задачи"]').exists()).toBe(true)
+    expect(wrapper.find('[aria-label="Название задачи"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Добавить задачу')
   })
 
   it('кнопка добавления заблокирована при пустом названии', () => {
     const wrapper = mount(TaskForm)
-    const submitBtn = wrapper.findAll('button').find((b: VueWrapper) => b.text().includes('Добавить задачу'))
 
-    expect(submitBtn?.element.hasAttribute('disabled')).toBe(true)
+    expect(submitBtn(wrapper)?.element.hasAttribute('disabled')).toBe(true)
   })
 
   it('кнопка добавления заблокирована при loading', () => {
     const wrapper = mount(TaskForm, { props: { loading: true } })
-    const submitBtn = wrapper.findAll('button').find((b: VueWrapper) =>
-      b.text().includes('Добавить') || b.text().includes('Добавление'),
-    )
 
-    expect(submitBtn?.element.hasAttribute('disabled')).toBe(true)
+    expect(submitBtn(wrapper)?.element.hasAttribute('disabled')).toBe(true)
   })
 
   it('эмитит submit с корректным payload при клике Добавить', async () => {
     const wrapper = mount(TaskForm)
-    const input = wrapper.find('input[placeholder="Название задачи"]')
+    await setTitle(wrapper, 'Новая задача')
 
-    await input.setValue('Новая задача')
-    await wrapper.vm.$nextTick()
-
-    const submitBtn = wrapper.findAll('button').find((b: VueWrapper) => b.text().includes('Добавить задачу'))
-    await submitBtn?.trigger('click')
+    await submitBtn(wrapper)?.trigger('click')
 
     const emitted = wrapper.emitted('submit')
     expect(emitted).toHaveLength(1)
@@ -50,12 +58,9 @@ describe('TaskForm', () => {
 
   it('эмитит submit с pomodoro-полями по умолчанию', async () => {
     const wrapper = mount(TaskForm)
-    const input = wrapper.find('input[placeholder="Название задачи"]')
-    await input.setValue('Task with defaults')
-    await wrapper.vm.$nextTick()
+    await setTitle(wrapper, 'Task with defaults')
 
-    const submitBtn = wrapper.findAll('button').find((b: VueWrapper) => b.text().includes('Добавить задачу'))
-    await submitBtn?.trigger('click')
+    await submitBtn(wrapper)?.trigger('click')
 
     const emitted = wrapper.emitted('submit')
     expect(emitted).toHaveLength(1)
@@ -71,10 +76,10 @@ describe('TaskForm', () => {
 
   it('не эмитит submit при пустом названии', async () => {
     const wrapper = mount(TaskForm)
-    const submitBtn = wrapper.findAll('button').find((b: VueWrapper) => b.text().includes('Добавить задачу'))
+    const btn = submitBtn(wrapper)
 
-    if (submitBtn && !submitBtn.attributes('disabled')) {
-      await submitBtn.trigger('click')
+    if (btn && !btn.attributes('disabled')) {
+      await btn.trigger('click')
     }
 
     expect(wrapper.emitted('submit')).toBeUndefined()
@@ -82,22 +87,22 @@ describe('TaskForm', () => {
 
   it('resetForm очищает форму', async () => {
     const wrapper = mount(TaskForm)
-    const input = wrapper.find('input[placeholder="Название задачи"]')
-    await input.setValue('Задача для сброса')
-    await wrapper.vm.$nextTick()
+    await setTitle(wrapper, 'Задача для сброса')
 
     ;(wrapper.vm as { resetForm: () => void }).resetForm()
+    // ContentEditableInput sync via watch → nested nextTick — need two flushes.
+    await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
-    const inputAfter = wrapper.find('input[placeholder="Название задачи"]')
-    expect((inputAfter.element as HTMLInputElement).value).toBe('')
+    const el = wrapper.find('[aria-label="Название задачи"]').element as HTMLElement
+    expect(el.textContent || '').toBe('')
   })
 
   it('Enter в поле названия вызывает submit', async () => {
     const wrapper = mount(TaskForm)
-    const input = wrapper.find('input[placeholder="Название задачи"]')
-    await input.setValue('Задача по Enter')
-    await input.trigger('keyup.enter')
+    await setTitle(wrapper, 'Задача по Enter')
+
+    await wrapper.find('[aria-label="Название задачи"]').trigger('keydown', { key: 'Enter' })
 
     const emitted = wrapper.emitted('submit')
     expect(emitted).toHaveLength(1)

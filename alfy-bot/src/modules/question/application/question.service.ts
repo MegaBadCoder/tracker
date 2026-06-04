@@ -207,6 +207,11 @@ export class QuestionService {
     await this.questionRepo.deactivate(id);
   }
 
+  async countAnswers(id: number, userId: number): Promise<number> {
+    await this.assertOwnership(id, userId);
+    return this.answerRepo.countByQuestion(id);
+  }
+
   private async assertOwnership(id: number, userId: number): Promise<Question> {
     const question = await this.questionRepo.findById(id);
     if (!question) {

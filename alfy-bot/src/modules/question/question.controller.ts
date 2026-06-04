@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -10,10 +11,15 @@ import {
   Post,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -22,11 +28,16 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { memoryStorage } from 'multer';
+import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
+import { ReportService } from '../report/application/report.service';
 import { QuestionService } from './application/question.service';
+import { AnswerQuestionDto } from './dto/answer-question.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { PhotoGalleryEntryDto } from './dto/photo-gallery-response.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { UploadPhotoAnswerDto } from './dto/upload-photo-answer.dto';
 import { UpdateScheduleDto } from '../goal/dto/update-schedule.dto';
 import { HabitWithHistoryDto } from './dto/habit-response.dto';
 import { QuestionDto, ScheduleDto } from '../goal/dto/goal-response.dto';
@@ -37,10 +48,13 @@ interface AuthRequest extends Request {
 
 @ApiTags('questions')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtOrApiTokenGuard)
 @Controller('questions')
 export class QuestionController {
-  constructor(private readonly questionService: QuestionService) {}
+  constructor(
+    private readonly questionService: QuestionService,
+    private readonly reportService: ReportService,
+  ) {}
 
   @Get('habits')
   @ApiOperation({ summary: 'Все активные привычки пользователя с историей' })
@@ -103,6 +117,67 @@ export class QuestionController {
     }) as unknown as Promise<ScheduleDto>;
   }
 
+  @Post(':id/answers')
+  @ApiOperation({ summary: 'Отметить ответ на вопрос за дату' })
+  @ApiCreatedResponse({ schema: { example: { ok: true } } })
+  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
+  async answerQuestion(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AnswerQuestionDto,
+  ): Promise<{ ok: true }> {
+    await this.reportService.addAnswer(
+      req.user.sub,
+      id,
+      dto.scheduled_date,
+      dto.answer,
+    );
+    return { ok: true };
+  }
+
+  @Post(':id/answers/photo')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (req, file, cb) =>
+        /^image\//.test(file.mimetype)
+          ? cb(null, true)
+          : cb(new BadRequestException('Only images are allowed'), false),
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        photo: { type: 'string', format: 'binary' },
+        scheduled_date: { type: 'string', example: '2026-05-22' },
+      },
+      required: ['photo', 'scheduled_date'],
+    },
+  })
+  @ApiOperation({ summary: 'Загрузить фото-ответ на photo-вопрос' })
+  @ApiCreatedResponse({ schema: { example: { ok: true } } })
+  async uploadPhotoAnswer(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UploadPhotoAnswerDto,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<{ ok: true }> {
+    if (!file) throw new BadRequestException('photo file is required');
+    await this.reportService.addPhotoAnswer(
+      req.user.sub,
+      id,
+      dto.scheduled_date,
+      {
+        buffer: file.buffer,
+        mime: file.mimetype,
+      },
+    );
+    return { ok: true };
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Обновить вопрос' })
   @ApiOkResponse({ type: QuestionDto })
@@ -131,5 +206,43 @@ export class QuestionController {
     @Param('id', ParseIntPipe) id: number,
   ): Promise<void> {
     await this.questionService.deactivate(id, req.user.sub);
+  }
+
+  @Get(':id/answer-count')
+  @ApiOperation({
+    summary: 'Количество сохранённых ответов на вопрос',
+    description:
+      'Используется фронтом, чтобы предупредить о неоднородности интерпретации при смене типа вопроса.',
+  })
+  @ApiOkResponse({ schema: { example: { count: 12 } } })
+  @ApiNotFoundResponse({ description: 'Вопрос не найден' })
+  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
+  async getAnswerCount(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ count: number }> {
+    const count = await this.questionService.countAnswers(id, req.user.sub);
+    return { count };
+  }
+
+  @Get(':id/photo-gallery')
+  @ApiOperation({
+    summary: 'Галерея фото-ответов (DESC по дате, presigned URL TTL 1ч)',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiOkResponse({ type: [PhotoGalleryEntryDto] })
+  async getPhotoGallery(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
+  ): Promise<PhotoGalleryEntryDto[]> {
+    return this.reportService.getPhotoGallery(
+      req.user.sub,
+      id,
+      limit,
+      offset,
+    ) as Promise<PhotoGalleryEntryDto[]>;
   }
 }

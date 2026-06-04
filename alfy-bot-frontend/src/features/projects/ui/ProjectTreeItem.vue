@@ -29,7 +29,7 @@ import {
   Zap,
 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,6 +90,9 @@ const { isHovered } = useDropTarget({
   el: linkEl,
   projectId: props.node.id,
 })
+
+const route = useRoute()
+const isActive = computed(() => route.params.projectId === props.node.id)
 </script>
 
 <template>
@@ -100,9 +103,12 @@ const { isHovered } = useDropTarget({
         :to="`/tasks/project/${node.id}`"
         data-drop-kind="project"
         :data-project-id="node.id"
-        class="flex items-center gap-2 px-3 py-1.5 pr-8 rounded-md text-sm transition-colors hover:bg-sidebar-accent/50 text-sidebar-foreground"
+        class="flex items-center gap-3 px-3 py-2 pr-8 rounded-md text-sm font-medium transition-colors"
         :style="{ paddingLeft: `${12 + depth * 16}px` }"
-        :class="{ 'bg-accent ring-2 ring-primary': isHovered }"
+        :class="[
+          isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
+          isHovered ? 'bg-accent ring-2 ring-primary' : '',
+        ]"
       >
         <component
           :is="nodeIcon"

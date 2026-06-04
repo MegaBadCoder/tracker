@@ -8,7 +8,7 @@ import ScheduleEditor from '../components/ScheduleEditor.vue'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { fetchQuestion, updateQuestion } from '../api/goals'
-import { fetchQuestionAnalytics } from '../api/reports'
+import { fetchQuestionAnalytics, fetchPhotoGallery, type PhotoGalleryEntry } from '../api/reports'
 import { analyticsToDataPoints, type DataPoint } from '../utils/reportAnswer'
 import type { Question } from '../types'
 import PageContainer from '@/components/PageContainer.vue'
@@ -20,6 +20,7 @@ const questionId = Number(route.params.id)
 
 const question = ref<Question | null>(null)
 const dataPoints = ref<DataPoint[]>([])
+const photoEntries = ref<PhotoGalleryEntry[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const habitUpdating = ref(false)
@@ -73,12 +74,14 @@ async function toggleHabit(value: boolean) {
 
 onMounted(async () => {
   try {
-    const [q, entries] = await Promise.all([
-      fetchQuestion(questionId),
-      fetchQuestionAnalytics(questionId),
-    ])
+    const q = await fetchQuestion(questionId)
     question.value = q
-    dataPoints.value = analyticsToDataPoints(entries)
+    if (q.type === 'photo') {
+      photoEntries.value = await fetchPhotoGallery(questionId)
+    } else {
+      const entries = await fetchQuestionAnalytics(questionId)
+      dataPoints.value = analyticsToDataPoints(entries)
+    }
   } catch (e: any) {
     if (e?.response?.status === 404) {
       router.replace('/not-found')
@@ -129,10 +132,11 @@ onMounted(async () => {
 
     <PageContainer class="space-y-6">
       <QuestionVisual
-        v-if="dataPoints.length"
+        v-if="question.type === 'photo' ? photoEntries.length > 0 : dataPoints.length > 0"
         :question="question"
         :data-points="dataPoints"
         :accent="'#8b5cf6'"
+        :photo-entries="photoEntries"
       />
       <div v-else class="text-sm text-muted-foreground py-8">
         Пока нет данных

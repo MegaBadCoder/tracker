@@ -4,7 +4,8 @@ export type QuestionType =
   | 'emoji_rating'
   | 'yes_no'
   | 'number'
-  | 'time_spent';
+  | 'time_spent'
+  | 'photo';
 
 export interface QuestionTypeConfig {
   type: QuestionType;
@@ -62,6 +63,13 @@ export const QUESTION_TYPES: Record<QuestionType, QuestionTypeConfig> = {
     example: 'Сколько времени потратил?',
     options: ['<30 мин', '30-60', '1-2ч', '2+ч'],
     ui_component: 'buttons',
+  },
+  photo: {
+    type: 'photo',
+    label: 'Фото',
+    description: 'Фотография на дату',
+    example: 'Сделай фото себя сегодня',
+    ui_component: 'photo_upload',
   },
 };
 

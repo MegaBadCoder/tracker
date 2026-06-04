@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, In, IsNull, Not, Repository } from 'typeorm';
 import { ReportAnswer } from '../../../shared/entities';
 import {
   ReportAnswerRepositoryPort,
@@ -22,6 +22,17 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
     scheduledDate: string,
     data: AnswerData,
   ): Promise<ReportAnswer> {
+    const existing = await this.findByQuestionAndDate(
+      questionId,
+      scheduledDate,
+    );
+    if (existing) {
+      existing.answer_text = data.answer_text;
+      existing.answer_number = data.answer_number;
+      existing.answer_bool = data.answer_bool;
+      existing.photo_key = data.photo_key ?? null;
+      return this.repo.save(existing);
+    }
     const answer = this.repo.create({
       user_id: userId,
       question_id: questionId,
@@ -29,6 +40,7 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
       answer_text: data.answer_text,
       answer_number: data.answer_number,
       answer_bool: data.answer_bool,
+      photo_key: data.photo_key ?? null,
     });
     return this.repo.save(answer);
   }
@@ -85,6 +97,32 @@ export class TypeOrmReportAnswerRepository extends ReportAnswerRepositoryPort {
         scheduled_date: Between(startDate, endDate),
       },
       order: { scheduled_date: 'ASC' },
+    });
+  }
+
+  async countByQuestion(questionId: number): Promise<number> {
+    return this.repo.count({ where: { question_id: questionId } });
+  }
+
+  async findByQuestionAndDate(
+    questionId: number,
+    scheduledDate: string,
+  ): Promise<ReportAnswer | null> {
+    return this.repo.findOne({
+      where: { question_id: questionId, scheduled_date: scheduledDate },
+    });
+  }
+
+  async findPhotosByQuestion(
+    questionId: number,
+    limit: number,
+    offset: number,
+  ): Promise<ReportAnswer[]> {
+    return this.repo.find({
+      where: { question_id: questionId, photo_key: Not(IsNull()) },
+      order: { scheduled_date: 'DESC' },
+      take: limit,
+      skip: offset,
     });
   }
 }

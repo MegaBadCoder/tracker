@@ -16,6 +16,18 @@ services:
     networks:
       - app
 
+  alfy-mcp:
+    image: ${REGISTRY_URL}/alfy-mcp:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - ALFY_API_BASE=http://backend:3002/api
+      - MCP_HTTP_PORT=3003
+    networks:
+      - app
+    depends_on:
+      - backend
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -28,6 +40,7 @@ services:
       - caddy-config:/config
     depends_on:
       - frontend
+      - alfy-mcp
     networks:
       - app
 

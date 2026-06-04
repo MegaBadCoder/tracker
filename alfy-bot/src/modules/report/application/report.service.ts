@@ -1,9 +1,12 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Goal, Question } from '../../../shared/entities';
+import { StoragePort } from '../../../shared/storage/domain/storage.port';
 import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportAnswerRepositoryPort } from '../domain/report-answer-repository.port';
@@ -23,6 +26,7 @@ export class ReportService {
     private answerRepo: ReportAnswerRepositoryPort,
     private goalService: GoalService,
     private scheduleService: ScheduleService,
+    private storage: StoragePort,
   ) {}
 
   async addAnswer(
@@ -32,7 +36,12 @@ export class ReportService {
     answerText: string,
   ): Promise<void> {
     const question = await this.goalService.findQuestionById(questionId);
-    if (!question) throw new Error('Question not found');
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
 
     const normalized = this.normalizeAnswer(answerText, question.type);
 
@@ -188,6 +197,93 @@ export class ReportService {
     }
 
     return null;
+  }
+
+  async addPhotoAnswer(
+    userId: number,
+    questionId: number,
+    scheduledDate: string,
+    photo: { buffer: Buffer; mime: string },
+  ): Promise<void> {
+    const question = await this.goalService.findQuestionById(questionId);
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    if (question.type !== 'photo')
+      throw new BadRequestException('Question is not of type photo');
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
+
+    const ext = this.mimeToExt(photo.mime);
+    const key = `goal-reports/${userId}/${questionId}/${scheduledDate}-${randomUUID()}.${ext}`;
+
+    const existing = await this.answerRepo.findByQuestionAndDate(
+      questionId,
+      scheduledDate,
+    );
+
+    await this.storage.upload(key, photo.buffer, photo.mime);
+
+    try {
+      await this.answerRepo.save(userId, questionId, scheduledDate, {
+        answer_text: '',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: key,
+      });
+    } catch (e) {
+      await this.storage.delete(key).catch(() => undefined);
+      throw e;
+    }
+
+    if (existing?.photo_key) {
+      await this.storage.delete(existing.photo_key).catch(() => undefined);
+    }
+  }
+
+  async getPhotoGallery(
+    userId: number,
+    questionId: number,
+    limit: number,
+    offset: number,
+  ): Promise<{ scheduled_date: string; url: string }[]> {
+    const question = await this.goalService.findQuestionById(questionId);
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    if (question.type !== 'photo')
+      throw new BadRequestException('Question is not of type photo');
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
+
+    const rows = await this.answerRepo.findPhotosByQuestion(
+      questionId,
+      limit,
+      offset,
+    );
+
+    return Promise.all(
+      rows.map(async (row) => ({
+        scheduled_date: row.scheduled_date,
+        url: await this.storage.getSignedReadUrl(row.photo_key!, 3600),
+      })),
+    );
+  }
+
+  private mimeToExt(mime: string): string {
+    const map: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+    };
+    const ext = map[mime];
+    if (!ext) throw new BadRequestException('Unsupported image type');
+    return ext;
   }
 
   async getQuestionAnalytics(
