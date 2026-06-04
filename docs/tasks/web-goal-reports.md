@@ -1,6 +1,6 @@
 # Web Goal Reports
 
-**Status:** planning
+**Status:** done
 **Branch:** feat/web-goal-reports (base: chore/deploy-smtp-s3-env-secrets @ 6060bff; merged photo feature origin/feat/goal-report-photo-questions @ 329670b)
 **Worktree:** .worktrees/feat-web-goal-reports
 **Mode:** interactive
@@ -206,10 +206,55 @@ Greenfield: новые эндпоинты/контроллер, новый фр�
 - **Rollback**: каждая фаза — отдельный коммит, `git revert` точечно; БД-схема не меняется, откат code-only безопасен.
 
 ## Verify
-<empty — filled by up:uverify>
+
+**Result:** passed
+
+Positive:
+- BE unit `npm run test` → 296/296; FE `npm run test:run` → 240/240; оба `build` чисто; FE `vue-tsc --noEmit` чисто
+- `getGoalReportStatus`: answered-маппинг, сортировка по order_index, `allDone` только по `!can_skip` due-вопросам — 6/6 (прогнаны в этом сообщении)
+- `getReportQueue`: только цели с unanswered due, верный `pendingCount` — 2/2
+- answer-format util (бот-идентичные строки: emoji→индекс, yes_no→`yes`/`no`) — 6/6
+- Photo answer → строка `report_answers` с `photo_key` ⇒ считается answered тем же `findByQuestionsAndDate` (покрыто тестами `addPhotoAnswer`)
+
+Negative:
+- Не-владелец / несуществующая цель в `report-status` → Forbidden / NotFound (unit)
+- `addPhotoAnswer` на не-photo тип → BadRequest; чужая цель → Forbidden (unit)
+
+Invariants:
+- Запись только через 2 существующих POST (`/questions/:id/answers`, `/questions/:id/answers/photo`); нового goal-level write-пути нет (grep `api.post` в reports.ts)
+- Due на дату — через `isQuestionDueOnDateHistorical`; owner-check в обоих новых методах
+- Статические маршруты до `:id` во фронт-роутере; на бэке — двухсегментный `goals/reports/queue`
+- answer ≤200 (TextAnswerInput maxlength); photo `accept="image/*"`, эмитит File, шлёт FormData
+
+Smoke: routing e2e (`web-goal-reports-routing.e2e-spec.ts`, реальный Nest-роутер, GoalController зарегистрирован первым = worst case) → `goals/reports/queue`, `goals/:id/report-status`, `goals/:id` резолвятся верно — 4/4.
+
+Notes:
+- **Найден и исправлен баг роут-коллизии** (тот самый риск из Plan): одиночный `goals/report-queue` перехватывался `GoalController @Get(':id')` → 400 (ParseIntPipe). Express 5 / path-to-regexp v8 отвергают inline-regex `:id(\d+)`; порядок контроллеров определяется import-порядком модулей (`GoalModule` до `ReportModule`). Фикс — двухсегментный путь `goals/reports/queue` (его не может захватить одиночный `:id`), `78ae0e7`, + e2e-регрессия.
+- **Не запускался** полный HTTP-смоук против живого DB-сервера: full `AppModule` поднимает Telegram-бота и падает на `401: Bot Token is required` — pre-existing (так же падают `tasks.e2e-spec.ts`/`app.e2e-spec.ts` на baseline, не вводилось этой задачей). Компенсировано real-router routing e2e + сервис-уровневыми тестами данных.
 
 ## Conclusion
-<empty — filled by up:ureview>
+
+Outcome: веб-заполнение отчётов по целям (текст + фото) работает end-to-end — одиночный отчёт, последовательный проход по всем целям дня, переиспользуемый `GoalReportForm`. HEAD: `78ae0e7`.
+
+Invariants:
+- answer-строки бот-идентичны (emoji→1-based индекс, yes_no→`yes`/`no`, rating→число, time_spent→лейбл) — `answer-format.ts`, сверено с `question-ui.util.ts`; unit 6/6
+- owner-check в обоих read-методах (`report.service.ts:235`, queue через `findActiveByUser`) — unit (Forbidden/NotFound)
+- due через `isQuestionDueOnDateHistorical` во всех путях
+- запись только через 2 существующих POST; новых goal-level write нет — grep `api.post` reports.ts
+- опции типов из единого `question-types.ts`; photo `accept="image/*"`, text maxlength 200
+- фото-вопрос считается answered (`answered = answer !== undefined`, `answer_text=''` проходит без спец-кейса)
+
+Plan adherence: 4 минорных отклонения (ниже), все зафиксированы и подтверждены ревьюером как консистентные.
+
+Review findings: чисто — независимый `up:reviewer` не нашёл находок ≥80; 3 ключевых утверждения (нет stale-пути, photo-маппинг без падения, fail-fast не продвигается на ошибке) перепроверены диспетчером против кода.
+
+Verified by: routing e2e против реального Nest-роутера (worst-case порядок контроллеров). НЕ запускался полный HTTP-смоук против живого DB-сервера — full `AppModule` поднимает Telegram-бота и падает `401: Bot Token required` (pre-existing, так же `tasks.e2e-spec.ts` на baseline); компенсировано routing e2e + сервис-тестами.
+
+### Deviations from plan
+- Phase 1: `toLocalISO` извлечён из `report.service.ts` в новый `report/lib/date.ts` (одна точка истины), импортирован сервисом и `goal-report.controller.ts`. Pure-функция, без смены поведения; все 6 прежних вызовов переключены.
+- Phase 4: `AnswerInput.vue` props сменены `{ question: Question }` → `{ type: QuestionType }` (предпочтительный вариант, явно одобренный планом — компонент использует только `type`; `report-status` отдаёт `QuestionReportItem`, не `Question`). Единственный потребитель — `GoalReportForm`.
+- Phase 4: `GoalReportView.onDone` делает повторный read-only `GET report-status`, чтобы прочитать `lastUnfilledDate` (форма не экспонирует свой статус). Новых write-путей не вводит.
+- Phase 5: кнопка на `HomeView` — `fetchReportQueue` обёрнут в локальный try/catch (фейл очереди → кнопка скрыта, список целей не ломается). Сознательная деградация второстепенной фичи, не маскировка бага.
 
 ### Hands-off decisions
 <empty — populated only when Mode is hands-off>
