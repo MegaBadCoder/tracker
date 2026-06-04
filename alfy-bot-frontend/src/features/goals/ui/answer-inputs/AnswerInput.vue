@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Question } from '@/types'
+import type { QuestionType } from '@/types'
 import EmojiRatingAnswerInput from './EmojiRatingAnswerInput.vue'
 import NumberAnswerInput from './NumberAnswerInput.vue'
 import PhotoAnswerInput from './PhotoAnswerInput.vue'
@@ -9,12 +9,13 @@ import TimeSpentAnswerInput from './TimeSpentAnswerInput.vue'
 import YesNoAnswerInput from './YesNoAnswerInput.vue'
 
 /**
- * Роутер по `question.type` → нужный answer-input (зеркало QuestionVisual).
- * Принимает весь объект вопроса; пробрасывает оба эмита наверх.
- * Потребляется в Phase 4: `<AnswerInput :question @submit @submitPhoto>`.
+ * Роутер по `type` → нужный answer-input (зеркало QuestionVisual).
+ * Принимает только тип вопроса (единственное, что нужно для выбора инпута),
+ * чтобы одинаково работать и с `Question`, и с `QuestionReportItem`.
+ * Потребляется в Phase 4: `<AnswerInput :type @submit @submitPhoto>`.
  */
 defineProps<{
-  question: Question
+  type: QuestionType
 }>()
 
 const emit = defineEmits<{
@@ -33,27 +34,27 @@ function onSubmitPhoto(file: File) {
 
 <template>
   <PhotoAnswerInput
-    v-if="question.type === 'photo'"
+    v-if="type === 'photo'"
     @submit-photo="onSubmitPhoto"
   />
   <RatingAnswerInput
-    v-else-if="question.type === 'rating'"
+    v-else-if="type === 'rating'"
     @submit="onSubmit"
   />
   <EmojiRatingAnswerInput
-    v-else-if="question.type === 'emoji_rating'"
+    v-else-if="type === 'emoji_rating'"
     @submit="onSubmit"
   />
   <YesNoAnswerInput
-    v-else-if="question.type === 'yes_no'"
+    v-else-if="type === 'yes_no'"
     @submit="onSubmit"
   />
   <TimeSpentAnswerInput
-    v-else-if="question.type === 'time_spent'"
+    v-else-if="type === 'time_spent'"
     @submit="onSubmit"
   />
   <NumberAnswerInput
-    v-else-if="question.type === 'number'"
+    v-else-if="type === 'number'"
     @submit="onSubmit"
   />
   <TextAnswerInput

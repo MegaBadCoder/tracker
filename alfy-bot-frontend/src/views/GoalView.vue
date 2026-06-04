@@ -51,6 +51,10 @@ function goToQuestion(q: { id: number }) {
   return router.push({ name: 'questionReport', params: { id: q.id } })
 }
 
+function goToReport() {
+  return router.push({ name: 'goalReport', params: { id } })
+}
+
 const goal = ref<Goal | null>(null)
 const loading = ref(true)
 
@@ -349,6 +353,17 @@ function onCancelGoalAction() {
     </AppHeader>
 
     <PageContainer class="space-y-8">
+      <!-- report CTA -->
+      <Button
+        v-if="goal.status === 'active'"
+        size="lg"
+        class="w-full"
+        data-testid="goal-report-cta"
+        @click="goToReport"
+      >
+        Сделать отчёт по цели
+      </Button>
+
       <!-- summary -->
       <section>
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
