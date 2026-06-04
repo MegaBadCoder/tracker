@@ -47,6 +47,11 @@ const router = createRouter({
           component: () => import('../views/GoalCreateView.vue'),
         },
         {
+          path: 'goals/report-today',
+          name: 'goalsReportToday',
+          component: () => import('../views/GoalsReportFlowView.vue'),
+        },
+        {
           path: 'goals/:id',
           name: 'goal',
           component: () => import('../views/GoalView.vue'),
