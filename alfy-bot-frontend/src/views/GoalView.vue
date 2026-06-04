@@ -2,7 +2,7 @@
 import type { QuestionWithScheduleItem } from '../api/goals'
 import type { GoalReportStatus } from '../api/reports'
 import type { Goal, Question } from '../types'
-import { Archive, Check, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { Archive, Check, MoreVertical, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/PageContainer.vue'
@@ -30,8 +30,10 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { toLocalISODate } from '@/features/goals/lib/dates'
+import { newQuestionDraft } from '@/features/goals/lib/new-question'
 import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
 import {
+  addGoalQuestions,
   deleteQuestion,
   fetchGoalById,
   fetchQuestionAnswerCount,
@@ -62,6 +64,8 @@ const goal = ref<Goal | null>(null)
 const loading = ref(true)
 
 const editingQuestion = ref<Question | null>(null)
+const addingQuestion = ref(false)
+const addError = ref<string | null>(null)
 const deletingQuestion = ref<Question | null>(null)
 // Снимок Question, захваченный при клике trash-иконки. Используется в onConfirmDelete,
 // т.к. reka-ui AlertDialog emit'ит `update:open(false)` ДО `@click` action-кнопки,
@@ -142,6 +146,23 @@ function questionToFormValue(q: Question): QuestionWithScheduleItem {
     selectedDays: q.schedule.days_of_week ?? undefined,
     intervalDays: q.schedule.interval_days ?? undefined,
     targetValue: q.target_value ?? undefined,
+  }
+}
+
+async function onSaveAdd(v: QuestionWithScheduleItem) {
+  saving.value = true
+  addError.value = null
+  try {
+    await addGoalQuestions(id, [v])
+    await reloadGoal()
+    addingQuestion.value = false
+  }
+  catch (e: unknown) {
+    // fail-fast: Sheet не закрываем, список не трогаем
+    addError.value = e instanceof Error ? e.message : 'Не удалось добавить вопрос'
+  }
+  finally {
+    saving.value = false
   }
 }
 
@@ -421,6 +442,16 @@ function onCancelGoalAction() {
           <h2 class="text-base font-semibold text-foreground">
             Вопросы цели
           </h2>
+          <Button
+            v-if="goal.status === 'active'"
+            size="sm"
+            variant="outline"
+            data-testid="add-question-cta"
+            @click="addingQuestion = true"
+          >
+            <Plus class="size-4" />
+            Добавить вопрос
+          </Button>
         </div>
         <div class="space-y-2">
           <div
@@ -486,6 +517,26 @@ function onCancelGoalAction() {
           :submitting="saving"
           @save="onSaveEdit"
           @cancel="editingQuestion = null; saveError = null"
+        />
+      </SheetContent>
+    </Sheet>
+
+    <Sheet
+      :open="addingQuestion"
+      @update:open="(o: boolean) => { if (!o) { addingQuestion = false; addError = null } }"
+    >
+      <SheetContent class="overflow-y-auto p-6">
+        <SheetHeader class="px-0">
+          <SheetTitle>Добавить вопрос</SheetTitle>
+        </SheetHeader>
+        <QuestionEditForm
+          v-if="addingQuestion"
+          :initial="newQuestionDraft()"
+          submit-label="Добавить"
+          :error="addError ?? undefined"
+          :submitting="saving"
+          @save="onSaveAdd"
+          @cancel="addingQuestion = false; addError = null"
         />
       </SheetContent>
     </Sheet>
