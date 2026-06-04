@@ -18,6 +18,8 @@ export type Step
     | 'start'
     | 'end'
     | 'point_a'
+    | 'parent'
+    | 'global_deadline'
     | 'creating'
     | 'questions_offer'
     | 'q_type'
@@ -40,6 +42,10 @@ export interface FlowState {
   startDate?: Date
   endDate?: Date
   pointA?: boolean
+  /** Опциональный дедлайн для global-цели (→ goal_end). */
+  deadline?: Date
+  /** Опциональный родитель для simple-цели (→ parent_goal_id). */
+  parentGoalId?: number
   goalId?: number
   questionsToAdd: QuestionWithScheduleItem[]
   pending: Partial<QuestionWithScheduleItem>
@@ -86,6 +92,8 @@ export interface GoalCreateFlow {
     selectStartPreset: (p: StartPreset, custom?: Date) => void
     selectEndPreset: (p: EndPreset, custom?: Date) => void
     setPointA: (v: boolean) => void
+    selectParent: (goalId?: number) => void
+    selectDeadline: (date?: Date) => void
     offerQuestions: (yes: boolean) => void
     selectQuestionType: (t: QuestionType) => void
     submitQuestionText: (s: string) => void
@@ -123,7 +131,8 @@ export function useGoalCreateFlow(): GoalCreateFlow {
 
   function selectType(t: GoalTypeKey): void {
     state.value.goalType = t
-    state.value.step = t === 'simple' ? 'name' : 'type_in_development'
+    // simple и global ведут на ввод имени; остальные типы — в заглушку.
+    state.value.step = t === 'simple' || t === 'global' ? 'name' : 'type_in_development'
   }
 
   function submitName(s: string): void {
@@ -131,7 +140,8 @@ export function useGoalCreateFlow(): GoalCreateFlow {
     if (trimmed.length === 0)
       return
     state.value.goalName = trimmed
-    state.value.step = 'start'
+    // global: минуем start/end/point_a/questions — сразу к опциональному дедлайну.
+    state.value.step = state.value.goalType === 'global' ? 'global_deadline' : 'start'
   }
 
   function selectStartPreset(p: StartPreset, custom?: Date): void {
@@ -163,6 +173,23 @@ export function useGoalCreateFlow(): GoalCreateFlow {
 
   function setPointA(v: boolean): void {
     state.value.pointA = v
+    // simple: предлагаем опциональный выбор родительской global-цели перед созданием.
+    state.value.step = 'parent'
+  }
+
+  function selectParent(goalId?: number): void {
+    if (goalId !== undefined)
+      state.value.parentGoalId = goalId
+    else
+      delete state.value.parentGoalId
+    state.value.step = 'creating'
+  }
+
+  function selectDeadline(date?: Date): void {
+    if (date !== undefined)
+      state.value.deadline = date
+    else
+      delete state.value.deadline
     state.value.step = 'creating'
   }
 
@@ -319,6 +346,11 @@ export function useGoalCreateFlow(): GoalCreateFlow {
         state.value.goalType = undefined
         state.value.step = 'type'
         return
+      case 'global_deadline':
+        // global: единственный предшествующий шаг — name.
+        state.value.deadline = undefined
+        state.value.step = 'name'
+        return
       case 'start':
         state.value.goalName = undefined
         state.value.step = 'name'
@@ -331,9 +363,19 @@ export function useGoalCreateFlow(): GoalCreateFlow {
         state.value.endDate = undefined
         state.value.step = 'end'
         return
-      case 'creating':
-        state.value.pointA = undefined
+      case 'parent':
+        state.value.parentGoalId = undefined
         state.value.step = 'point_a'
+        return
+      case 'creating':
+        // simple приходит сюда из 'parent', global — из 'global_deadline'.
+        if (state.value.goalType === 'global') {
+          state.value.step = 'global_deadline'
+        }
+        else {
+          state.value.parentGoalId = undefined
+          state.value.step = 'parent'
+        }
         return
       case 'questions_offer':
         // цель уже создана — назад не пускаем; ничего не делаем.
@@ -382,15 +424,34 @@ export function useGoalCreateFlow(): GoalCreateFlow {
   }
 
   function buildCreatePayload(): CreateGoalDto {
-    const { goalName, startDate, endDate } = state.value
-    if (!goalName || !startDate || !endDate) {
+    const { goalType, goalName, startDate, endDate, deadline, parentGoalId } = state.value
+    if (!goalName) {
+      throw new Error('buildCreatePayload: goalName must be set')
+    }
+    if (goalType === 'global') {
+      // global: даты опциональны. Только дедлайн (→ goal_end), если задан.
+      const payload: CreateGoalDto = {
+        goal_name: goalName,
+        is_global: true,
+      }
+      if (deadline) {
+        payload.goal_end = toLocalISODate(deadline)
+      }
+      return payload
+    }
+    // simple: даты обязательны, родитель опционален.
+    if (!startDate || !endDate) {
       throw new Error('buildCreatePayload: goalName/startDate/endDate must be set')
     }
-    return {
+    const payload: CreateGoalDto = {
       goal_name: goalName,
       goal_start: toLocalISODate(startDate),
       goal_end: toLocalISODate(endDate),
     }
+    if (parentGoalId !== undefined) {
+      payload.parent_goal_id = parentGoalId
+    }
+    return payload
   }
 
   function buildQuestionsPayload(): QuestionWithScheduleItem[] {
@@ -402,7 +463,8 @@ export function useGoalCreateFlow(): GoalCreateFlow {
     const payload = buildCreatePayload()
     const goal = await createGoal(payload)
     state.value.goalId = goal.id
-    state.value.step = 'questions_offer'
+    // global-цели не получают вопросов — сразу завершаем поток.
+    state.value.step = state.value.goalType === 'global' ? 'done' : 'questions_offer'
     return goal.id
   }
 
@@ -427,6 +489,8 @@ export function useGoalCreateFlow(): GoalCreateFlow {
       selectStartPreset,
       selectEndPreset,
       setPointA,
+      selectParent,
+      selectDeadline,
       offerQuestions,
       selectQuestionType,
       submitQuestionText,
