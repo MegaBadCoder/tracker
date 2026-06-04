@@ -45,7 +45,12 @@ export class GoalReportController {
     return toLocalISO(new Date());
   }
 
-  @Get('report-queue')
+  // Двухсегментный путь `reports/queue` — НЕ `report-queue`: одиночный литерал
+  // `goals/report-queue` перехватывается `GoalController @Get(':id')` (Express 5 /
+  // path-to-regexp v8 не поддерживает inline-regex `:id(\\d+)`, а порядок
+  // контроллеров определяется import-порядком модулей). Двухсегментный путь не
+  // может быть захвачен одиночным `:id`. См. goal-report.controller.e2e-spec.ts.
+  @Get('reports/queue')
   @ApiOperation({
     summary: 'Очередь целей с неотвеченными due-вопросами на дату',
   })

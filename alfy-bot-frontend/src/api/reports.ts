@@ -60,7 +60,7 @@ export async function fetchGoalReportStatus(goalId: number, date: string): Promi
 }
 
 export async function fetchReportQueue(date: string): Promise<ReportQueueItem[]> {
-  const { data } = await api.get<ReportQueueItem[]>('/goals/report-queue', { params: { date } })
+  const { data } = await api.get<ReportQueueItem[]>('/goals/reports/queue', { params: { date } })
   return data
 }
 
