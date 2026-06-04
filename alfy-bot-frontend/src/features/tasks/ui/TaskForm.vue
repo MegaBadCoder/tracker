@@ -56,7 +56,13 @@
         </DropdownMenuTrigger>
         <DropdownMenuContent class="w-auto p-0" align="start">
           <div class="p-3 space-y-3">
-            <Calendar :model-value="dueDateCalendarValue" @update:model-value="onDueDateCalendarChange" />
+            <Calendar
+              :model-value="dueDateCalendarValue"
+              :locale="intlLocale"
+              :week-starts-on="weekStartsOn"
+              weekday-format="short"
+              @update:model-value="onDueDateCalendarChange"
+            />
             <Input
               v-model="dueDateTime"
               type="time"
@@ -285,6 +291,7 @@ import { Input } from '@/components/ui/input'
 import { ContentEditableInput } from '@/components/ui/content-editable-input'
 import { Switch } from '@/components/ui/switch'
 import { Calendar } from '@/components/ui/calendar'
+import { intlLocale, weekStartsOn } from '@/composables/useLocale'
 import {
   DropdownMenu,
   DropdownMenuContent,
