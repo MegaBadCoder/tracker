@@ -24,7 +24,7 @@ const emit = defineEmits<{
         class="justify-start"
         @click="emit('selectType', opt.type)"
       >
-        <span class="mr-2">{{ opt.emoji }}</span>
+        <span v-if="opt.emoji" class="mr-2">{{ opt.emoji }}</span>
         <span>{{ opt.label }}</span>
       </Button>
     </div>

@@ -15,8 +15,17 @@ function questionsLabel(n: number) {
   return n === 1 ? '1 вопрос' : n < 5 ? `${n} вопроса` : `${n} вопросов`
 }
 
-function goalsLabel(n: number) {
-  return n === 1 ? '1 цель' : n < 5 ? `${n} цели` : `${n} целей`
+function subGoalsLabel(n: number) {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  let word: string
+  if (mod10 === 1 && mod100 !== 11)
+    word = 'подцель'
+  else if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14))
+    word = 'подцели'
+  else
+    word = 'подцелей'
+  return `${n} ${word}`
 }
 </script>
 
@@ -44,9 +53,9 @@ function goalsLabel(n: number) {
         <GoalStatusBadge :status="goal.status" />
         <span
           v-if="goal.is_global"
-          class="inline-flex items-center gap-1 rounded-full bg-sidebar-accent px-2 py-0.5 text-xs font-medium text-sidebar-primary"
+          class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
         >
-          🌍 Global
+          Global
         </span>
       </div>
 
@@ -58,14 +67,13 @@ function goalsLabel(n: number) {
         {{ formatDate(goal.goal_start) }} → {{ formatDate(goal.goal_end) }}
       </p>
 
-      <!-- count: child goals for global (when embedded), questions for regular goals.
-           Global goals in list view have no embedded children (only GET /goals/:id embeds),
-           and never have questions — so omit the count entirely rather than show "0 вопросов". -->
+      <!-- count: sub-goals for global (children_count from list endpoint),
+           questions for regular goals. -->
       <span v-if="!goal.is_global" class="text-xs text-muted-foreground">
         {{ questionsLabel(goal.questions.length) }}
       </span>
-      <span v-else-if="goal.children" class="text-xs text-muted-foreground">
-        {{ goalsLabel(goal.children.length) }}
+      <span v-else class="text-xs text-muted-foreground">
+        {{ subGoalsLabel(goal.children_count ?? goal.children?.length ?? 0) }}
       </span>
     </div>
   </div>

@@ -62,7 +62,6 @@ function skip() {
         :data-testid="`parent-option-${g.id}`"
         @click="pick(g.id)"
       >
-        <span class="mr-2">🌍</span>
         <span class="truncate">{{ g.goal_name }}</span>
       </Button>
     </div>

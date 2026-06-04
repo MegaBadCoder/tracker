@@ -2,7 +2,7 @@
 import type { QuestionWithScheduleItem } from '../api/goals'
 import type { Goal, Question } from '../types'
 import { Archive, ChevronRight, MoreVertical, MoveUpRight, Pencil, Plus, RotateCcw, Trash2, Unlink } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/PageContainer.vue'
 import {
@@ -46,7 +46,10 @@ import { goalAccent } from '../utils/goalColor'
 
 const route = useRoute()
 const router = useRouter()
-const id = Number(route.params.id)
+// Реактивный id: при навигации goal→goal (например, вход в подцель или к родителю)
+// vue-router переиспользует компонент, onMounted не срабатывает повторно —
+// поэтому id вычисляем из route и перезагружаем цель по его смене (watcher ниже).
+const id = computed(() => Number(route.params.id))
 
 function goToQuestion(q: { id: number }) {
   return router.push({ name: 'questionReport', params: { id: q.id } })
@@ -77,7 +80,7 @@ let pendingGoalAction: GoalAction | null = null
 const parentGoal = ref<Goal | null>(null)
 
 async function reloadGoal() {
-  goal.value = await fetchGoalById(id)
+  goal.value = await fetchGoalById(id.value)
   if (goal.value.parent_goal_id) {
     try {
       parentGoal.value = await fetchGoalById(goal.value.parent_goal_id)
@@ -93,6 +96,22 @@ async function reloadGoal() {
 }
 
 onMounted(async () => {
+  try {
+    await reloadGoal()
+  }
+  catch {
+    router.replace('/not-found')
+  }
+  finally {
+    loading.value = false
+  }
+})
+
+// Переход goal→goal (подцель/родитель) меняет :id без перемонтирования —
+// перезагружаем данные при смене параметра маршрута.
+watch(id, async () => {
+  loading.value = true
+  goal.value = null
   try {
     await reloadGoal()
   }
@@ -694,7 +713,6 @@ function onCancelGoalAction() {
             :data-testid="`move-target-${g.id}`"
             @click="onMoveToGlobal(g.id)"
           >
-            <span class="shrink-0">🌍</span>
             <span class="flex-1 min-w-0 truncate text-sm font-medium text-foreground">{{ g.goal_name }}</span>
             <span v-if="g.id === goal.parent_goal_id" class="text-xs text-muted-foreground shrink-0">текущий</span>
           </button>

@@ -51,7 +51,31 @@ describe('goalCard', () => {
     expect(wrapper.text()).toContain('Global')
   })
 
-  it('глобальная цель с children показывает количество вложенных целей', () => {
+  it('глобальная цель: показывает счётчик подцелей по children_count (из списка)', () => {
+    const goal = makeGoal({
+      is_global: true,
+      goal_start: null,
+      goal_end: null,
+      children_count: 3,
+    })
+    const wrapper = mount(GoalCard, { props: { goal } })
+
+    expect(wrapper.text()).toContain('3 подцели')
+  })
+
+  it('глобальная цель без подцелей: показывает «0 подцелей»', () => {
+    const goal = makeGoal({
+      is_global: true,
+      goal_start: null,
+      goal_end: null,
+      children_count: 0,
+    })
+    const wrapper = mount(GoalCard, { props: { goal } })
+
+    expect(wrapper.text()).toContain('0 подцелей')
+  })
+
+  it('глобальная цель с embedded children (fallback, без children_count)', () => {
     const goal = makeGoal({
       is_global: true,
       goal_start: null,
@@ -60,6 +84,6 @@ describe('goalCard', () => {
     })
     const wrapper = mount(GoalCard, { props: { goal } })
 
-    expect(wrapper.text()).toContain('2 цели')
+    expect(wrapper.text()).toContain('2 подцели')
   })
 })

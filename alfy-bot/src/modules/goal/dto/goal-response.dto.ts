@@ -102,6 +102,12 @@ export class GoalDto {
   })
   parent_goal_id: number | null;
 
+  @ApiPropertyOptional({
+    example: 3,
+    description: 'Кол-во подцелей (только для global-целей в списках)',
+  })
+  children_count?: number;
+
   @ApiProperty({ example: '2026-02-01T10:00:00.000Z' })
   createdAt: Date;
 

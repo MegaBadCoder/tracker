@@ -47,6 +47,13 @@ export class Goal {
   @OneToMany(() => Goal, (g) => g.parent)
   children: Goal[];
 
+  /**
+   * Кол-во непустых (не deleted) подцелей. Не колонка — заполняется
+   * репозиторием для global-целей в списочных выборках, чтобы карточка
+   * могла показать «N подцелей» без загрузки самих детей.
+   */
+  children_count?: number;
+
   @OneToMany(() => Question, (question) => question.goal)
   questions: Question[];
 

@@ -270,3 +270,11 @@ Verified by: реальный smoke service+repo+sqlite (HTTP-e2e нереали
 
 ### Known UX notes (для review)
 - Simple-create теперь на 1 шаг длиннее (parent-select) даже когда global-целей нет. Возможная полировка: пропускать шаг при пустом списке — отложено, не входило в план.
+
+### Post-review полировка (живой прогон)
+Правки по фидбэку при ручной проверке, после открытия PR #13:
+- **Навигация в подцель**: `GoalView` не перезагружался при переходе goal→goal (vue-router переиспользует компонент, `onMounted` не повторялся) — `id` сделан реактивным + watcher. Чинит вход в подцель и переход к родителю.
+- **Счётчик подцелей на карточке global**: список `GET /goals` отдаёт `children_count` (1 групповой запрос, без N+1, не-deleted дети); карточка показывает «N подцелей» (рус. склонение). `GoalDto.children_count`, `Goal.children_count` (не колонка).
+- **Ярлык Global**: синий бренд-акцент → нейтральный `bg-muted`/`border` (категория vs зелёный статус); убран emoji 🌍 со всех веб-поверхностей (badge, ParentGoalStep, GoalView move-sheet, type-picker + `v-if` guard в TypeStep).
+- Тесты: alfy-bot 272 (+2 children_count), frontend 236 (+2 GoalCard).
+- Не в PR: `app.module.ts` (локальный env-gate `BOT_LAUNCH=off` для web-only прогона) и `.env` — оставлены только в рабочем дереве.

@@ -14,5 +14,5 @@ export interface GoalTypeOption {
 export const GOAL_TYPE_OPTIONS: GoalTypeOption[] = [
   { type: 'simple', emoji: '📝', label: 'Простая цель', enabled: true },
   { type: 'smart', emoji: '🎯', label: 'SMART цель', enabled: false },
-  { type: 'global', emoji: '🌍', label: 'Global цель', enabled: true },
+  { type: 'global', emoji: '', label: 'Global цель', enabled: true },
 ]

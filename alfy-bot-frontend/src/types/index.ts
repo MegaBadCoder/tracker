@@ -54,6 +54,7 @@ export interface Goal {
   is_global: boolean
   parent_goal_id: number | null
   children?: Goal[]
+  children_count?: number
   questions: Question[]
 }
 

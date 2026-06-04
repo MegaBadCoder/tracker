@@ -134,6 +134,45 @@ describe('TypeOrmGoalRepository (in-memory sqlite)', () => {
     expect(activeGlobals.map((g) => g.id)).toEqual([global.id]);
   });
 
+  it('findAllByUser sets children_count on global goals (non-deleted children only)', async () => {
+    const global = await repo.create(USER_A, {
+      goal_name: 'Global',
+      is_global: true,
+    });
+    await repo.create(USER_A, {
+      goal_name: 'Child 1',
+      goal_start: '2026-01-01',
+      goal_end: '2026-12-31',
+      parent_goal_id: global.id,
+    });
+    const child2 = await repo.create(USER_A, {
+      goal_name: 'Child 2',
+      goal_start: '2026-01-01',
+      goal_end: '2026-12-31',
+      parent_goal_id: global.id,
+    });
+    const childDeleted = await repo.create(USER_A, {
+      goal_name: 'Child deleted',
+      goal_start: '2026-01-01',
+      goal_end: '2026-12-31',
+      parent_goal_id: global.id,
+    });
+    await repo.updateGoalStatus(childDeleted.id, 'deleted');
+
+    const globals = await repo.findAllByUser(USER_A, 'global');
+    expect(globals[0].children_count).toBe(2);
+
+    // regular goal (child2) has no children_count set
+    const regulars = await repo.findAllByUser(USER_A, 'regular');
+    expect(regulars.find((g) => g.id === child2.id)?.children_count).toBeUndefined();
+  });
+
+  it('findAllByUser sets children_count = 0 for childless global goal', async () => {
+    await repo.create(USER_A, { goal_name: 'Lonely', is_global: true });
+    const globals = await repo.findAllByUser(USER_A, 'global');
+    expect(globals[0].children_count).toBe(0);
+  });
+
   it('does not leak goals across users', async () => {
     await repo.create(USER_A, { goal_name: 'A global', is_global: true });
     await repo.create(USER_B, { goal_name: 'B global', is_global: true });

@@ -89,7 +89,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
     userId: number,
     scope: 'global' | 'regular' | 'all' = 'all',
   ): Promise<Goal[]> {
-    return this.goalRepo.find({
+    const goals = await this.goalRepo.find({
       where: {
         user_id: userId,
         status: Not('deleted'),
@@ -98,6 +98,8 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
       relations: ['questions'],
       order: { createdAt: 'DESC' },
     });
+    await this.attachChildrenCounts(goals);
+    return goals;
   }
 
   async findByStatus(
@@ -105,7 +107,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
     status: string,
     scope: 'global' | 'regular' | 'all' = 'all',
   ): Promise<Goal[]> {
-    return this.goalRepo.find({
+    const goals = await this.goalRepo.find({
       where: {
         user_id: userId,
         status,
@@ -114,6 +116,31 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
       relations: ['questions'],
       order: { createdAt: 'DESC' },
     });
+    await this.attachChildrenCounts(goals);
+    return goals;
+  }
+
+  /**
+   * Заполняет `children_count` у global-целей одним групповым запросом
+   * (без N+1). Считаются только не-deleted дети.
+   */
+  private async attachChildrenCounts(goals: Goal[]): Promise<void> {
+    const globalIds = goals.filter((g) => g.is_global).map((g) => g.id);
+    if (globalIds.length === 0) return;
+
+    const rows = await this.goalRepo
+      .createQueryBuilder('g')
+      .select('g.parent_goal_id', 'parent')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('g.parent_goal_id IN (:...ids)', { ids: globalIds })
+      .andWhere('g.status != :deleted', { deleted: 'deleted' })
+      .groupBy('g.parent_goal_id')
+      .getRawMany<{ parent: number; cnt: string }>();
+
+    const counts = new Map(rows.map((r) => [Number(r.parent), Number(r.cnt)]));
+    for (const goal of goals) {
+      if (goal.is_global) goal.children_count = counts.get(goal.id) ?? 0;
+    }
   }
 
   async findChildren(parentGoalId: number): Promise<Goal[]> {
