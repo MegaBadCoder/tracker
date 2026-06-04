@@ -12,3 +12,17 @@ export async function fetchQuestionAnalytics(questionId: number): Promise<Analyt
   const { data } = await api.get<AnalyticsEntry[]>(`/questions/${questionId}/analytics`)
   return data
 }
+
+export interface PhotoGalleryEntry {
+  scheduled_date: string
+  url: string
+}
+
+export async function fetchPhotoGallery(
+  questionId: number,
+  limit = 50,
+  offset = 0,
+): Promise<PhotoGalleryEntry[]> {
+  const { data } = await api.get<PhotoGalleryEntry[]>(`/questions/${questionId}/photo-gallery`, { params: { limit, offset } })
+  return data
+}

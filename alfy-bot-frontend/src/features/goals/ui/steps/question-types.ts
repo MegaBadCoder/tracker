@@ -19,6 +19,7 @@ export const QUESTION_TYPE_OPTIONS: QuestionTypeOption[] = [
   { type: 'yes_no', emoji: '✅', label: 'Да/Нет', example: 'Выполнил запланированное?' },
   { type: 'number', emoji: '🔢', label: 'Число', example: 'Сколько страниц написал?' },
   { type: 'time_spent', emoji: '⏱', label: 'Затраченное время', example: 'Сколько времени потратил?' },
+  { type: 'photo', emoji: '📷', label: 'Фото', example: 'Сделай фото себя сегодня' },
 ]
 
 export function findQuestionTypeOption(type: QuestionType): QuestionTypeOption {
