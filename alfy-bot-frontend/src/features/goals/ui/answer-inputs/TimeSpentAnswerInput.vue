@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { timeSpentAnswer } from '@/features/goals/lib/answer-format'
-import { findQuestionTypeOption } from '@/features/goals/ui/steps/question-types'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 
 const emit = defineEmits<{
   (e: 'submit', answer: string): void
 }>()
 
-// Лейблы диапазонов из единого конфига; submit шлёт лейбл как есть
-const labels = findQuestionTypeOption('time_spent').options as string[]
+const store = useQuestionTypesStore()
+
+// Лейблы диапазонов из стора; до гидрации — пусто. submit шлёт лейбл как есть.
+const labels = computed(() => store.options('time_spent') as string[])
 
 function pick(label: string) {
   emit('submit', timeSpentAnswer(label))

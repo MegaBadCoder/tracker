@@ -1,8 +1,11 @@
+import type { QuestionTypeOption } from '@/api/question-types'
 import type { Goal } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { addGoalQuestions, fetchGoalById } from '@/api/goals'
 import { fetchGoalReportStatus } from '@/api/reports'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 import GoalView from '@/views/GoalView.vue'
 
 vi.mock('@/api/goals', () => ({
@@ -23,6 +26,11 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { id: '5' } }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
+
+const SERVER_TYPES: QuestionTypeOption[] = [
+  { type: 'text', label: 'Текстовый ввод', example: 'Что сделал сегодня?' },
+  { type: 'number', label: 'Число', example: 'Сколько страниц написал?' },
+]
 
 function makeGoal(): Goal {
   return {
@@ -48,6 +56,10 @@ function mountGoal() {
 describe('goalView — добавление вопроса', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
+    const store = useQuestionTypesStore()
+    store.types = SERVER_TYPES
+    store.loaded = true
     vi.mocked(fetchGoalById).mockResolvedValue(makeGoal())
     vi.mocked(fetchGoalReportStatus).mockResolvedValue({
       goalId: 5,

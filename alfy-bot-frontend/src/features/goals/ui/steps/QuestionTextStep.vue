@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { findQuestionTypeOption } from './question-types'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 
 const props = defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
@@ -12,10 +12,12 @@ const emit = defineEmits<{
   (e: 'back'): void
 }>()
 
+const store = useQuestionTypesStore()
+
 const text = ref<string>(props.state.pending.question ?? '')
 
 const typeOption = computed(() =>
-  props.state.pending.type ? findQuestionTypeOption(props.state.pending.type) : null,
+  props.state.pending.type ? store.byType(props.state.pending.type) ?? null : null,
 )
 
 function onSubmit() {

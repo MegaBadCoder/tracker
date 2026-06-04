@@ -1,7 +1,10 @@
+import type { QuestionTypeOption } from '@/api/question-types'
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import QuestionTypeStep from '@/features/goals/ui/steps/QuestionTypeStep.vue'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 import GoalCreateView from '@/views/GoalCreateView.vue'
 
 vi.mock('@/api/goals', () => ({
@@ -13,6 +16,18 @@ vi.mock('@/api/goals', () => ({
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
 }))
+
+const SERVER_TYPES: QuestionTypeOption[] = [
+  { type: 'text', label: 'Текстовый ввод', example: 'Что сделал сегодня?' },
+  { type: 'number', label: 'Число', example: 'Сколько страниц написал?' },
+]
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  const store = useQuestionTypesStore()
+  store.types = SERVER_TYPES
+  store.loaded = true
+})
 
 describe('goalCreateView', () => {
   it('рендерит начальный шаг с кнопкой "Простая цель"', () => {

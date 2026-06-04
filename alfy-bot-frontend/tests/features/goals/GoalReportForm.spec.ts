@@ -1,5 +1,7 @@
+import type { QuestionTypeOption } from '@/api/question-types'
 import type { GoalReportStatus, QuestionReportItem } from '@/api/reports'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -9,12 +11,19 @@ import {
   submitPhotoAnswer,
 } from '@/api/reports'
 import GoalReportForm from '@/features/goals/ui/GoalReportForm.vue'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 
 vi.mock('@/api/reports', () => ({
   fetchGoalReportStatus: vi.fn(),
   submitAnswer: vi.fn(),
   submitPhotoAnswer: vi.fn(),
 }))
+
+const SERVER_TYPES: QuestionTypeOption[] = [
+  { type: 'text', label: 'Текстовый ввод', example: 'Что сделал сегодня?' },
+  { type: 'yes_no', label: 'Да/Нет', example: 'Выполнил запланированное?', options: ['Да', 'Нет'] },
+  { type: 'photo', label: 'Фото', example: 'Сделай фото себя сегодня' },
+]
 
 beforeAll(() => {
   // happy-dom может не иметь URL.createObjectURL — мокаем для превью фото
@@ -52,6 +61,10 @@ function makeStatus(over: Partial<GoalReportStatus>): GoalReportStatus {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setActivePinia(createPinia())
+  const store = useQuestionTypesStore()
+  store.types = SERVER_TYPES
+  store.loaded = true
 })
 
 describe('goalReportForm', () => {

@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { ratingAnswer } from '@/features/goals/lib/answer-format'
-import { findQuestionTypeOption } from '@/features/goals/ui/steps/question-types'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 
 const emit = defineEmits<{
   (e: 'submit', answer: string): void
 }>()
 
-// Числа 1..5 из единого конфига типов
-const options = findQuestionTypeOption('rating').options as number[]
+const store = useQuestionTypesStore()
+
+// Числа 1..5 из стора; до гидрации — пусто.
+const options = computed(() => store.options('rating') as number[])
 
 function pick(n: number) {
   emit('submit', ratingAnswer(n))

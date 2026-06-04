@@ -1,8 +1,22 @@
 import type { QuestionWithScheduleItem } from '@/api/goals'
+import type { QuestionTypeOption } from '@/api/question-types'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
+
+const SERVER_TYPES: QuestionTypeOption[] = [
+  { type: 'text', label: 'Текстовый ввод', example: 'Что сделал сегодня?' },
+  { type: 'number', label: 'Число', example: 'Сколько страниц написал?' },
+]
+
+function seedStore() {
+  const store = useQuestionTypesStore()
+  store.types = SERVER_TYPES
+  store.loaded = true
+}
 
 function makeInitial(overrides: Partial<QuestionWithScheduleItem> = {}): QuestionWithScheduleItem {
   return {
@@ -16,6 +30,11 @@ function makeInitial(overrides: Partial<QuestionWithScheduleItem> = {}): Questio
 }
 
 describe('QuestionEditForm — smoke', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    seedStore()
+  })
+
   it('рендерит target_value input для type=number с переданным значением', () => {
     const wrapper = mount(QuestionEditForm, {
       props: { initial: makeInitial() },

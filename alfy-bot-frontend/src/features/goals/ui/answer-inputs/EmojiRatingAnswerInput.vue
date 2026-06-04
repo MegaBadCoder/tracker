@@ -1,14 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { emojiRatingAnswer } from '@/features/goals/lib/answer-format'
-import { findQuestionTypeOption } from '@/features/goals/ui/steps/question-types'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 
 const emit = defineEmits<{
   (e: 'submit', answer: string): void
 }>()
 
-// Эмодзи для отрисовки кнопок из единого конфига; в submit идёт 1-based индекс
-const emojis = findQuestionTypeOption('emoji_rating').options as string[]
+const store = useQuestionTypesStore()
+
+// Эмодзи для отрисовки кнопок из стора; до гидрации — пусто. В submit идёт 1-based индекс.
+const emojis = computed(() => store.options('emoji_rating') as string[])
 
 function pick(index0based: number) {
   emit('submit', emojiRatingAnswer(index0based + 1))
