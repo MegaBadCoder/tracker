@@ -72,5 +72,11 @@ export async function submitPhotoAnswer(questionId: number, scheduledDate: strin
   const form = new FormData()
   form.append('photo', file)
   form.append('scheduled_date', scheduledDate)
-  await api.post(`/questions/${questionId}/answers/photo`, form)
+  // У axios-инстанса дефолтный заголовок 'Content-Type: application/json' —
+  // его надо снять, иначе запрос уйдёт без multipart-boundary и multer на бэке
+  // не увидит файл (400 «photo file is required»). Браузер сам выставит
+  // 'multipart/form-data; boundary=…' из FormData, если Content-Type не задан.
+  await api.post(`/questions/${questionId}/answers/photo`, form, {
+    headers: { 'Content-Type': undefined },
+  })
 }
