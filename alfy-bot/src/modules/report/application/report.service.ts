@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -144,6 +145,9 @@ export class ReportService {
     const activeQuestions = (goal.questions || []).filter((q) => q.is_active);
     if (activeQuestions.length === 0) return null;
 
+    // Global goals have no dates/questions; nothing to fill.
+    if (!goal.goal_start || !goal.goal_end) return null;
+
     const start = new Date(goal.goal_start);
     start.setHours(0, 0, 0, 0);
     const today = new Date();
@@ -207,6 +211,11 @@ export class ReportService {
     const goal = await this.goalService.findById(question.goal_id!);
     if (!goal) throw new NotFoundException('Goal not found');
     if (goal.user_id !== dbUserId) throw new ForbiddenException();
+    if (!goal.goal_start || !goal.goal_end) {
+      throw new BadRequestException(
+        `Goal #${goal.id} has no date range for analytics`,
+      );
+    }
 
     // 2. Определяем диапазон дат: от старта цели до min(конец цели, сегодня)
     //    Не показываем будущие даты — по ним ещё нет данных

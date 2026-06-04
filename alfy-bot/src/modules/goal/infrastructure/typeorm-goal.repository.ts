@@ -24,16 +24,20 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
       | Partial<Goal>
       | {
           goal_name: string;
-          goal_start: string;
-          goal_end: string;
+          goal_start?: string;
+          goal_end?: string;
+          is_global?: boolean;
+          parent_goal_id?: number | null;
           questions?: QuestionData[];
         },
   ): Promise<Goal> {
     if ('questions' in goalData && Array.isArray(goalData.questions)) {
       const { questions, ...goalInfo } = goalData as {
         goal_name: string;
-        goal_start: string;
-        goal_end: string;
+        goal_start?: string;
+        goal_end?: string;
+        is_global?: boolean;
+        parent_goal_id?: number | null;
         questions: QuestionData[];
       };
       const goal = this.goalRepo.create({
@@ -81,17 +85,40 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
     });
   }
 
-  async findAllByUser(userId: number): Promise<Goal[]> {
+  async findAllByUser(
+    userId: number,
+    scope: 'global' | 'regular' | 'all' = 'all',
+  ): Promise<Goal[]> {
     return this.goalRepo.find({
-      where: { user_id: userId, status: Not('deleted') },
+      where: {
+        user_id: userId,
+        status: Not('deleted'),
+        ...(scope === 'all' ? {} : { is_global: scope === 'global' }),
+      },
       relations: ['questions'],
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findByStatus(userId: number, status: string): Promise<Goal[]> {
+  async findByStatus(
+    userId: number,
+    status: string,
+    scope: 'global' | 'regular' | 'all' = 'all',
+  ): Promise<Goal[]> {
     return this.goalRepo.find({
-      where: { user_id: userId, status },
+      where: {
+        user_id: userId,
+        status,
+        ...(scope === 'all' ? {} : { is_global: scope === 'global' }),
+      },
+      relations: ['questions'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findChildren(parentGoalId: number): Promise<Goal[]> {
+    return this.goalRepo.find({
+      where: { parent_goal_id: parentGoalId, status: Not('deleted') },
       relations: ['questions'],
       order: { createdAt: 'DESC' },
     });
@@ -100,7 +127,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
   async findById(goalId: number): Promise<Goal | null> {
     return this.goalRepo.findOne({
       where: { id: goalId },
-      relations: ['questions'],
+      relations: ['questions', 'children'],
       order: { questions: { order_index: 'ASC' } },
     });
   }

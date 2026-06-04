@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { GoalStatus } from '../../../shared/constants/goal-statuses';
 import { Goal, Question, Schedule } from '../../../shared/entities';
 import { GoalRepositoryPort } from '../domain/goal-repository.port';
@@ -56,16 +60,48 @@ export class GoalService {
     return this.goalRepo.findActiveByUser(userId);
   }
 
-  async findByStatus(userId: number, status: GoalStatus): Promise<Goal[]> {
-    return this.goalRepo.findByStatus(userId, status);
+  async findByStatus(
+    userId: number,
+    status: GoalStatus,
+    scope?: 'global' | 'regular' | 'all',
+  ): Promise<Goal[]> {
+    return this.goalRepo.findByStatus(userId, status, scope);
   }
 
-  async findAllByUser(userId: number): Promise<Goal[]> {
-    return this.goalRepo.findAllByUser(userId);
+  async findAllByUser(
+    userId: number,
+    scope?: 'global' | 'regular' | 'all',
+  ): Promise<Goal[]> {
+    return this.goalRepo.findAllByUser(userId, scope);
+  }
+
+  async findChildren(parentGoalId: number): Promise<Goal[]> {
+    return this.goalRepo.findChildren(parentGoalId);
   }
 
   async findById(goalId: number): Promise<Goal | null> {
     return this.goalRepo.findById(goalId);
+  }
+
+  /**
+   * Проверяет, что parentGoalId указывает на существующую global-цель,
+   * принадлежащую userId. Бросает BadRequestException иначе.
+   */
+  async assertValidParent(userId: number, parentGoalId: number): Promise<void> {
+    const parent = await this.goalRepo.findById(parentGoalId);
+    if (!parent) {
+      throw new BadRequestException(`Parent goal #${parentGoalId} not found`);
+    }
+    if (parent.user_id !== userId) {
+      throw new BadRequestException(
+        `Parent goal #${parentGoalId} does not belong to user`,
+      );
+    }
+    if (!parent.is_global) {
+      throw new BadRequestException(
+        `Parent goal #${parentGoalId} is not a global goal`,
+      );
+    }
   }
 
   async addQuestions(
