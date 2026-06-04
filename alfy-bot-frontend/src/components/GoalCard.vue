@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import type { Goal } from '../types'
 import { useRouter } from 'vue-router'
 import { formatDate } from '../utils/date'
-import type { Goal } from '../types'
 import { goalAccent, goalBorderClass } from '../utils/goalColor'
 import GoalStatusBadge from './GoalStatusBadge.vue'
 
@@ -11,14 +11,18 @@ const router = useRouter()
 const accent = goalAccent(props.goal.id)
 const borderClass = goalBorderClass(props.goal.id)
 
-const questionsLabel = (n: number) =>
-  n === 1 ? '1 вопрос' : n < 5 ? `${n} вопроса` : `${n} вопросов`
+function questionsLabel(n: number) {
+  return n === 1 ? '1 вопрос' : n < 5 ? `${n} вопроса` : `${n} вопросов`
+}
+
+function goalsLabel(n: number) {
+  return n === 1 ? '1 цель' : n < 5 ? `${n} цели` : `${n} целей`
+}
 </script>
 
 <template>
   <div
-    :class="[
-      'relative bg-card border border-border rounded-xl p-5 cursor-pointer transition-all duration-200 hover:shadow-md',
+    class="relative bg-card border border-border rounded-xl p-5 cursor-pointer transition-all duration-200 hover:shadow-md" :class="[
       borderClass,
     ]"
     @click="router.push(`/goals/${goal.id}`)"
@@ -35,17 +39,33 @@ const questionsLabel = (n: number) =>
         {{ goal.goal_name }}
       </h3>
 
-      <!-- status -->
-      <GoalStatusBadge :status="goal.status" class="mb-3" />
+      <!-- status + global badge -->
+      <div class="mb-3 flex items-center gap-2">
+        <GoalStatusBadge :status="goal.status" />
+        <span
+          v-if="goal.is_global"
+          class="inline-flex items-center gap-1 rounded-full bg-sidebar-accent px-2 py-0.5 text-xs font-medium text-sidebar-primary"
+        >
+          🌍 Global
+        </span>
+      </div>
 
-      <!-- dates -->
-      <p class="text-xs text-muted-foreground mb-1">
+      <!-- dates (only when present) -->
+      <p
+        v-if="goal.goal_start && goal.goal_end"
+        class="text-xs text-muted-foreground mb-1"
+      >
         {{ formatDate(goal.goal_start) }} → {{ formatDate(goal.goal_end) }}
       </p>
 
-      <!-- questions count -->
+      <!-- count: child goals for global, questions otherwise -->
       <span class="text-xs text-muted-foreground">
-        {{ questionsLabel(goal.questions.length) }}
+        <template v-if="goal.is_global && goal.children">
+          {{ goalsLabel(goal.children.length) }}
+        </template>
+        <template v-else>
+          {{ questionsLabel(goal.questions.length) }}
+        </template>
       </span>
     </div>
   </div>

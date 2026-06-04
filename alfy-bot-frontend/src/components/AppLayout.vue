@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, provide, computed, defineAsyncComponent, type Component } from 'vue'
-import { useRoute } from 'vue-router'
-import AppSidebar from './AppSidebar.vue'
+import type { Component } from 'vue'
 import type { NavLink } from '@/types/navigation'
+import { computed, defineAsyncComponent, provide, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { goalsNavLinks } from '@/router/goals-nav'
 import { tasksNavLinks } from '@/router/tasks-nav'
+import AppSidebar from './AppSidebar.vue'
 
 const ProjectTreeNav = defineAsyncComponent(() =>
   import('@/features/projects/ui/ProjectTreeNav.vue'),
@@ -14,6 +16,7 @@ const sidebarOpen = ref(false)
 
 const sectionNavRegistry: Record<string, NavLink[]> = {
   tasks: tasksNavLinks,
+  goals: goalsNavLinks,
 }
 
 const sectionExtraRegistry: Record<string, Component> = {

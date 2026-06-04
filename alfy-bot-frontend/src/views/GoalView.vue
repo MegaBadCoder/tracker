@@ -89,7 +89,9 @@ onMounted(async () => {
 })
 
 const accent = computed(() => goal.value ? goalAccent(goal.value.id) : '#3b82f6')
-const daysLeftVal = computed(() => goal.value ? daysLeft(goal.value.goal_end) : 0)
+const daysLeftVal = computed(() =>
+  goal.value?.goal_end ? daysLeft(goal.value.goal_end) : 0,
+)
 
 const questionTypeLabel: Record<string, string> = {
   number: 'Число',
@@ -352,8 +354,8 @@ function onCancelGoalAction() {
       <!-- summary -->
       <section>
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <SummaryCard label="Начало" :value="formatDate(goal.goal_start)" />
-          <SummaryCard label="Конец" :value="formatDate(goal.goal_end)" />
+          <SummaryCard label="Начало" :value="goal.goal_start ? formatDate(goal.goal_start) : '—'" />
+          <SummaryCard label="Конец" :value="goal.goal_end ? formatDate(goal.goal_end) : '—'" />
           <SummaryCard
             label="Дней до конца"
             :value="goal.status === 'completed' ? '—' : daysLeftVal > 0 ? daysLeftVal : 'Истёк'"
@@ -474,7 +476,9 @@ function onCancelGoalAction() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="onCancelTypeChange">Отмена</AlertDialogCancel>
+          <AlertDialogCancel @click="onCancelTypeChange">
+            Отмена
+          </AlertDialogCancel>
           <AlertDialogAction data-testid="confirm-type-change" @click="onConfirmTypeChange">
             Продолжить
           </AlertDialogAction>
@@ -496,7 +500,9 @@ function onCancelGoalAction() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="onCancelGoalAction">Отмена</AlertDialogCancel>
+          <AlertDialogCancel @click="onCancelGoalAction">
+            Отмена
+          </AlertDialogCancel>
           <AlertDialogAction
             :class="goalActionPending ? GOAL_ACTION_LABEL[goalActionPending].confirmClass : ''"
             data-testid="confirm-goal-action"

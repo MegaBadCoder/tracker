@@ -8,6 +8,18 @@ defineProps<{ links: NavLink[] }>()
 
 const route = useRoute()
 
+function isLinkActive(to: string): boolean {
+  const [path, queryStr] = to.split('?')
+  if (route.path !== path)
+    return false
+  if (queryStr === undefined) {
+    // plain link (e.g. "/") is active only when there is no scope query
+    return route.query.scope === undefined
+  }
+  const linkScope = new URLSearchParams(queryStr).get('scope')
+  return route.query.scope === linkScope
+}
+
 const inboxLinkEl = ref<HTMLElement | null>(null)
 const inboxEl = computed<HTMLElement | null>(() => inboxLinkEl.value)
 
@@ -28,7 +40,7 @@ const { isHovered: isInboxHovered } = useDropTarget({
       :data-drop-kind="link.to === '/tasks' ? 'inbox' : undefined"
       class="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors"
       :class="[
-        route.path === link.to
+        isLinkActive(link.to)
           ? 'bg-sidebar-accent text-sidebar-primary'
           : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
         link.to === '/tasks' && isInboxHovered ? 'bg-accent ring-2 ring-primary' : '',
