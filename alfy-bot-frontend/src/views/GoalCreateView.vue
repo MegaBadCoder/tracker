@@ -81,7 +81,8 @@ watch(
       catch (e) {
         error.value
           = e instanceof Error ? e.message : 'Не удалось создать цель'
-        // composable перевёл шаг на 'creating' до запроса; откатываем на 'point_a'.
+        // composable перевёл шаг на 'creating' до запроса; back() откатывает на
+        // предыдущий шаг (parent для simple, global_deadline для global).
         go.back()
       }
     }

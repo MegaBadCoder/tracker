@@ -58,14 +58,14 @@ function goalsLabel(n: number) {
         {{ formatDate(goal.goal_start) }} → {{ formatDate(goal.goal_end) }}
       </p>
 
-      <!-- count: child goals for global, questions otherwise -->
-      <span class="text-xs text-muted-foreground">
-        <template v-if="goal.is_global && goal.children">
-          {{ goalsLabel(goal.children.length) }}
-        </template>
-        <template v-else>
-          {{ questionsLabel(goal.questions.length) }}
-        </template>
+      <!-- count: child goals for global (when embedded), questions for regular goals.
+           Global goals in list view have no embedded children (only GET /goals/:id embeds),
+           and never have questions — so omit the count entirely rather than show "0 вопросов". -->
+      <span v-if="!goal.is_global" class="text-xs text-muted-foreground">
+        {{ questionsLabel(goal.questions.length) }}
+      </span>
+      <span v-else-if="goal.children" class="text-xs text-muted-foreground">
+        {{ goalsLabel(goal.children.length) }}
       </span>
     </div>
   </div>
