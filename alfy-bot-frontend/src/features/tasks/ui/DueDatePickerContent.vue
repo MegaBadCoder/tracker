@@ -1,6 +1,12 @@
 <template>
   <div class="space-y-3">
-    <Calendar :model-value="calendarValue" @update:model-value="onCalendarChange" />
+    <Calendar
+      :model-value="calendarValue"
+      :locale="intlLocale"
+      :week-starts-on="weekStartsOn"
+      weekday-format="short"
+      @update:model-value="onCalendarChange"
+    />
     <Input
       v-model="localTime"
       type="time"
@@ -15,6 +21,7 @@
 import { ref, computed } from 'vue'
 import { Input } from '@/components/ui/input'
 import { Calendar } from '@/components/ui/calendar'
+import { intlLocale, weekStartsOn } from '@/composables/useLocale'
 import { toDate, toCalendarDateValue, updateDeadlineTime } from '../lib/dateTime'
 
 const props = defineProps<{

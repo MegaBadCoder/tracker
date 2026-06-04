@@ -430,12 +430,25 @@ export class AuthService {
       phone: user.phone,
       username: user.username,
       timezone: user.timezone ?? 'UTC',
+      language: user.language ?? 'ru',
+      firstDayOfWeek: user.firstDayOfWeek ?? 1,
       hasEmailAuth: !!emailMethod?.emailVerified,
     };
   }
 
   async updateTimezone(userId: number, timezone: string): Promise<string> {
     return this.userService.updateTimezone(userId, timezone);
+  }
+
+  async updateLanguage(userId: number, language: string): Promise<string> {
+    return this.userService.updateLanguage(userId, language);
+  }
+
+  async updateFirstDayOfWeek(
+    userId: number,
+    firstDayOfWeek: number,
+  ): Promise<number> {
+    return this.userService.updateFirstDayOfWeek(userId, firstDayOfWeek);
   }
 
   // ──────────────────────────────────────────────

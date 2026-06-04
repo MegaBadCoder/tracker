@@ -47,4 +47,23 @@ export class UserService {
     await this.userRepo.save(user);
     return timezone;
   }
+
+  async updateLanguage(userId: number, language: string): Promise<string> {
+    const user = await this.userRepo.findOneById(userId);
+    if (!user) return 'ru';
+    user.language = language;
+    await this.userRepo.save(user);
+    return language;
+  }
+
+  async updateFirstDayOfWeek(
+    userId: number,
+    firstDayOfWeek: number,
+  ): Promise<number> {
+    const user = await this.userRepo.findOneById(userId);
+    if (!user) return 1;
+    user.firstDayOfWeek = firstDayOfWeek;
+    await this.userRepo.save(user);
+    return firstDayOfWeek;
+  }
 }

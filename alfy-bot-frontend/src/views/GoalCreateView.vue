@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import type { QuestionWithScheduleItem } from '@/api/goals'
+import { X } from 'lucide-vue-next'
 import { markRaw, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
@@ -180,7 +181,8 @@ function onSavePending(v: QuestionWithScheduleItem) {
       <AlertDialog>
         <AlertDialogTrigger as-child>
           <Button variant="ghost" size="sm" class="text-muted-foreground">
-            ❌ Отмена
+            <X class="size-4" />
+            Отмена
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>

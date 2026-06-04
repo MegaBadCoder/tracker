@@ -37,6 +37,12 @@ export class User {
   @Column({ nullable: true, default: 'UTC' })
   timezone: string;
 
+  @Column({ nullable: true, default: 'ru' })
+  language: string;
+
+  @Column({ nullable: true, default: 1 })
+  firstDayOfWeek: number;
+
   @CreateDateColumn()
   createdAt: Date;
 }

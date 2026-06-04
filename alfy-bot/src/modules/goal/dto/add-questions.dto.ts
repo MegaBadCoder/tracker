@@ -21,9 +21,25 @@ export class QuestionWithScheduleItem {
 
   @ApiProperty({
     example: 'number',
-    enum: ['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent'],
+    enum: [
+      'text',
+      'rating',
+      'emoji_rating',
+      'yes_no',
+      'number',
+      'time_spent',
+      'photo',
+    ],
   })
-  @IsIn(['text', 'rating', 'emoji_rating', 'yes_no', 'number', 'time_spent'])
+  @IsIn([
+    'text',
+    'rating',
+    'emoji_rating',
+    'yes_no',
+    'number',
+    'time_spent',
+    'photo',
+  ])
   type: QuestionType;
 
   @ApiProperty({ example: false })

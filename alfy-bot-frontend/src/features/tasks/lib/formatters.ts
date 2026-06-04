@@ -1,6 +1,6 @@
 import { format } from 'date-fns'
-import { ru } from 'date-fns/locale'
 import { toDate } from './dateTime'
+import { dateFnsLocale } from '@/composables/useLocale'
 
 export const DATE_SHORT = 'd MMM'
 export const DATE_WITH_TIME = 'd MMM, HH:mm'
@@ -9,7 +9,7 @@ export const DATE_FULL_TIME = 'd MMM yyyy, HH:mm'
 
 export const formatDate = (date: Date | string, formatStr: string): string => {
   const dateObj = typeof date === 'string' ? new Date(date) : date
-  return format(dateObj, formatStr, { locale: ru })
+  return format(dateObj, formatStr, { locale: dateFnsLocale.value })
 }
 
 export function formatDueDate(value: unknown, opts?: { includeYear?: boolean }): string {

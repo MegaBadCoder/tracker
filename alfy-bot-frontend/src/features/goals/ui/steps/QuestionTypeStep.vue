@@ -2,7 +2,7 @@
 import type { QuestionWithScheduleItem } from '@/api/goals'
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
 import type { QuestionType } from '@/types'
-import { Pencil, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, Check, Pencil, Trash2 } from 'lucide-vue-next'
 import { ref } from 'vue'
 import {
   AlertDialog,
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { WEEKDAY_LABELS } from './goal-create-options'
 import { QUESTION_TYPE_OPTIONS } from './question-types'
 
 defineProps<{ state: FlowState }>()
@@ -31,16 +32,6 @@ const deleteIdx = ref<number | null>(null)
 // потому что reka-ui AlertDialog emit'ит `update:open(false)` ДО `@click` action-кнопки,
 // что обнуляет deleteIdx до запуска confirm-хендлера.
 let pendingDeleteIdx: number | null = null
-
-const WEEKDAY_LABELS: Record<number, string> = {
-  0: 'Вс',
-  1: 'Пн',
-  2: 'Вт',
-  3: 'Ср',
-  4: 'Чт',
-  5: 'Пт',
-  6: 'Сб',
-}
 
 function typeLabel(t: QuestionType): string {
   return QUESTION_TYPE_OPTIONS.find(o => o.type === t)?.label ?? t
@@ -139,8 +130,7 @@ function onConfirmDelete() {
         class="justify-start"
         @click="emit('selectQuestionType', opt.type)"
       >
-        <span class="mr-2">{{ opt.emoji }}</span>
-        <span>{{ opt.label }}</span>
+        {{ opt.label }}
       </Button>
     </div>
 
@@ -150,10 +140,12 @@ function onConfirmDelete() {
         variant="default"
         @click="emit('finishQuestions')"
       >
-        ✅ Готово, сохранить
+        <Check class="size-4" />
+        Готово, сохранить
       </Button>
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
     </div>
 

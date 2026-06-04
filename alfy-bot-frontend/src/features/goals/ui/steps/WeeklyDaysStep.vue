@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { FlowState } from '@/features/goals/model/use-goal-create-flow'
+import { ArrowLeft } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
+import { WEEKDAYS } from './goal-create-options'
 
 const props = defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
@@ -9,19 +11,6 @@ const emit = defineEmits<{
   (e: 'confirmWeekly'): void
   (e: 'back'): void
 }>()
-
-// Index 0..6 = Пн..Вс (как в бэке `weekly_days` / в JS getDay() — другая
-// схема: 0=Вс. Тут используем тот же индекс, что хранит composable; зеркало
-// бота с порядком Пн-первым).
-const WEEKDAYS: { idx: number; label: string }[] = [
-  { idx: 1, label: 'Пн' },
-  { idx: 2, label: 'Вт' },
-  { idx: 3, label: 'Ср' },
-  { idx: 4, label: 'Чт' },
-  { idx: 5, label: 'Пт' },
-  { idx: 6, label: 'Сб' },
-  { idx: 0, label: 'Вс' },
-]
 
 const selected = computed(() => props.state.pending.selectedDays ?? [])
 
@@ -56,7 +45,8 @@ const canConfirm = computed(() => selected.value.length >= 1)
 
     <div class="flex gap-2">
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
       <Button :disabled="!canConfirm" @click="emit('confirmWeekly')">
         Готово

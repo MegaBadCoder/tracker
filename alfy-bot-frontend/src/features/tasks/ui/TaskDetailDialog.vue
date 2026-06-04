@@ -269,7 +269,13 @@
             </div>
             <DropdownMenuContent class="w-auto p-0" align="start">
               <div class="p-3 space-y-3">
-                <Calendar :model-value="dueDateCalendarValue" @update:model-value="onDueDateCalendarChange" />
+                <Calendar
+                  :model-value="dueDateCalendarValue"
+                  :locale="intlLocale"
+                  :week-starts-on="weekStartsOn"
+                  weekday-format="short"
+                  @update:model-value="onDueDateCalendarChange"
+                />
                 <Input
                   v-model="localDueTime"
                   type="time"
@@ -531,6 +537,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Calendar } from '@/components/ui/calendar'
+import { intlLocale, weekStartsOn } from '@/composables/useLocale'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import {
   DropdownMenu,

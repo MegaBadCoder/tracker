@@ -80,7 +80,7 @@ describe('TaskCardBadges', () => {
     const props = apiPayloadToBadgesProps({ dueDate: due, deadline })
     const wrapper = mount(TaskCardBadges, { props })
 
-    expect(wrapper.text()).toContain('мар.')
+    expect(wrapper.text()).toContain('мар')
     expect(wrapper.text()).toContain('15')
     expect(wrapper.text()).toContain('20')
     expect(wrapper.text()).toMatch(/14:30/)
