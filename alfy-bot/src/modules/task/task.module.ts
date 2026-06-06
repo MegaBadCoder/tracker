@@ -20,12 +20,21 @@ import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-se
 import { TelegramNotificationAdapter } from './infrastructure/telegram-notification.adapter';
 import { TelegramUserLookupAdapter } from './infrastructure/telegram-user-lookup.adapter';
 import { CompositeNotificationAdapter } from './infrastructure/composite-notification.adapter';
+import { WebPushNotificationAdapter } from '../notification/web-push-notification.adapter';
+import { isTelegramEnabled } from '../../shared/config/telegram-enabled';
 import { TimerExpiryScheduler } from './infrastructure/timer-expiry.scheduler';
 import { OverdueRecurringScheduler } from './infrastructure/overdue-recurring.scheduler';
 import { TaskService } from './task.service';
 import { TimerSessionService } from './timer-session.service';
 import { OverdueRecurringService } from './overdue-recurring.service';
 import { TaskController } from './task.controller';
+
+const notificationProviders = isTelegramEnabled()
+  ? [
+      { provide: NotificationPort, useClass: CompositeNotificationAdapter },
+      TelegramNotificationAdapter,
+    ]
+  : [{ provide: NotificationPort, useClass: WebPushNotificationAdapter }];
 
 @Module({
   imports: [
@@ -42,12 +51,11 @@ import { TaskController } from './task.controller';
       useClass: TypeOrmTimerSessionRepository,
     },
     { provide: UserSettingsPort, useClass: TypeOrmUserSettingsAdapter },
-    { provide: NotificationPort, useClass: CompositeNotificationAdapter },
+    ...notificationProviders,
     {
       provide: TelegramUserLookupPort,
       useClass: TelegramUserLookupAdapter,
     },
-    TelegramNotificationAdapter,
     TaskService,
     TimerSessionService,
     TimerExpiryScheduler,

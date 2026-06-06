@@ -45,7 +45,9 @@ describe('CalendarEventBlock', () => {
     const wrapper = mount(CalendarEventBlock, {
       props: { event: makeEvent({ priority: 'high' }) },
     })
-    expect(wrapper.classes()).toContain('bg-red-500/25')
+    // high-priority стили адаптивны к теме: светлый базовый класс + dark-вариант
+    expect(wrapper.classes()).toContain('bg-red-100')
+    expect(wrapper.classes()).toContain('dark:bg-red-500/25')
   })
 
   // Негативные

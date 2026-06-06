@@ -19,6 +19,13 @@ const router = createRouter({
           path: 'habits',
           name: 'habits',
           component: () => import('../views/HabitsView.vue'),
+          meta: { sectionNav: 'habits' },
+        },
+        {
+          path: 'habits/atomic',
+          name: 'habits-atomic',
+          component: () => import('../views/AtomicHabitsView.vue'),
+          meta: { sectionNav: 'habits' },
         },
         {
           path: 'tasks',

@@ -277,21 +277,49 @@ const POPULAR_TIMEZONES = [
   { value: 'America/Los_Angeles', label: 'Лос-Анджелес (UTC-8/-7)' },
 ]
 
+// Текущее UTC-смещение зоны (учитывает DST на момент открытия), напр. "UTC-3".
+function offsetLabel(tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      timeZoneName: 'shortOffset',
+    }).formatToParts(new Date())
+    const gmt = parts.find((p) => p.type === 'timeZoneName')?.value ?? ''
+    return gmt.replace('GMT', 'UTC') || 'UTC'
+  } catch {
+    return ''
+  }
+}
+
+// Полный список IANA-зон из рантайма (ICU/IANA tz database). Без сторонних библиотек.
+const ALL_TIMEZONES = computed(() => {
+  const supportedValuesOf = (
+    Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
+  ).supportedValuesOf
+  const zones = typeof supportedValuesOf === 'function' ? supportedValuesOf('timeZone') : []
+  return zones.map((value) => ({ value, label: `${value} (${offsetLabel(value)})` }))
+})
+
 const selectedTimezone = ref(userStore.timezone)
 const searchQuery = ref('')
 const dropdownOpen = ref(false)
 
 const currentLabel = computed(() => {
   const found = POPULAR_TIMEZONES.find((tz) => tz.value === selectedTimezone.value)
-  return found ? found.label : selectedTimezone.value
+  if (found) return found.label
+  const off = offsetLabel(selectedTimezone.value)
+  return off ? `${selectedTimezone.value} (${off})` : selectedTimezone.value
 })
 
 const filteredTimezones = computed(() => {
   if (!searchQuery.value) return POPULAR_TIMEZONES
   const q = searchQuery.value.toLowerCase()
-  return POPULAR_TIMEZONES.filter(
-    (tz) => tz.label.toLowerCase().includes(q) || tz.value.toLowerCase().includes(q),
-  )
+  const match = (tz: { value: string; label: string }) =>
+    tz.label.toLowerCase().includes(q) || tz.value.toLowerCase().includes(q)
+  const popular = POPULAR_TIMEZONES.filter(match)
+  const seen = new Set(popular.map((tz) => tz.value))
+  const rest = ALL_TIMEZONES.value.filter((tz) => !seen.has(tz.value) && match(tz))
+  return [...popular, ...rest]
 })
 
 async function selectTimezone(tz: string) {
