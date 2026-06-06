@@ -8,6 +8,7 @@ import { QuestionService } from './application/question.service';
 import { QuestionRepositoryPort } from './domain/question-repository.port';
 import { TypeOrmQuestionRepository } from './infrastructure/typeorm-question.repository';
 import { QuestionController } from './question.controller';
+import { QuestionTypesController } from './question-types.controller';
 import { ScheduleRepositoryPort } from '../goal/domain/schedule-repository.port';
 import { TypeOrmScheduleRepository } from '../goal/infrastructure/typeorm-schedule.repository';
 
@@ -18,7 +19,7 @@ import { TypeOrmScheduleRepository } from '../goal/infrastructure/typeorm-schedu
     GoalModule,
     ReportModule,
   ],
-  controllers: [QuestionController],
+  controllers: [QuestionController, QuestionTypesController],
   providers: [
     { provide: QuestionRepositoryPort, useClass: TypeOrmQuestionRepository },
     { provide: ScheduleRepositoryPort, useClass: TypeOrmScheduleRepository },

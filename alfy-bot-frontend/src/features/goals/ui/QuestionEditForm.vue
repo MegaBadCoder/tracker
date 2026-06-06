@@ -4,7 +4,7 @@ import type { FrequencyType, QuestionType } from '@/types'
 import { computed, reactive, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { QUESTION_TYPE_OPTIONS } from './steps/question-types'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 
 const props = defineProps<{
   initial: QuestionWithScheduleItem
@@ -37,6 +37,8 @@ const draft = reactive<Draft>({
   selectedDays: [...(props.initial.selectedDays ?? [])],
   intervalDays: props.initial.intervalDays ?? 1,
 })
+
+const store = useQuestionTypesStore()
 
 const localError = ref<string>('')
 
@@ -141,7 +143,7 @@ function onCancel() {
       </h3>
       <div class="flex flex-col gap-2">
         <Button
-          v-for="opt in QUESTION_TYPE_OPTIONS"
+          v-for="opt in store.all"
           :key="opt.type"
           :variant="draft.type === opt.type ? 'default' : 'outline'"
           size="lg"

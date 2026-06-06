@@ -95,11 +95,13 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 - `components/ui/` — shadcn-vue примитивы (см. ниже).
 - `components/` (корень) — общие layout/виджеты (`AppLayout`, `AppHeader`, `AppSidebar`, чарты).
 - `views/` — страницы, подключённые в `router/index.ts`.
-- `stores/` — глобальные Pinia-сторы (`user-store`).
+- `stores/` — глобальные Pinia-сторы (`user-store`, `question-types-store`).
 - `api/` — общий HTTP-клиент: `api/client.ts` (axios инстанс с JWT-интерцептором и редиректом на `/login` по 401), `api/auth.ts`, `api/tokenStorage.ts`.
 - `composables/` — реюзабельные composables (`useCooldown`, `usePushSubscription`, ...).
 - `mocks/` — MSW-моки для тестов.
 - `sw.ts` — кастомный service worker (workbox).
+
+**Справочник типов вопросов — единый источник на бэке.** Лейблы/example/`options` типов вопросов (`text`/`rating`/`emoji_rating`/`yes_no`/`number`/`time_spent`/`photo`) живут ТОЛЬКО в `alfy-bot/src/shared/types/question-types.ts` (`QUESTION_TYPES`). Бот читает импортом, веб — по `GET /api/question-types` (отдельный `@Controller('question-types')`) через `stores/question-types-store.ts` (грузится в router guard на входе в авторизованную часть, идемпотентно). НЕ воссоздавать хардкод-копию на фронте — это рассинхронизирует бота и веб. answer-format-логика (emoji_rating→1-based индекс, yes_no→`yes`/`no`) — отдельно в `features/goals/lib/answer-format.ts`, это логика, не данные.
 
 Авторизация: при старте `main.ts` пробует `authorize()` если есть `Telegram.WebApp.initData` или dev-флаг `VITE_DEV_TELEGRAM_ID`. Router guard в `router/index.ts` редиректит на `/login` любой не-public маршрут при отсутствии токена. Public-маршруты помечены `meta: { public: true }`.
 

@@ -15,8 +15,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 import { WEEKDAY_LABELS } from './goal-create-options'
-import { QUESTION_TYPE_OPTIONS } from './question-types'
 
 defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
@@ -27,6 +27,8 @@ const emit = defineEmits<{
   (e: 'removePendingQuestion', idx: number): void
 }>()
 
+const store = useQuestionTypesStore()
+
 const deleteIdx = ref<number | null>(null)
 // Снимок idx, захваченный при клике trash-иконки. Используется в onConfirmDelete,
 // потому что reka-ui AlertDialog emit'ит `update:open(false)` ДО `@click` action-кнопки,
@@ -34,7 +36,7 @@ const deleteIdx = ref<number | null>(null)
 let pendingDeleteIdx: number | null = null
 
 function typeLabel(t: QuestionType): string {
-  return QUESTION_TYPE_OPTIONS.find(o => o.type === t)?.label ?? t
+  return store.label(t)
 }
 
 function scheduleSummary(q: QuestionWithScheduleItem): string {
@@ -123,7 +125,7 @@ function onConfirmDelete() {
 
     <div class="flex flex-col gap-2">
       <Button
-        v-for="opt in QUESTION_TYPE_OPTIONS"
+        v-for="opt in store.all"
         :key="opt.type"
         variant="outline"
         size="lg"

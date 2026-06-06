@@ -1,8 +1,11 @@
+import type { QuestionTypeOption } from '@/api/question-types'
 import type { Goal } from '@/types'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { addGoalQuestions, fetchGoalById } from '@/api/goals'
 import { fetchGoalReportStatus } from '@/api/reports'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 import GoalView from '@/views/GoalView.vue'
 
 // vue-router замокан один раз на файл. route id изменяемый — каждый describe
@@ -185,6 +188,11 @@ describe('goalView — regular goal with parent', () => {
   })
 })
 
+const SERVER_TYPES: QuestionTypeOption[] = [
+  { type: 'text', label: 'Текстовый ввод', example: 'Что сделал сегодня?' },
+  { type: 'number', label: 'Число', example: 'Сколько страниц написал?' },
+]
+
 function makeGoal(): Goal {
   return {
     id: 5,
@@ -209,6 +217,10 @@ function mountGoal() {
 describe('goalView — добавление вопроса', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
+    const store = useQuestionTypesStore()
+    store.types = SERVER_TYPES
+    store.loaded = true
     routeParams.id = '5'
     vi.mocked(fetchGoalById).mockResolvedValue(makeGoal())
     vi.mocked(fetchGoalReportStatus).mockResolvedValue({

@@ -2,11 +2,11 @@ import { createPinia } from 'pinia'
 import { registerSW } from 'virtual:pwa-register'
 import { createApp } from 'vue'
 import { authorize } from './api/auth'
-import { useUserStore } from './stores/user-store'
+import App from './App.vue'
 import { initPushSubscription } from './composables/usePushSubscription'
 import { initTheme } from './composables/useTheme'
-import App from './App.vue'
 import router from './router'
+import { useUserStore } from './stores/user-store'
 import './style.css'
 
 initTheme()
@@ -28,12 +28,16 @@ async function bootstrap() {
     if (tg?.initData) {
       tg.ready()
       const { user } = await authorize()
-      if (user) useUserStore().setUser(user)
-    } else if (DEV_TELEGRAM_ID && !DEV_USE_WIDGET) {
-      const { user } = await authorize()
-      if (user) useUserStore().setUser(user)
+      if (user)
+        useUserStore().setUser(user)
     }
-  } catch {
+    else if (DEV_TELEGRAM_ID && !DEV_USE_WIDGET) {
+      const { user } = await authorize()
+      if (user)
+        useUserStore().setUser(user)
+    }
+  }
+  catch {
     // Auth failed — app will redirect to /login via router guard
   }
 

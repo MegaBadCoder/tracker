@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, START_LOCATION } from 'vue-router'
 import { useNavigationStore } from '@/stores/navigation-store'
+import { useQuestionTypesStore } from '@/stores/question-types-store'
 import { isAuthenticated } from '../api/tokenStorage'
 
 const router = createRouter({
@@ -110,6 +111,13 @@ const router = createRouter({
 router.beforeEach((to, from) => {
   if (!to.meta.public && !isAuthenticated()) {
     return { name: 'login' }
+  }
+  // Гарантируем загрузку справочника типов вопросов на ЛЮБОМ входе в
+  // авторизованную часть (cold boot с токеном, свежий логин через LoginView,
+  // навигация). Стор идемпотентен — фактический fetch один раз. Не зависим от
+  // пути входа (main.ts грузит только при наличии токена на старте).
+  if (!to.meta.public && isAuthenticated()) {
+    useQuestionTypesStore().load().catch(() => {})
   }
   if (from === START_LOCATION && to.path === '/') {
     const last = useNavigationStore().lastSection
