@@ -1,8 +1,8 @@
 import { startOfWeek, addWeeks, eachDayOfInterval, addDays, isSameDay, format } from 'date-fns'
-import { ru } from 'date-fns/locale'
+import { dateFnsLocale, weekStartsOn } from '@/composables/useLocale'
 
 export function getWeekStart(date: Date): Date {
-  return startOfWeek(date, { weekStartsOn: 1 })
+  return startOfWeek(date, { weekStartsOn: weekStartsOn.value })
 }
 
 export function getWeekDays(weekStart: Date): Date[] {
@@ -19,8 +19,8 @@ export function isToday(date: Date): boolean {
 
 export function formatWeekRange(weekStart: Date): string {
   const weekEnd = addDays(weekStart, 6)
-  const startMonth = format(weekStart, 'LLLL', { locale: ru })
-  const endMonth = format(weekEnd, 'LLLL', { locale: ru })
+  const startMonth = format(weekStart, 'LLLL', { locale: dateFnsLocale.value })
+  const endMonth = format(weekEnd, 'LLLL', { locale: dateFnsLocale.value })
 
   const startDay = format(weekStart, 'd')
   const endDay = format(weekEnd, 'd')
@@ -34,14 +34,14 @@ export function formatWeekRange(weekStart: Date): string {
 
 export function formatDayHeader(date: Date): { dayName: string; dayNumber: string } {
   return {
-    dayName: format(date, 'EEEEEE', { locale: ru }),
+    dayName: format(date, 'EEEEEE', { locale: dateFnsLocale.value }),
     dayNumber: format(date, 'd'),
   }
 }
 
 export function formatDateRange(start: Date, end: Date): string {
-  const startMonth = format(start, 'LLLL', { locale: ru })
-  const endMonth = format(end, 'LLLL', { locale: ru })
+  const startMonth = format(start, 'LLLL', { locale: dateFnsLocale.value })
+  const endMonth = format(end, 'LLLL', { locale: dateFnsLocale.value })
   const year = format(end, 'yyyy')
   if (startMonth === endMonth) {
     return `${format(start, 'd')}–${format(end, 'd')} ${startMonth} ${year}`

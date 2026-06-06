@@ -115,6 +115,54 @@
         Влияет на вычисление дат повторяющихся задач и отображение в календаре.
       </p>
     </div>
+
+    <!-- Calendar language -->
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-foreground">Язык календаря</label>
+      <div class="flex gap-2">
+        <button
+          v-for="opt in LANGUAGE_OPTIONS"
+          :key="opt.value"
+          type="button"
+          :class="[
+            'flex-1 h-10 px-3 rounded-md border text-sm transition-colors',
+            userStore.language === opt.value
+              ? 'border-primary bg-accent font-medium'
+              : 'border-border hover:bg-accent',
+          ]"
+          @click="selectLanguage(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <p class="text-xs text-muted-foreground">
+        Язык названий месяцев и дней недели в календарях и датах.
+      </p>
+    </div>
+
+    <!-- First day of week -->
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-foreground">Первый день недели</label>
+      <div class="flex gap-2">
+        <button
+          v-for="opt in FIRST_DAY_OPTIONS"
+          :key="opt.value"
+          type="button"
+          :class="[
+            'flex-1 h-10 px-3 rounded-md border text-sm transition-colors',
+            userStore.firstDayOfWeek === opt.value
+              ? 'border-primary bg-accent font-medium'
+              : 'border-border hover:bg-accent',
+          ]"
+          @click="selectFirstDayOfWeek(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <p class="text-xs text-muted-foreground">
+        С какого дня начинается неделя в календарях.
+      </p>
+    </div>
   </div>
 </template>
 
@@ -279,6 +327,24 @@ async function selectTimezone(tz: string) {
   searchQuery.value = ''
   dropdownOpen.value = false
   await userStore.updateTimezone(tz)
+}
+
+// ── Calendar language & first day of week ──
+const LANGUAGE_OPTIONS = [
+  { value: 'ru', label: 'Русский' },
+  { value: 'en', label: 'English' },
+]
+const FIRST_DAY_OPTIONS = [
+  { value: 1, label: 'Понедельник' },
+  { value: 0, label: 'Воскресенье' },
+]
+
+async function selectLanguage(lang: string) {
+  await userStore.updateLanguage(lang)
+}
+
+async function selectFirstDayOfWeek(day: number) {
+  await userStore.updateFirstDayOfWeek(day)
 }
 
 function onClickOutside(e: MouseEvent) {

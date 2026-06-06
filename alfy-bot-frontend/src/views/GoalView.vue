@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { QuestionWithScheduleItem } from '../api/goals'
+import type { GoalReportStatus } from '../api/reports'
 import type { Goal, Question } from '../types'
-import { Archive, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { Archive, Check, ChevronRight, MoreVertical, MoveUpRight, Pencil, Plus, RotateCcw, Trash2, Unlink } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/PageContainer.vue'
 import {
@@ -28,15 +29,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { toLocalISODate } from '@/features/goals/lib/dates'
+import { newQuestionDraft } from '@/features/goals/lib/new-question'
 import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
 import {
+  addGoalQuestions,
   deleteQuestion,
   fetchGoalById,
+  fetchGoals,
   fetchQuestionAnswerCount,
   updateGoal,
   updateQuestion,
   updateQuestionSchedule,
 } from '../api/goals'
+import { fetchGoalReportStatus } from '../api/reports'
 import AppHeader from '../components/AppHeader.vue'
 import GoalStatusBadge from '../components/GoalStatusBadge.vue'
 import SummaryCard from '../components/SummaryCard.vue'
@@ -45,16 +51,25 @@ import { goalAccent } from '../utils/goalColor'
 
 const route = useRoute()
 const router = useRouter()
-const id = Number(route.params.id)
+// Реактивный id: при навигации goal→goal (например, вход в подцель или к родителю)
+// vue-router переиспользует компонент, onMounted не срабатывает повторно —
+// поэтому id вычисляем из route и перезагружаем цель по его смене (watcher ниже).
+const id = computed(() => Number(route.params.id))
 
 function goToQuestion(q: { id: number }) {
   return router.push({ name: 'questionReport', params: { id: q.id } })
+}
+
+function goToReport() {
+  return router.push({ name: 'goalReport', params: { id: id.value } })
 }
 
 const goal = ref<Goal | null>(null)
 const loading = ref(true)
 
 const editingQuestion = ref<Question | null>(null)
+const addingQuestion = ref(false)
+const addError = ref<string | null>(null)
 const deletingQuestion = ref<Question | null>(null)
 // Снимок Question, захваченный при клике trash-иконки. Используется в onConfirmDelete,
 // т.к. reka-ui AlertDialog emit'ит `update:open(false)` ДО `@click` action-кнопки,
@@ -72,11 +87,68 @@ type GoalAction = 'archive' | 'delete' | 'restore'
 const goalActionPending = ref<GoalAction | null>(null)
 let pendingGoalAction: GoalAction | null = null
 
+// Родительская global-цель (если текущая цель привязана к ней).
+const parentGoal = ref<Goal | null>(null)
+
 async function reloadGoal() {
-  goal.value = await fetchGoalById(id)
+  goal.value = await fetchGoalById(id.value)
+  if (goal.value.parent_goal_id) {
+    try {
+      parentGoal.value = await fetchGoalById(goal.value.parent_goal_id)
+    }
+    catch {
+      // Родителя не удалось загрузить — не блокируем просмотр цели.
+      parentGoal.value = null
+    }
+  }
+  else {
+    parentGoal.value = null
+  }
 }
 
+// Статус сегодняшнего отчёта — чтобы не предлагать повторно заполнять уже сданный.
+const reportStatus = ref<GoalReportStatus | null>(null)
+
+async function loadReportStatus() {
+  if (goal.value?.status !== 'active') {
+    reportStatus.value = null
+    return
+  }
+  try {
+    reportStatus.value = await fetchGoalReportStatus(id.value, toLocalISODate(new Date()))
+  }
+  catch {
+    reportStatus.value = null
+  }
+}
+
+// Состояние CTA отчёта: 'pending' — есть неотвеченные; 'done' — всё заполнено;
+// 'none' — на сегодня вопросов нет (или статус не загрузился).
+const reportState = computed<'pending' | 'done' | 'none'>(() => {
+  const s = reportStatus.value
+  if (!s || s.questions.length === 0)
+    return 'none'
+  return s.allDone ? 'done' : 'pending'
+})
+
 onMounted(async () => {
+  try {
+    await reloadGoal()
+    await loadReportStatus()
+  }
+  catch {
+    router.replace('/not-found')
+  }
+  finally {
+    loading.value = false
+  }
+})
+
+// Переход goal→goal (подцель/родитель) меняет :id без перемонтирования —
+// перезагружаем данные при смене параметра маршрута.
+watch(id, async () => {
+  loading.value = true
+  goal.value = null
   try {
     await reloadGoal()
   }
@@ -89,7 +161,82 @@ onMounted(async () => {
 })
 
 const accent = computed(() => goal.value ? goalAccent(goal.value.id) : '#3b82f6')
-const daysLeftVal = computed(() => goal.value ? daysLeft(goal.value.goal_end) : 0)
+const daysLeftVal = computed(() =>
+  goal.value?.goal_end ? daysLeft(goal.value.goal_end) : 0,
+)
+// Показываем блок дат только если у цели есть хотя бы одна дата
+// (бессрочные global-цели создаются без дат).
+const hasDates = computed(() => Boolean(goal.value?.goal_start || goal.value?.goal_end))
+
+function goToChild(child: { id: number }) {
+  return router.push({ name: 'goal', params: { id: child.id } })
+}
+
+function goToCreateHere() {
+  return router.push({ name: 'goal-create' })
+}
+
+// === Перенос regular-цели в global / открепление ===
+const moveSheetOpen = ref(false)
+const globalGoals = ref<Goal[]>([])
+const globalsLoading = ref(false)
+const moveError = ref<string | null>(null)
+
+async function openMoveSheet() {
+  moveSheetOpen.value = true
+  moveError.value = null
+  globalsLoading.value = true
+  try {
+    globalGoals.value = await fetchGoals({ scope: 'global' })
+  }
+  catch (e: unknown) {
+    moveError.value = e instanceof Error ? e.message : 'Не удалось загрузить глобальные цели'
+  }
+  finally {
+    globalsLoading.value = false
+  }
+}
+
+async function onMoveToGlobal(parentId: number) {
+  if (!goal.value)
+    return
+  saving.value = true
+  moveError.value = null
+  try {
+    await updateGoal(goal.value.id, { parent_goal_id: parentId })
+    moveSheetOpen.value = false
+    await reloadGoal()
+  }
+  catch (e: unknown) {
+    moveError.value = e instanceof Error ? e.message : 'Не удалось перенести цель'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function onUnlinkParent() {
+  if (!goal.value)
+    return
+  saving.value = true
+  saveError.value = null
+  try {
+    await updateGoal(goal.value.id, { parent_goal_id: null })
+    await reloadGoal()
+  }
+  catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'Не удалось открепить цель'
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+function goToParent() {
+  if (!goal.value?.parent_goal_id)
+    return
+  return router.push({ name: 'goal', params: { id: goal.value.parent_goal_id } })
+}
 
 const questionTypeLabel: Record<string, string> = {
   number: 'Число',
@@ -109,6 +256,23 @@ function questionToFormValue(q: Question): QuestionWithScheduleItem {
     selectedDays: q.schedule.days_of_week ?? undefined,
     intervalDays: q.schedule.interval_days ?? undefined,
     targetValue: q.target_value ?? undefined,
+  }
+}
+
+async function onSaveAdd(v: QuestionWithScheduleItem) {
+  saving.value = true
+  addError.value = null
+  try {
+    await addGoalQuestions(id.value, [v])
+    await reloadGoal()
+    addingQuestion.value = false
+  }
+  catch (e: unknown) {
+    // fail-fast: Sheet не закрываем, список не трогаем
+    addError.value = e instanceof Error ? e.message : 'Не удалось добавить вопрос'
+  }
+  finally {
+    saving.value = false
   }
 }
 
@@ -308,6 +472,20 @@ function onCancelGoalAction() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <template v-if="!goal.is_global && goal.status !== 'deleted'">
+                <DropdownMenuItem data-testid="goal-action-move" @click="openMoveSheet">
+                  <MoveUpRight class="w-4 h-4 mr-2" />
+                  Переместить в глобальную цель
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="goal.parent_goal_id"
+                  data-testid="goal-action-unlink"
+                  @click="onUnlinkParent"
+                >
+                  <Unlink class="w-4 h-4 mr-2" />
+                  Открепить
+                </DropdownMenuItem>
+              </template>
               <template v-if="goal.status === 'active' || goal.status === 'completed'">
                 <DropdownMenuItem data-testid="goal-action-archive" @click="openGoalAction('archive')">
                   <Archive class="w-4 h-4 mr-2" />
@@ -349,11 +527,42 @@ function onCancelGoalAction() {
     </AppHeader>
 
     <PageContainer class="space-y-8">
-      <!-- summary -->
-      <section>
+      <!-- parent link (regular goal under a global parent) -->
+      <button
+        v-if="!goal.is_global && parentGoal"
+        type="button"
+        class="w-full flex items-center gap-2 text-left text-sm text-muted-foreground hover:text-foreground transition-colors"
+        data-testid="parent-goal-link"
+        @click="goToParent"
+      >
+        <span class="shrink-0">↑</span>
+        <span class="truncate">Родительская цель: {{ parentGoal.goal_name }}</span>
+      </button>
+
+      <!-- report CTA -->
+      <Button
+        v-if="goal.status === 'active' && reportState === 'pending'"
+        size="lg"
+        class="w-full"
+        data-testid="goal-report-cta"
+        @click="goToReport"
+      >
+        Сделать отчёт по цели
+      </Button>
+      <div
+        v-else-if="goal.status === 'active' && reportState === 'done'"
+        class="flex items-center justify-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-sm text-muted-foreground"
+        data-testid="goal-report-done"
+      >
+        <Check class="size-4 text-green-500" />
+        Отчёт на сегодня заполнен
+      </div>
+
+      <!-- summary (скрываем блок дат у бессрочных целей без дат) -->
+      <section v-if="hasDates">
         <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <SummaryCard label="Начало" :value="formatDate(goal.goal_start)" />
-          <SummaryCard label="Конец" :value="formatDate(goal.goal_end)" />
+          <SummaryCard label="Начало" :value="goal.goal_start ? formatDate(goal.goal_start) : '—'" />
+          <SummaryCard label="Конец" :value="goal.goal_end ? formatDate(goal.goal_end) : '—'" />
           <SummaryCard
             label="Дней до конца"
             :value="goal.status === 'completed' ? '—' : daysLeftVal > 0 ? daysLeftVal : 'Истёк'"
@@ -363,12 +572,59 @@ function onCancelGoalAction() {
         </div>
       </section>
 
-      <!-- questions -->
-      <section>
+      <!-- children (global goal) -->
+      <section v-if="goal.is_global">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-foreground">
+            Цели внутри
+          </h2>
+          <Button size="sm" variant="outline" data-testid="create-child-goal" @click="goToCreateHere">
+            <Plus class="w-4 h-4 mr-1" />
+            Создать цель здесь
+          </Button>
+        </div>
+        <div v-if="(goal.children?.length ?? 0) > 0" class="space-y-2">
+          <button
+            v-for="child in goal.children"
+            :key="child.id"
+            type="button"
+            class="w-full flex items-center gap-3 bg-card border border-border rounded-xl px-4 py-3 text-left transition-all duration-150 hover:bg-accent hover:border-accent hover:shadow-sm active:scale-[0.98]"
+            :data-testid="`child-goal-${child.id}`"
+            @click="goToChild(child)"
+          >
+            <div
+              class="w-1 h-8 rounded-full shrink-0"
+              :style="{ backgroundColor: goalAccent(child.id) }"
+            />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-foreground truncate">
+                {{ child.goal_name }}
+              </p>
+            </div>
+            <ChevronRight class="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+        </div>
+        <p v-else class="text-sm text-muted-foreground">
+          Пока нет вложенных целей. Создайте первую — она будет привязана к этой глобальной цели.
+        </p>
+      </section>
+
+      <!-- questions (regular goal) -->
+      <section v-else>
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-base font-semibold text-foreground">
             Вопросы цели
           </h2>
+          <Button
+            v-if="goal.status === 'active'"
+            size="sm"
+            variant="outline"
+            data-testid="add-question-cta"
+            @click="addingQuestion = true"
+          >
+            <Plus class="size-4" />
+            Добавить вопрос
+          </Button>
         </div>
         <div class="space-y-2">
           <div
@@ -438,6 +694,26 @@ function onCancelGoalAction() {
       </SheetContent>
     </Sheet>
 
+    <Sheet
+      :open="addingQuestion"
+      @update:open="(o: boolean) => { if (!o) { addingQuestion = false; addError = null } }"
+    >
+      <SheetContent class="overflow-y-auto p-6">
+        <SheetHeader class="px-0">
+          <SheetTitle>Добавить вопрос</SheetTitle>
+        </SheetHeader>
+        <QuestionEditForm
+          v-if="addingQuestion"
+          :initial="newQuestionDraft()"
+          submit-label="Добавить"
+          :error="addError ?? undefined"
+          :submitting="saving"
+          @save="onSaveAdd"
+          @cancel="addingQuestion = false; addError = null"
+        />
+      </SheetContent>
+    </Sheet>
+
     <AlertDialog
       :open="deletingQuestion !== null"
       @update:open="(o: boolean) => { if (!o) deletingQuestion = null }"
@@ -474,7 +750,9 @@ function onCancelGoalAction() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="onCancelTypeChange">Отмена</AlertDialogCancel>
+          <AlertDialogCancel @click="onCancelTypeChange">
+            Отмена
+          </AlertDialogCancel>
           <AlertDialogAction data-testid="confirm-type-change" @click="onConfirmTypeChange">
             Продолжить
           </AlertDialogAction>
@@ -496,7 +774,9 @@ function onCancelGoalAction() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="onCancelGoalAction">Отмена</AlertDialogCancel>
+          <AlertDialogCancel @click="onCancelGoalAction">
+            Отмена
+          </AlertDialogCancel>
           <AlertDialogAction
             :class="goalActionPending ? GOAL_ACTION_LABEL[goalActionPending].confirmClass : ''"
             data-testid="confirm-goal-action"
@@ -507,5 +787,40 @@ function onCancelGoalAction() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <Sheet
+      :open="moveSheetOpen"
+      @update:open="(o: boolean) => { if (!o) moveSheetOpen = false }"
+    >
+      <SheetContent class="overflow-y-auto p-6">
+        <SheetHeader class="px-0">
+          <SheetTitle>Переместить в глобальную цель</SheetTitle>
+        </SheetHeader>
+        <div class="mt-4 space-y-2">
+          <p v-if="globalsLoading" class="text-sm text-muted-foreground">
+            Загрузка...
+          </p>
+          <p v-else-if="moveError" class="text-sm text-destructive">
+            {{ moveError }}
+          </p>
+          <p v-else-if="globalGoals.length === 0" class="text-sm text-muted-foreground">
+            Пока нет глобальных целей.
+          </p>
+          <button
+            v-for="g in globalGoals"
+            v-else
+            :key="g.id"
+            type="button"
+            class="w-full flex items-center gap-2 bg-card border border-border rounded-xl px-4 py-3 text-left transition-all duration-150 hover:bg-accent hover:border-accent disabled:opacity-50"
+            :disabled="saving || g.id === goal.parent_goal_id"
+            :data-testid="`move-target-${g.id}`"
+            @click="onMoveToGlobal(g.id)"
+          >
+            <span class="flex-1 min-w-0 truncate text-sm font-medium text-foreground">{{ g.goal_name }}</span>
+            <span v-if="g.id === goal.parent_goal_id" class="text-xs text-muted-foreground shrink-0">текущий</span>
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>

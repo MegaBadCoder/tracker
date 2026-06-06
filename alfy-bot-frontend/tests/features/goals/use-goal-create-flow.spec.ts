@@ -31,10 +31,11 @@ describe('useGoalCreateFlow — state machine', () => {
     expect(flow.state.value.step).toBe('type_in_development')
   })
 
-  it('selectType("global") → "type_in_development"', () => {
+  it('selectType("global") → "name" (как simple, без dead-end)', () => {
     const flow = useGoalCreateFlow()
     flow.go.selectType('global')
-    expect(flow.state.value.step).toBe('type_in_development')
+    expect(flow.state.value.step).toBe('name')
+    expect(flow.state.value.goalType).toBe('global')
   })
 
   it('back() из stub возвращает на "type"', () => {
@@ -76,8 +77,10 @@ describe('useGoalCreateFlow — state machine', () => {
     expect(flow.state.value.step).toBe('point_a')
     expect(flow.state.value.endDate).toEqual(end)
     flow.go.setPointA(true)
-    expect(flow.state.value.step).toBe('creating')
+    expect(flow.state.value.step).toBe('parent')
     expect(flow.state.value.pointA).toBe(true)
+    flow.go.selectParent()
+    expect(flow.state.value.step).toBe('creating')
     expect(goalsApi.createGoal).not.toHaveBeenCalled()
   })
 
@@ -155,7 +158,7 @@ describe('useGoalCreateFlow — state machine', () => {
     // Простейший путь — через submit.createGoal с моком.
     // НО mock уже настроен на дефолтное undefined. Перенастроим.
     // Для упрощения — внесём API-вызов отдельным тестом, а здесь обойдём:
-    expect(flow.state.value.step).toBe('creating')
+    expect(flow.state.value.step).toBe('parent')
   })
 
   it('questions-loop full: number → text → target_value → can_skip; text → пропускает target_value', async () => {
@@ -329,14 +332,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('finishQuestions() → "saving" если есть добавленные вопросы', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(true)
@@ -360,14 +368,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('offerQuestions(false) после добавленных вопросов → "saving" (не теряем их)', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(true)
@@ -385,14 +398,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('offerQuestions(false) без добавленных вопросов → "done" (зеркало бота)', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(false)
@@ -402,14 +420,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('updateQuestion(idx, value) подменяет элемент целиком и не меняет state.step', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(true)
@@ -442,14 +465,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('removeQuestion(idx) вырезает элемент, не меняет state.step и не мутирует соседей', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(true)
@@ -485,14 +513,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('updateQuestion с idx вне диапазона — no-op', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(true)
@@ -506,10 +539,16 @@ describe('useGoalCreateFlow — state machine', () => {
     const lenBefore = flow.state.value.questionsToAdd.length
 
     flow.go.updateQuestion(-1, {
-      question: 'X', type: 'text', canSkip: false, scheduleType: 'daily',
+      question: 'X',
+      type: 'text',
+      canSkip: false,
+      scheduleType: 'daily',
     })
     flow.go.updateQuestion(99, {
-      question: 'Y', type: 'text', canSkip: false, scheduleType: 'daily',
+      question: 'Y',
+      type: 'text',
+      canSkip: false,
+      scheduleType: 'daily',
     })
 
     expect(flow.state.value.step).toBe(stepBefore)
@@ -520,14 +559,19 @@ describe('useGoalCreateFlow — state machine', () => {
   it('removeQuestion с idx вне диапазона — no-op', async () => {
     const goalsApi = await import('@/api/goals')
     vi.mocked(goalsApi.createGoal).mockResolvedValue({
-      id: 1, goal_name: 'g', goal_start: '2026-01-10', goal_end: '2026-02-10',
-      status: 'active', createdAt: '', questions: [],
+      id: 1,
+      goal_name: 'g',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      questions: [],
     } as any)
     const flow = useGoalCreateFlow()
     flow.go.selectType('simple')
     flow.go.submitName('Ц')
     flow.go.selectStartPreset('today')
-    flow.go.selectEndPreset('week')
+    flow.go.selectEndPreset('weeks_12')
     flow.go.setPointA(false)
     await flow.submit.createGoal()
     flow.go.offerQuestions(true)
@@ -546,5 +590,185 @@ describe('useGoalCreateFlow — state machine', () => {
     expect(flow.state.value.step).toBe(stepBefore)
     expect(flow.state.value.questionsToAdd.length).toBe(lenBefore)
     expect(flow.state.value.questionsToAdd[0]).toEqual(snapshot)
+  })
+})
+
+describe('useGoalCreateFlow — global goal flow', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('selectType("global") → name → submitName → "global_deadline" (минуя start/end/point_a)', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    expect(flow.state.value.step).toBe('global_deadline')
+    expect(flow.state.value.goalName).toBe('Стать сильнее')
+    expect(flow.state.value.startDate).toBeUndefined()
+    expect(flow.state.value.endDate).toBeUndefined()
+  })
+
+  it('selectDeadline(undefined) (пропуск) → "creating"', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    flow.go.selectDeadline()
+    expect(flow.state.value.step).toBe('creating')
+    expect(flow.state.value.deadline).toBeUndefined()
+  })
+
+  it('selectDeadline(date) → "creating" и сохраняет дедлайн', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    const dl = new Date(2027, 0, 1)
+    flow.go.selectDeadline(dl)
+    expect(flow.state.value.step).toBe('creating')
+    expect(flow.state.value.deadline).toEqual(dl)
+  })
+
+  it('buildCreatePayload для global без дедлайна → { is_global: true, goal_name }, без дат, без throw', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    flow.go.selectDeadline()
+    const payload = flow.buildCreatePayload()
+    expect(payload).toEqual({ goal_name: 'Стать сильнее', is_global: true })
+    expect(payload).not.toHaveProperty('goal_start')
+    expect(payload).not.toHaveProperty('goal_end')
+  })
+
+  it('buildCreatePayload для global с дедлайном → goal_end установлен, goal_start отсутствует', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    flow.go.selectDeadline(new Date(2027, 11, 31))
+    const payload = flow.buildCreatePayload()
+    expect(payload.is_global).toBe(true)
+    expect(payload.goal_end).toBe('2027-12-31')
+    expect(payload).not.toHaveProperty('goal_start')
+  })
+
+  it('submitCreateGoal для global → шаг "done" (без questions_offer)', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 7,
+      goal_name: 'Стать сильнее',
+      goal_start: null,
+      goal_end: null,
+      status: 'active',
+      createdAt: '',
+      is_global: true,
+      parent_goal_id: null,
+      questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    flow.go.selectDeadline()
+    const goalId = await flow.submit.createGoal()
+    expect(goalId).toBe(7)
+    expect(flow.state.value.step).toBe('done')
+    expect(flow.state.value.goalId).toBe(7)
+  })
+
+  it('back() из global_deadline возвращает на name', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('global')
+    flow.go.submitName('Стать сильнее')
+    flow.go.back()
+    expect(flow.state.value.step).toBe('name')
+  })
+})
+
+describe('useGoalCreateFlow — simple goal parent select', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('simple: setPointA → "parent" (не "creating")', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Цель')
+    flow.go.selectStartPreset('custom', new Date(2026, 0, 10))
+    flow.go.selectEndPreset('custom', new Date(2026, 1, 10))
+    flow.go.setPointA(true)
+    expect(flow.state.value.step).toBe('parent')
+  })
+
+  it('selectParent(undefined) (без родителя) → "creating", parentGoalId не установлен', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Цель')
+    flow.go.selectStartPreset('custom', new Date(2026, 0, 10))
+    flow.go.selectEndPreset('custom', new Date(2026, 1, 10))
+    flow.go.setPointA(true)
+    flow.go.selectParent()
+    expect(flow.state.value.step).toBe('creating')
+    expect(flow.state.value.parentGoalId).toBeUndefined()
+  })
+
+  it('selectParent(id) → "creating", parentGoalId установлен; buildCreatePayload включает parent_goal_id', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Цель')
+    flow.go.selectStartPreset('custom', new Date(2026, 0, 10))
+    flow.go.selectEndPreset('custom', new Date(2026, 1, 10))
+    flow.go.setPointA(true)
+    flow.go.selectParent(99)
+    expect(flow.state.value.step).toBe('creating')
+    expect(flow.state.value.parentGoalId).toBe(99)
+    const payload = flow.buildCreatePayload()
+    expect(payload.parent_goal_id).toBe(99)
+    expect(payload.is_global).toBeUndefined()
+  })
+
+  it('buildCreatePayload для simple без выбранного родителя не содержит parent_goal_id', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Цель')
+    flow.go.selectStartPreset('custom', new Date(2026, 0, 10))
+    flow.go.selectEndPreset('custom', new Date(2026, 1, 10))
+    flow.go.setPointA(true)
+    flow.go.selectParent()
+    const payload = flow.buildCreatePayload()
+    expect(payload).not.toHaveProperty('parent_goal_id')
+  })
+
+  it('back() из parent возвращает на point_a', () => {
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Цель')
+    flow.go.selectStartPreset('custom', new Date(2026, 0, 10))
+    flow.go.selectEndPreset('custom', new Date(2026, 1, 10))
+    flow.go.setPointA(true)
+    expect(flow.state.value.step).toBe('parent')
+    flow.go.back()
+    expect(flow.state.value.step).toBe('point_a')
+    expect(flow.state.value.parentGoalId).toBeUndefined()
+  })
+
+  it('simple submitCreateGoal по-прежнему → questions_offer', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.createGoal).mockResolvedValue({
+      id: 3,
+      goal_name: 'Цель',
+      goal_start: '2026-01-10',
+      goal_end: '2026-02-10',
+      status: 'active',
+      createdAt: '',
+      is_global: false,
+      parent_goal_id: null,
+      questions: [],
+    } as any)
+    const flow = useGoalCreateFlow()
+    flow.go.selectType('simple')
+    flow.go.submitName('Цель')
+    flow.go.selectStartPreset('custom', new Date(2026, 0, 10))
+    flow.go.selectEndPreset('custom', new Date(2026, 1, 10))
+    flow.go.setPointA(true)
+    flow.go.selectParent()
+    await flow.submit.createGoal()
+    expect(flow.state.value.step).toBe('questions_offer')
   })
 })

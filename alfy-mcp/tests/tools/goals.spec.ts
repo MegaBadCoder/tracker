@@ -56,6 +56,19 @@ describe('goal tools', () => {
       expect(client.get).toHaveBeenCalledWith('/goals', { status: 'active' });
     });
 
+    it('puts scope into GET params when given', async () => {
+      client.get.mockResolvedValueOnce([]);
+      await server.callTool('list_goals', { scope: 'global' });
+      expect(client.get).toHaveBeenCalledWith('/goals', { scope: 'global' });
+    });
+
+    it('omits scope from GET params when absent', async () => {
+      client.get.mockResolvedValueOnce([]);
+      await server.callTool('list_goals', { status: 'active' });
+      const callArgs = (client.get as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1]).not.toHaveProperty('scope');
+    });
+
     it('returns JSON text with goals array', async () => {
       const goals = [{ id: 1, goal_name: 'Read daily', status: 'active', goal_start: '2026-01-01', goal_end: '2026-12-31', questions: [] }];
       client.get.mockResolvedValueOnce(goals);
@@ -108,6 +121,35 @@ describe('goal tools', () => {
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toEqual(created);
     });
+
+    it('forwards is_global and parent_goal_id in POST body when given', async () => {
+      client.post.mockResolvedValueOnce({ id: 11 });
+      await server.callTool('create_goal', { goal_name: 'Global goal', is_global: true, parent_goal_id: 7 });
+      expect(client.post).toHaveBeenCalledWith('/goals', {
+        goal_name: 'Global goal',
+        is_global: true,
+        parent_goal_id: 7,
+      });
+    });
+
+    it('omits date keys from POST body when dates absent', async () => {
+      client.post.mockResolvedValueOnce({ id: 12 });
+      await server.callTool('create_goal', { goal_name: 'Global goal', is_global: true });
+      const callArgs = (client.post as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[0]).toBe('/goals');
+      expect(callArgs[1]).not.toHaveProperty('goal_start');
+      expect(callArgs[1]).not.toHaveProperty('goal_end');
+      expect(callArgs[1]).not.toHaveProperty('parent_goal_id');
+      expect(callArgs[1]).toEqual({ goal_name: 'Global goal', is_global: true });
+    });
+
+    it('omits is_global and parent_goal_id when absent', async () => {
+      client.post.mockResolvedValueOnce({ id: 13 });
+      await server.callTool('create_goal', { goal_name: 'Regular', goal_start: '2026-01-01', goal_end: '2026-12-31' });
+      const callArgs = (client.post as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1]).not.toHaveProperty('is_global');
+      expect(callArgs[1]).not.toHaveProperty('parent_goal_id');
+    });
   });
 
   describe('add_questions_to_goal', () => {
@@ -156,6 +198,27 @@ describe('goal tools', () => {
       const result = await server.callTool('update_goal', { id: 3, status: 'completed' });
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed).toEqual(updated);
+    });
+
+    it('sends parent_goal_id null in PATCH body to unlink', async () => {
+      client.patch.mockResolvedValueOnce({ id: 4 });
+      await server.callTool('update_goal', { id: 4, parent_goal_id: null });
+      const callArgs = (client.patch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[0]).toBe('/goals/4');
+      expect(callArgs[1]).toHaveProperty('parent_goal_id', null);
+    });
+
+    it('forwards parent_goal_id when set to a number', async () => {
+      client.patch.mockResolvedValueOnce({ id: 4 });
+      await server.callTool('update_goal', { id: 4, parent_goal_id: 9 });
+      expect(client.patch).toHaveBeenCalledWith('/goals/4', { parent_goal_id: 9 });
+    });
+
+    it('omits parent_goal_id from PATCH body when absent', async () => {
+      client.patch.mockResolvedValueOnce({ id: 4 });
+      await server.callTool('update_goal', { id: 4, status: 'archived' });
+      const callArgs = (client.patch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(callArgs[1]).not.toHaveProperty('parent_goal_id');
     });
   });
 });

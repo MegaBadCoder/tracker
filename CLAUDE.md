@@ -85,6 +85,8 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 
 Глобально включены: `ValidationPipe({ whitelist: true, transform: true })`, префикс `/api`, CORS только для `localhost`, Swagger Bearer auth.
 
+**Route-коллизии под общим префиксом.** Несколько контроллеров могут делить один префикс (например `@Controller('goals')` в `GoalModule` и в `ReportModule`). Тогда `@Get(':id')` одного контроллера перехватывает одиночный литерал (`goals/report-queue`) другого, и `ParseIntPipe` отдаёт 400. Порядок матчинга = import-порядку модулей в `AppModule` — полагаться на него хрупко. Express 5 / path-to-regexp v8 **не поддерживают** inline-regex `:id(\d+)` (приложение не стартует). Решение: давать литеральным маршрутам **многосегментный** путь, который одиночный `:id` не может захватить (`goals/reports/queue`, не `goals/report-queue`). Регрессия — `alfy-bot/test/web-goal-reports-routing.e2e-spec.ts`.
+
 # Frontend architecture (FSD-like)
 
 `alfy-bot-frontend/src/` устроен как feature-sliced:
@@ -143,6 +145,14 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 - Локальное время браузера = таймзона пользователя.
 - Утилиты дат (`recurrence.ts`, `dateTime.ts`) используют локальные методы (`getDay`, `setDate`), не UTC.
 - Календарь и виртуальные проекции считаются в локальном времени — никаких явных конверсий.
+
+# Locale & first day of week (frontend)
+
+Локаль дат/календарей и первый день недели берутся из настроек пользователя (`User.language`, `User.firstDayOfWeek` — зеркало `timezone` на бэке). Единый реактивный источник на фронте — `composables/useLocale.ts`. Это только локаль дат/календарей, полного i18n всего UI нет.
+
+- Любой reka-ui `<Calendar>` обязан получать `:locale="intlLocale"` + `:week-starts-on="weekStartsOn"` из `useLocale`, иначе он на дефолтах reka-ui (англ./воскресенье).
+- Форматтеры дат (`features/tasks/lib/formatters.ts`, `features/calendar/lib/week.ts`) читают `dateFnsLocale.value` / `weekStartsOn.value` из `useLocale`, а не хардкодят `date-fns/locale`. `.value` читается в рендере → реактивный ре-рендер при смене настройки.
+- Менять настройку — через `user-store.updateLanguage` / `updateFirstDayOfWeek` (пушат в `setLocalePrefs`). Дефолты: `ru`, понедельник (`1`).
 
 Add as a new top-level ## Workflow Discipline section near the top of CLAUDE.md\n\n## Workflow Discipline
 - When user invokes a new task (e.g. /up:make), START that task immediately. Do NOT divert to finalize or close prior tasks unless explicitly asked.

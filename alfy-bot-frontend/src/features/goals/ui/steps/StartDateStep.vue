@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import type { FlowState, StartPreset } from '@/features/goals/model/use-goal-create-flow'
+import type { FlowState, StartPresetKey } from '@/features/goals/model/use-goal-create-flow'
+import { ArrowLeft, Pencil } from 'lucide-vue-next'
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { START_PRESETS } from './goal-create-options'
 
 defineProps<{ state: FlowState }>()
 const emit = defineEmits<{
-  (e: 'selectStartPreset', preset: StartPreset, custom?: Date): void
+  (e: 'selectStartPreset', preset: StartPresetKey, custom?: Date): void
   (e: 'back'): void
 }>()
 
 const showCustom = ref(false)
 const customValue = ref<string>('')
 
-function pickPreset(p: Exclude<StartPreset, 'custom'>) {
+function pickPreset(p: Exclude<StartPresetKey, 'custom'>) {
   emit('selectStartPreset', p)
 }
 
@@ -40,17 +42,17 @@ function submitCustom() {
     </h2>
 
     <div class="flex flex-wrap gap-2">
-      <Button variant="outline" @click="pickPreset('today')">
-        Сегодня
-      </Button>
-      <Button variant="outline" @click="pickPreset('tomorrow')">
-        Завтра
-      </Button>
-      <Button variant="outline" @click="pickPreset('week')">
-        Через неделю
+      <Button
+        v-for="opt in START_PRESETS"
+        :key="opt.key"
+        variant="outline"
+        @click="pickPreset(opt.key)"
+      >
+        {{ opt.label }}
       </Button>
       <Button variant="outline" @click="pickCustom">
-        ✏️ Своя дата
+        <Pencil class="size-4" />
+        Своя дата
       </Button>
     </div>
 
@@ -63,7 +65,8 @@ function submitCustom() {
 
     <div>
       <Button variant="outline" @click="emit('back')">
-        ⬅️ Назад
+        <ArrowLeft class="size-4" />
+        Назад
       </Button>
     </div>
   </div>

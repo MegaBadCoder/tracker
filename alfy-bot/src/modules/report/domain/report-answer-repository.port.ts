@@ -4,6 +4,7 @@ export interface AnswerData {
   answer_text: string;
   answer_number: number | null;
   answer_bool: boolean | null;
+  photo_key?: string | null;
 }
 
 export abstract class ReportAnswerRepositoryPort {
@@ -37,4 +38,15 @@ export abstract class ReportAnswerRepositoryPort {
   ): Promise<ReportAnswer[]>;
 
   abstract countByQuestion(questionId: number): Promise<number>;
+
+  abstract findByQuestionAndDate(
+    questionId: number,
+    scheduledDate: string,
+  ): Promise<ReportAnswer | null>;
+
+  abstract findPhotosByQuestion(
+    questionId: number,
+    limit: number,
+    offset: number,
+  ): Promise<ReportAnswer[]>;
 }

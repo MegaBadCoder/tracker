@@ -9,8 +9,10 @@ export interface UpdateScheduleDto {
 
 export interface CreateGoalDto {
   goal_name: string
-  goal_start: string
-  goal_end: string
+  goal_start?: string
+  goal_end?: string
+  is_global?: boolean
+  parent_goal_id?: number
 }
 
 export interface QuestionWithScheduleItem {
@@ -26,11 +28,22 @@ export interface QuestionWithScheduleItem {
 export interface UpdateGoalDto {
   status?: 'active' | 'completed' | 'archived' | 'deleted'
   goal_name?: string
+  parent_goal_id?: number | null
 }
 
-export async function fetchGoals(status?: Exclude<GoalStatus, 'all'>): Promise<Goal[]> {
+export interface FetchGoalsOptions {
+  status?: Exclude<GoalStatus, 'all'>
+  scope?: 'global' | 'regular' | 'all'
+}
+
+export async function fetchGoals(opts?: FetchGoalsOptions): Promise<Goal[]> {
+  const params: Record<string, string> = {}
+  if (opts?.status)
+    params.status = opts.status
+  if (opts?.scope)
+    params.scope = opts.scope
   const { data } = await api.get<Goal[]>('/goals', {
-    params: status ? { status } : undefined,
+    params: Object.keys(params).length ? params : undefined,
   })
   return data
 }

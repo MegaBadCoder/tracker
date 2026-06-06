@@ -24,16 +24,20 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
       | Partial<Goal>
       | {
           goal_name: string;
-          goal_start: string;
-          goal_end: string;
+          goal_start?: string;
+          goal_end?: string;
+          is_global?: boolean;
+          parent_goal_id?: number | null;
           questions?: QuestionData[];
         },
   ): Promise<Goal> {
     if ('questions' in goalData && Array.isArray(goalData.questions)) {
       const { questions, ...goalInfo } = goalData as {
         goal_name: string;
-        goal_start: string;
-        goal_end: string;
+        goal_start?: string;
+        goal_end?: string;
+        is_global?: boolean;
+        parent_goal_id?: number | null;
         questions: QuestionData[];
       };
       const goal = this.goalRepo.create({
@@ -81,17 +85,67 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
     });
   }
 
-  async findAllByUser(userId: number): Promise<Goal[]> {
-    return this.goalRepo.find({
-      where: { user_id: userId, status: Not('deleted') },
+  async findAllByUser(
+    userId: number,
+    scope: 'global' | 'regular' | 'all' = 'all',
+  ): Promise<Goal[]> {
+    const goals = await this.goalRepo.find({
+      where: {
+        user_id: userId,
+        status: Not('deleted'),
+        ...(scope === 'all' ? {} : { is_global: scope === 'global' }),
+      },
       relations: ['questions'],
       order: { createdAt: 'DESC' },
     });
+    await this.attachChildrenCounts(goals);
+    return goals;
   }
 
-  async findByStatus(userId: number, status: string): Promise<Goal[]> {
+  async findByStatus(
+    userId: number,
+    status: string,
+    scope: 'global' | 'regular' | 'all' = 'all',
+  ): Promise<Goal[]> {
+    const goals = await this.goalRepo.find({
+      where: {
+        user_id: userId,
+        status,
+        ...(scope === 'all' ? {} : { is_global: scope === 'global' }),
+      },
+      relations: ['questions'],
+      order: { createdAt: 'DESC' },
+    });
+    await this.attachChildrenCounts(goals);
+    return goals;
+  }
+
+  /**
+   * Заполняет `children_count` у global-целей одним групповым запросом
+   * (без N+1). Считаются только не-deleted дети.
+   */
+  private async attachChildrenCounts(goals: Goal[]): Promise<void> {
+    const globalIds = goals.filter((g) => g.is_global).map((g) => g.id);
+    if (globalIds.length === 0) return;
+
+    const rows = await this.goalRepo
+      .createQueryBuilder('g')
+      .select('g.parent_goal_id', 'parent')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('g.parent_goal_id IN (:...ids)', { ids: globalIds })
+      .andWhere('g.status != :deleted', { deleted: 'deleted' })
+      .groupBy('g.parent_goal_id')
+      .getRawMany<{ parent: number; cnt: string }>();
+
+    const counts = new Map(rows.map((r) => [Number(r.parent), Number(r.cnt)]));
+    for (const goal of goals) {
+      if (goal.is_global) goal.children_count = counts.get(goal.id) ?? 0;
+    }
+  }
+
+  async findChildren(parentGoalId: number): Promise<Goal[]> {
     return this.goalRepo.find({
-      where: { user_id: userId, status },
+      where: { parent_goal_id: parentGoalId, status: Not('deleted') },
       relations: ['questions'],
       order: { createdAt: 'DESC' },
     });
@@ -100,7 +154,7 @@ export class TypeOrmGoalRepository extends GoalRepositoryPort {
   async findById(goalId: number): Promise<Goal | null> {
     return this.goalRepo.findOne({
       where: { id: goalId },
-      relations: ['questions'],
+      relations: ['questions', 'children'],
       order: { questions: { order_index: 'ASC' } },
     });
   }

@@ -1,20 +1,45 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Goal, Question } from '../../../shared/entities';
+import { StoragePort } from '../../../shared/storage/domain/storage.port';
 import { GoalService } from '../../goal/application/goal.service';
 import { ScheduleService } from '../../goal/application/schedule.service';
 import { ReportAnswerRepositoryPort } from '../domain/report-answer-repository.port';
 import { AnalyticsEntryDto } from '../dto/question-analytics.dto';
+import { toLocalISO } from '../lib/date';
 
 const NUMERIC_TYPES = new Set(['number', 'rating']);
 const NOT_FILLED_TEXT = 'Не было заполнено';
 
-/** Форматирует Date в 'YYYY-MM-DD' по локальному времени (без UTC-сдвига) */
-function toLocalISO(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export interface QuestionReportItem {
+  questionId: number;
+  question: string;
+  type: string;
+  can_skip: boolean;
+  target_value: string | null;
+  answered: boolean;
+  answer_text: string | null;
+  answer_number: number | null;
+  answer_bool: boolean | null;
+}
+
+export interface GoalReportStatus {
+  goalId: number;
+  date: string;
+  lastUnfilledDate: string | null;
+  questions: QuestionReportItem[];
+  allDone: boolean;
+}
+
+export interface ReportQueueItem {
+  goalId: number;
+  goalName: string;
+  pendingCount: number;
 }
 
 @Injectable()
@@ -23,6 +48,7 @@ export class ReportService {
     private answerRepo: ReportAnswerRepositoryPort,
     private goalService: GoalService,
     private scheduleService: ScheduleService,
+    private storage: StoragePort,
   ) {}
 
   async addAnswer(
@@ -144,6 +170,9 @@ export class ReportService {
     const activeQuestions = (goal.questions || []).filter((q) => q.is_active);
     if (activeQuestions.length === 0) return null;
 
+    // Global goals have no dates/questions; nothing to fill.
+    if (!goal.goal_start || !goal.goal_end) return null;
+
     const start = new Date(goal.goal_start);
     start.setHours(0, 0, 0, 0);
     const today = new Date();
@@ -195,6 +224,174 @@ export class ReportService {
     return null;
   }
 
+  /**
+   * Статус отчёта по цели на конкретную дату: due-вопросы, отмеченные
+   * как answered/unanswered, плюс последняя незаполненная дата и флаг allDone.
+   * Read-only. Owner-check внутри.
+   */
+  async getGoalReportStatus(
+    userId: number,
+    goalId: number,
+    date: string,
+  ): Promise<GoalReportStatus> {
+    const goal = await this.goalService.findById(goalId);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
+
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const dueQuestions = (goal.questions || [])
+      .filter((q) => q.is_active)
+      .filter((q) =>
+        this.scheduleService.isQuestionDueOnDateHistorical(q, targetDate),
+      )
+      .sort((a, b) => a.order_index - b.order_index);
+
+    const dueIds = dueQuestions.map((q) => q.id);
+    const existing =
+      dueIds.length > 0
+        ? await this.answerRepo.findByQuestionsAndDate(dueIds, date)
+        : [];
+    const answerByQuestion = new Map(existing.map((a) => [a.question_id, a]));
+
+    const questions: QuestionReportItem[] = dueQuestions.map((q) => {
+      const answer = answerByQuestion.get(q.id);
+      return {
+        questionId: q.id,
+        question: q.question,
+        type: q.type,
+        can_skip: q.can_skip,
+        target_value: q.target_value,
+        answered: answer !== undefined,
+        answer_text: answer ? answer.answer_text : null,
+        answer_number: answer ? answer.answer_number : null,
+        answer_bool: answer ? answer.answer_bool : null,
+      };
+    });
+
+    const allDone = questions
+      .filter((q) => !q.can_skip)
+      .every((q) => q.answered);
+
+    const lastUnfilledDate = await this.findLastUnfilledDate(goalId);
+
+    return { goalId, date, lastUnfilledDate, questions, allDone };
+  }
+
+  /**
+   * Очередь целей пользователя, для которых на дату есть неотвеченные
+   * due-вопросы. Зеркалит фильтр offerNextGoal, но параметризован датой.
+   * Read-only.
+   */
+  async getReportQueue(
+    userId: number,
+    date: string,
+  ): Promise<ReportQueueItem[]> {
+    const goals = await this.goalService.findActiveByUser(userId);
+
+    const queue: ReportQueueItem[] = [];
+    for (const goal of goals) {
+      const unanswered = await this.getUnansweredQuestions(goal.id, date);
+      if (unanswered.length > 0) {
+        queue.push({
+          goalId: goal.id,
+          goalName: goal.goal_name,
+          pendingCount: unanswered.length,
+        });
+      }
+    }
+
+    return queue;
+  }
+
+  async addPhotoAnswer(
+    userId: number,
+    questionId: number,
+    scheduledDate: string,
+    photo: { buffer: Buffer; mime: string },
+  ): Promise<void> {
+    const question = await this.goalService.findQuestionById(questionId);
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    if (question.type !== 'photo')
+      throw new BadRequestException('Question is not of type photo');
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
+
+    const ext = this.mimeToExt(photo.mime);
+    const key = `goal-reports/${userId}/${questionId}/${scheduledDate}-${randomUUID()}.${ext}`;
+
+    const existing = await this.answerRepo.findByQuestionAndDate(
+      questionId,
+      scheduledDate,
+    );
+
+    await this.storage.upload(key, photo.buffer, photo.mime);
+
+    try {
+      await this.answerRepo.save(userId, questionId, scheduledDate, {
+        answer_text: '',
+        answer_number: null,
+        answer_bool: null,
+        photo_key: key,
+      });
+    } catch (e) {
+      await this.storage.delete(key).catch(() => undefined);
+      throw e;
+    }
+
+    if (existing?.photo_key) {
+      await this.storage.delete(existing.photo_key).catch(() => undefined);
+    }
+  }
+
+  async getPhotoGallery(
+    userId: number,
+    questionId: number,
+    limit: number,
+    offset: number,
+  ): Promise<{ scheduled_date: string; url: string }[]> {
+    const question = await this.goalService.findQuestionById(questionId);
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    if (question.type !== 'photo')
+      throw new BadRequestException('Question is not of type photo');
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== userId) throw new ForbiddenException();
+
+    const rows = await this.answerRepo.findPhotosByQuestion(
+      questionId,
+      limit,
+      offset,
+    );
+
+    return Promise.all(
+      rows.map(async (row) => ({
+        scheduled_date: row.scheduled_date,
+        url: await this.storage.getSignedReadUrl(row.photo_key!, 3600),
+      })),
+    );
+  }
+
+  private mimeToExt(mime: string): string {
+    const map: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+    };
+    const ext = map[mime];
+    if (!ext) throw new BadRequestException('Unsupported image type');
+    return ext;
+  }
+
   async getQuestionAnalytics(
     questionId: number,
     dbUserId: number,
@@ -207,6 +404,11 @@ export class ReportService {
     const goal = await this.goalService.findById(question.goal_id!);
     if (!goal) throw new NotFoundException('Goal not found');
     if (goal.user_id !== dbUserId) throw new ForbiddenException();
+    if (!goal.goal_start || !goal.goal_end) {
+      throw new BadRequestException(
+        `Goal #${goal.id} has no date range for analytics`,
+      );
+    }
 
     // 2. Определяем диапазон дат: от старта цели до min(конец цели, сегодня)
     //    Не показываем будущие даты — по ним ещё нет данных

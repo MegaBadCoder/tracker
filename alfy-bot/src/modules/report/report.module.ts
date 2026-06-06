@@ -1,16 +1,23 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReportAnswer } from '../../shared/entities';
+import { StorageModule } from '../../shared/storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
 import { GoalModule } from '../goal/goal.module';
 import { ReportService } from './application/report.service';
 import { ReportAnswerRepositoryPort } from './domain/report-answer-repository.port';
+import { GoalReportController } from './goal-report.controller';
 import { TypeOrmReportAnswerRepository } from './infrastructure/typeorm-report-answer.repository';
 import { ReportController } from './report.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ReportAnswer]), GoalModule, AuthModule],
-  controllers: [ReportController],
+  imports: [
+    TypeOrmModule.forFeature([ReportAnswer]),
+    GoalModule,
+    AuthModule,
+    StorageModule,
+  ],
+  controllers: [GoalReportController, ReportController],
   providers: [
     {
       provide: ReportAnswerRepositoryPort,

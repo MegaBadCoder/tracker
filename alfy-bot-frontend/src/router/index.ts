@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, START_LOCATION } from 'vue-router'
-import { isAuthenticated } from '../api/tokenStorage'
 import { useNavigationStore } from '@/stores/navigation-store'
+import { isAuthenticated } from '../api/tokenStorage'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,6 +13,7 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('../views/HomeView.vue'),
+          meta: { sectionNav: 'goals' },
         },
         {
           path: 'habits',
@@ -54,9 +55,19 @@ const router = createRouter({
           component: () => import('../views/GoalCreateView.vue'),
         },
         {
+          path: 'goals/report-today',
+          name: 'goalsReportToday',
+          component: () => import('../views/GoalsReportFlowView.vue'),
+        },
+        {
           path: 'goals/:id',
           name: 'goal',
           component: () => import('../views/GoalView.vue'),
+        },
+        {
+          path: 'goals/:id/report',
+          name: 'goalReport',
+          component: () => import('../views/GoalReportView.vue'),
         },
         {
           path: 'questions/:id',
@@ -102,12 +113,14 @@ router.beforeEach((to, from) => {
   }
   if (from === START_LOCATION && to.path === '/') {
     const last = useNavigationStore().lastSection
-    if (last && last !== '/') return { path: last }
+    if (last && last !== '/')
+      return { path: last }
   }
 })
 
 router.afterEach((to) => {
-  if (to.meta.public) return
+  if (to.meta.public)
+    return
   useNavigationStore().rememberSection(to.path)
 })
 
