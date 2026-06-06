@@ -47,10 +47,14 @@ export interface Report {
 export interface Goal {
   id: number
   goal_name: string
-  goal_start: string
-  goal_end: string
+  goal_start: string | null
+  goal_end: string | null
   status: GoalStatus
   createdAt: string
+  is_global: boolean
+  parent_goal_id: number | null
+  children?: Goal[]
+  children_count?: number
   questions: Question[]
 }
 

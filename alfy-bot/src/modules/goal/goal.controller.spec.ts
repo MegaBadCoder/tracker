@@ -1,5 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
 import { Goal, Question } from '../../shared/entities';
 import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { GoalService } from './application/goal.service';
@@ -35,6 +37,8 @@ describe('GoalController', () => {
     findActiveByUser: jest.Mock;
     findByStatus: jest.Mock;
     findAllByUser: jest.Mock;
+    findChildren: jest.Mock;
+    assertValidParent: jest.Mock;
     addQuestionsWithSchedules: jest.Mock;
     addQuestions: jest.Mock;
     update: jest.Mock;
@@ -51,6 +55,8 @@ describe('GoalController', () => {
       findActiveByUser: jest.fn(),
       findByStatus: jest.fn(),
       findAllByUser: jest.fn(),
+      findChildren: jest.fn(),
+      assertValidParent: jest.fn(),
       addQuestionsWithSchedules: jest.fn(),
       addQuestions: jest.fn(),
       update: jest.fn(),
@@ -115,6 +121,119 @@ describe('GoalController', () => {
       );
       expect(goalService.create).not.toHaveBeenCalled();
     });
+
+    it('создаёт global-цель без дат (даты не валидируются)', async () => {
+      const userId = 42;
+      const dto: CreateGoalDto = {
+        goal_name: 'Финансы',
+        is_global: true,
+      };
+      const created = makeGoal({
+        id: 5,
+        user_id: userId,
+        goal_name: 'Финансы',
+        is_global: true,
+        goal_start: null,
+        goal_end: null,
+      });
+      goalService.create.mockResolvedValue(created);
+
+      const req = { user: { sub: userId } } as AuthRequestLike;
+      const result = await controller.create(req as never, dto);
+
+      expect(goalService.create).toHaveBeenCalledWith(userId, dto);
+      expect(result).toEqual({ ...created, questions: [] });
+    });
+
+    it('DTO-валидация: обычная цель без дат не проходит @ValidateIf', async () => {
+      const dto = plainToInstance(CreateGoalDto, { goal_name: 'X' });
+      const errors = await validate(dto);
+      const props = errors.map((e) => e.property);
+
+      expect(props).toContain('goal_start');
+      expect(props).toContain('goal_end');
+    });
+
+    it('DTO-валидация: global-цель без дат проходит', async () => {
+      const dto = plainToInstance(CreateGoalDto, {
+        goal_name: 'Финансы',
+        is_global: true,
+      });
+      const errors = await validate(dto);
+      const props = errors.map((e) => e.property);
+
+      expect(props).not.toContain('goal_start');
+      expect(props).not.toContain('goal_end');
+    });
+
+    it('DTO-валидация: is_global и parent_goal_id объявлены (whitelist не вырежет)', async () => {
+      const dto = plainToInstance(CreateGoalDto, {
+        goal_name: 'Подцель',
+        goal_start: '2026-02-01',
+        goal_end: '2026-05-01',
+        parent_goal_id: 3,
+        is_global: false,
+      });
+      const errors = await validate(dto, { whitelist: true });
+
+      expect(errors).toHaveLength(0);
+      expect(dto.parent_goal_id).toBe(3);
+      expect(dto.is_global).toBe(false);
+    });
+
+    it('бросает BadRequestException, если parent не global (assertValidParent throw)', async () => {
+      const dto: CreateGoalDto = {
+        goal_name: 'Подцель',
+        goal_start: '2026-02-01',
+        goal_end: '2026-05-01',
+        parent_goal_id: 9,
+      };
+      goalService.assertValidParent.mockRejectedValue(
+        new BadRequestException('not a global goal'),
+      );
+      const req = { user: { sub: 42 } } as AuthRequestLike;
+
+      await expect(controller.create(req as never, dto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(goalService.assertValidParent).toHaveBeenCalledWith(42, 9);
+      expect(goalService.create).not.toHaveBeenCalled();
+    });
+
+    it('валидный parent → вызывает assertValidParent и create', async () => {
+      const userId = 42;
+      const dto: CreateGoalDto = {
+        goal_name: 'Подцель',
+        goal_start: '2026-02-01',
+        goal_end: '2026-05-01',
+        parent_goal_id: 9,
+      };
+      goalService.assertValidParent.mockResolvedValue(undefined);
+      const created = makeGoal({ id: 11, user_id: userId, parent_goal_id: 9 });
+      goalService.create.mockResolvedValue(created);
+
+      const req = { user: { sub: userId } } as AuthRequestLike;
+      const result = await controller.create(req as never, dto);
+
+      expect(goalService.assertValidParent).toHaveBeenCalledWith(userId, 9);
+      expect(goalService.create).toHaveBeenCalledWith(userId, dto);
+      expect(result).toEqual({ ...created, questions: [] });
+    });
+
+    it('бросает BadRequestException для global-цели с parent_goal_id', async () => {
+      const dto: CreateGoalDto = {
+        goal_name: 'Финансы',
+        is_global: true,
+        parent_goal_id: 9,
+      };
+      const req = { user: { sub: 42 } } as AuthRequestLike;
+
+      await expect(controller.create(req as never, dto)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(goalService.assertValidParent).not.toHaveBeenCalled();
+      expect(goalService.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('POST /goals/:id/questions (addQuestions)', () => {
@@ -150,6 +269,87 @@ describe('GoalController', () => {
         dto.questions,
       );
       expect(result).toBe(savedQuestions);
+    });
+
+    it('бросает BadRequestException при добавлении вопросов к global-цели', async () => {
+      const userId = 42;
+      const goalId = 7;
+      goalService.findById.mockResolvedValue(
+        makeGoal({ id: goalId, user_id: userId, is_global: true }),
+      );
+
+      const dto: AddQuestionsDto = {
+        questions: [
+          {
+            question: 'Q',
+            type: 'number',
+            canSkip: false,
+            scheduleType: 'daily',
+          },
+        ],
+      };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      await expect(
+        controller.addQuestions(req as never, goalId, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(goalService.addQuestionsWithSchedules).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /goals (findAll) scope', () => {
+    it('пробрасывает scope в findAllByUser', async () => {
+      goalService.findAllByUser.mockResolvedValue([]);
+      const req = { user: { sub: 42 } } as AuthRequestLike;
+
+      await controller.findAll(req as never, undefined, 'global');
+
+      expect(goalService.findAllByUser).toHaveBeenCalledWith(42, 'global');
+    });
+
+    it('пробрасывает scope в findByStatus при наличии status', async () => {
+      goalService.findByStatus.mockResolvedValue([]);
+      const req = { user: { sub: 42 } } as AuthRequestLike;
+
+      await controller.findAll(req as never, 'active', 'regular');
+
+      expect(goalService.findByStatus).toHaveBeenCalledWith(
+        42,
+        'active',
+        'regular',
+      );
+    });
+  });
+
+  describe('GET /goals/:id (findOne) children embed', () => {
+    it('для global-цели догружает детей через findChildren', async () => {
+      const userId = 42;
+      const goalId = 3;
+      const goal = makeGoal({ id: goalId, user_id: userId, is_global: true });
+      goalService.findById.mockResolvedValue(goal);
+      const children = [
+        makeGoal({ id: 4, user_id: userId, parent_goal_id: 3 }),
+      ];
+      goalService.findChildren.mockResolvedValue(children);
+
+      const req = { user: { sub: userId } } as AuthRequestLike;
+      const result = await controller.findOne(req as never, goalId);
+
+      expect(goalService.findChildren).toHaveBeenCalledWith(goalId);
+      expect((result as Goal).children).toBe(children);
+    });
+
+    it('для обычной цели не вызывает findChildren', async () => {
+      const userId = 42;
+      const goalId = 3;
+      goalService.findById.mockResolvedValue(
+        makeGoal({ id: goalId, user_id: userId, is_global: false }),
+      );
+
+      const req = { user: { sub: userId } } as AuthRequestLike;
+      await controller.findOne(req as never, goalId);
+
+      expect(goalService.findChildren).not.toHaveBeenCalled();
     });
   });
 
@@ -204,6 +404,112 @@ describe('GoalController', () => {
         goalId,
         'archived',
       );
+      expect(result).toBe(updated);
+    });
+
+    it('валидный parent_goal_id → assertValidParent + update', async () => {
+      const userId = 42;
+      const goalId = 7;
+      const owned = makeGoal({ id: goalId, user_id: userId, is_global: false });
+      const updated = makeGoal({
+        id: goalId,
+        user_id: userId,
+        parent_goal_id: 9,
+      });
+      goalService.findById
+        .mockResolvedValueOnce(owned)
+        .mockResolvedValueOnce(updated);
+      goalService.assertValidParent.mockResolvedValue(undefined);
+      goalService.update.mockResolvedValue(updated);
+
+      const dto: UpdateGoalDto = { parent_goal_id: 9 };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      const result = await controller.update(req as never, goalId, dto);
+
+      expect(goalService.assertValidParent).toHaveBeenCalledWith(userId, 9);
+      expect(goalService.update).toHaveBeenCalledWith(goalId, {
+        parent_goal_id: 9,
+      });
+      expect(result).toBe(updated);
+    });
+
+    it('parent_goal_id у global-цели → BadRequestException', async () => {
+      const userId = 42;
+      const goalId = 7;
+      goalService.findById.mockResolvedValue(
+        makeGoal({ id: goalId, user_id: userId, is_global: true }),
+      );
+      goalService.assertValidParent.mockResolvedValue(undefined);
+
+      const dto: UpdateGoalDto = { parent_goal_id: 9 };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      await expect(
+        controller.update(req as never, goalId, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(goalService.update).not.toHaveBeenCalled();
+    });
+
+    it('невалидный parent_goal_id → BadRequestException (assertValidParent throw)', async () => {
+      const userId = 42;
+      const goalId = 7;
+      goalService.findById.mockResolvedValue(
+        makeGoal({ id: goalId, user_id: userId, is_global: false }),
+      );
+      goalService.assertValidParent.mockRejectedValue(
+        new BadRequestException('not a global goal'),
+      );
+
+      const dto: UpdateGoalDto = { parent_goal_id: 9 };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      await expect(
+        controller.update(req as never, goalId, dto),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(goalService.update).not.toHaveBeenCalled();
+    });
+
+    it('DTO-валидация: UpdateGoalDto принимает parent_goal_id null и int, отклоняет строку', async () => {
+      const okNull = await validate(
+        plainToInstance(UpdateGoalDto, { parent_goal_id: null }),
+      );
+      expect(okNull).toHaveLength(0);
+
+      const okInt = await validate(
+        plainToInstance(UpdateGoalDto, { parent_goal_id: 5 }),
+      );
+      expect(okInt).toHaveLength(0);
+
+      const badStr = await validate(
+        plainToInstance(UpdateGoalDto, { parent_goal_id: 'x' }),
+      );
+      expect(badStr.map((e) => e.property)).toContain('parent_goal_id');
+    });
+
+    it('parent_goal_id === null → отвязывает (update с null)', async () => {
+      const userId = 42;
+      const goalId = 7;
+      const owned = makeGoal({ id: goalId, user_id: userId, is_global: false });
+      const updated = makeGoal({
+        id: goalId,
+        user_id: userId,
+        parent_goal_id: null,
+      });
+      goalService.findById
+        .mockResolvedValueOnce(owned)
+        .mockResolvedValueOnce(updated);
+      goalService.update.mockResolvedValue(updated);
+
+      const dto: UpdateGoalDto = { parent_goal_id: null };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      const result = await controller.update(req as never, goalId, dto);
+
+      expect(goalService.assertValidParent).not.toHaveBeenCalled();
+      expect(goalService.update).toHaveBeenCalledWith(goalId, {
+        parent_goal_id: null,
+      });
       expect(result).toBe(updated);
     });
   });

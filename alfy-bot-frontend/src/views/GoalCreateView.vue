@@ -29,8 +29,10 @@ import QuestionEditForm from '@/features/goals/ui/QuestionEditForm.vue'
 import CanSkipStep from '@/features/goals/ui/steps/CanSkipStep.vue'
 import CreateProgressStep from '@/features/goals/ui/steps/CreateProgressStep.vue'
 import EndDateStep from '@/features/goals/ui/steps/EndDateStep.vue'
+import GlobalDeadlineStep from '@/features/goals/ui/steps/GlobalDeadlineStep.vue'
 import IntervalStep from '@/features/goals/ui/steps/IntervalStep.vue'
 import NameStep from '@/features/goals/ui/steps/NameStep.vue'
+import ParentGoalStep from '@/features/goals/ui/steps/ParentGoalStep.vue'
 import PointAStep from '@/features/goals/ui/steps/PointAStep.vue'
 import QuestionsOfferStep from '@/features/goals/ui/steps/QuestionsOfferStep.vue'
 import QuestionTextStep from '@/features/goals/ui/steps/QuestionTextStep.vue'
@@ -55,6 +57,8 @@ const stepMap: Record<string, Component> = markRaw({
   start: StartDateStep,
   end: EndDateStep,
   point_a: PointAStep,
+  parent: ParentGoalStep,
+  global_deadline: GlobalDeadlineStep,
   creating: CreateProgressStep,
   questions_offer: QuestionsOfferStep,
   q_type: QuestionTypeStep,
@@ -78,7 +82,8 @@ watch(
       catch (e) {
         error.value
           = e instanceof Error ? e.message : 'Не удалось создать цель'
-        // composable перевёл шаг на 'creating' до запроса; откатываем на 'point_a'.
+        // composable перевёл шаг на 'creating' до запроса; back() откатывает на
+        // предыдущий шаг (parent для simple, global_deadline для global).
         go.back()
       }
     }
@@ -129,6 +134,8 @@ const stepListeners = {
   selectStartPreset: go.selectStartPreset,
   selectEndPreset: go.selectEndPreset,
   setPointA: go.setPointA,
+  selectParent: go.selectParent,
+  selectDeadline: go.selectDeadline,
   offerQuestions: go.offerQuestions,
   selectQuestionType: go.selectQuestionType,
   submitQuestionText: go.submitQuestionText,

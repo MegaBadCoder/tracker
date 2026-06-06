@@ -13,5 +13,5 @@ export interface GoalTypeOption {
 export const GOAL_TYPE_OPTIONS: GoalTypeOption[] = [
   { type: 'simple', label: 'Простая цель', enabled: true },
   { type: 'smart', label: 'SMART цель', enabled: false },
-  { type: 'global', label: 'Global цель', enabled: false },
+  { type: 'global', label: 'Global цель', enabled: true },
 ]
