@@ -7,9 +7,9 @@
       isOverdue
         ? OVERDUE_EVENT_CLASSES
         : completed
-          ? 'bg-emerald-500/25 border-emerald-500/40 text-white backdrop-blur-sm'
+          ? 'bg-emerald-100 border-emerald-300 text-emerald-900 dark:bg-emerald-500/25 dark:border-emerald-500/40 dark:text-white dark:backdrop-blur-sm'
           : isVirtual
-            ? 'border-dashed border-border/40 bg-muted/60 text-white backdrop-blur-sm'
+            ? 'border-dashed border-border bg-muted/40 text-muted-foreground dark:border-border/40 dark:bg-muted/60 dark:text-white dark:backdrop-blur-sm'
             : priorityClasses,
     ]"
     :style="blockStyle"
@@ -38,7 +38,7 @@
     <div
       v-if="event.resizable && !isOverdue"
       data-testid="resize-handle"
-      class="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-white/20 transition-colors"
+      class="absolute bottom-0 left-0 right-0 h-1.5 cursor-ns-resize hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
       @pointerdown.stop="onResizeDown"
     />
   </div>
@@ -104,12 +104,13 @@ function onResizeDown(e: PointerEvent) {
 
 <style scoped>
 .calendar-checkbox :deep(.round-checkbox__icon div) {
-  border-color: rgba(255, 255, 255, 0.6);
+  border-color: currentColor;
+  opacity: 0.6;
   width: 1rem;
   height: 1rem;
 }
 
 .calendar-checkbox:hover :deep(.round-checkbox__icon div) {
-  border-color: #fff;
+  opacity: 1;
 }
 </style>

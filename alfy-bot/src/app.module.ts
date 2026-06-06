@@ -8,6 +8,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { BotModule } from './modules/bot/bot.module';
+import { isTelegramEnabled } from './shared/config/telegram-enabled';
 import { GoalModule } from './modules/goal/goal.module';
 import { QuestionModule } from './modules/question/question.module';
 import { ReportModule } from './modules/report/report.module';
@@ -35,6 +36,16 @@ import { QuestionMigrationService } from './shared/database/question-migration.s
 import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
 import { SharedModule } from './shared/shared.module';
 
+const telegramImports = isTelegramEnabled()
+  ? [
+      TelegrafModule.forRoot({
+        token: process.env.BOT_TOKEN || '',
+        middlewares: [session()],
+      }),
+      BotModule,
+    ]
+  : [];
+
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -59,10 +70,7 @@ import { SharedModule } from './shared/shared.module';
       ],
       synchronize: true,
     }),
-    TelegrafModule.forRoot({
-      token: process.env.BOT_TOKEN || '',
-      middlewares: [session()],
-    }),
+    ...telegramImports,
     SharedModule,
     UserModule,
     AuthModule,
@@ -72,7 +80,6 @@ import { SharedModule } from './shared/shared.module';
     TaskModule,
     ProjectModule,
     NotificationModule,
-    BotModule,
   ],
   controllers: [AppController],
   providers: [

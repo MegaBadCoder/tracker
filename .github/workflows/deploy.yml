@@ -79,7 +79,7 @@ jobs:
               done <<< "$block"
             }
             {
-              printf 'BOT_TOKEN=%s\nJWT_SECRET=%s\nPORT=3002\nNODE_ENV=production\nREGISTRY_URL=%s\nWEBAPP_URL=%s\nBOT_USERNAME=%s\n' \
+              printf 'BOT_TOKEN=%s\nJWT_SECRET=%s\nPORT=3002\nNODE_ENV=production\nENABLE_TELEGRAM=false\nREGISTRY_URL=%s\nWEBAPP_URL=%s\nBOT_USERNAME=%s\n' \
                 "$BOT_TOKEN" "$JWT_SECRET" "$REGISTRY_URL" "$WEBAPP_URL" "$BOT_USERNAME"
               append_env_block "$SMTP_ENV"
               append_env_block "$S3_ENV"

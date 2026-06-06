@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, provide, computed, defineAsyncComponent, type Component } from 'vue'
+import { ref, provide, computed, watch, defineAsyncComponent, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import type { NavLink } from '@/types/navigation'
 import { tasksNavLinks } from '@/router/tasks-nav'
+import { habitsNavLinks } from '@/router/habits-nav'
 
 const ProjectTreeNav = defineAsyncComponent(() =>
   import('@/features/projects/ui/ProjectTreeNav.vue'),
@@ -14,6 +15,7 @@ const sidebarOpen = ref(false)
 
 const sectionNavRegistry: Record<string, NavLink[]> = {
   tasks: tasksNavLinks,
+  habits: habitsNavLinks,
 }
 
 const sectionExtraRegistry: Record<string, Component> = {
@@ -37,6 +39,10 @@ function openSidebar() {
 function closeSidebar() {
   sidebarOpen.value = false
 }
+
+// На мобильной версии sidebar — оверлей; после перехода по разделу его надо свернуть.
+// На десктопе панель видна всегда (CSS), поэтому вызов безвреден.
+watch(() => route.path, () => closeSidebar())
 
 provide('openSidebar', openSidebar)
 </script>

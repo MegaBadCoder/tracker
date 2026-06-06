@@ -35,7 +35,13 @@ const { isHovered: isInboxHovered } = useDropTarget({
       ]"
     >
       <component :is="link.icon" class="h-4 w-4" />
-      {{ link.label }}
+      <span class="flex-1">{{ link.label }}</span>
+      <span
+        v-if="link.badge"
+        class="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+      >
+        {{ link.badge }}
+      </span>
     </RouterLink>
   </nav>
 </template>
