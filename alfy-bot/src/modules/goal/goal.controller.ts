@@ -53,11 +53,19 @@ export class GoalController {
     description:
       'Фильтр по статусу. Без параметра — все цели (кроме удалённых)',
   })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: ['global', 'regular', 'all'],
+    description:
+      'Фильтр по типу цели: global — только глобальные, regular — только обычные, all/без параметра — все',
+  })
   @ApiOkResponse({ type: [GoalDto] })
   @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
   async findAll(
     @Request() req: AuthRequest,
     @Query('status') status?: string,
+    @Query('scope') scope?: 'global' | 'regular' | 'all',
   ): Promise<GoalDto[]> {
     const userId = req.user.sub;
 
@@ -65,10 +73,11 @@ export class GoalController {
       return this.goalService.findByStatus(
         userId,
         status as GoalStatus,
+        scope,
       ) as Promise<GoalDto[]>;
     }
 
-    return this.goalService.findAllByUser(userId) as Promise<GoalDto[]>;
+    return this.goalService.findAllByUser(userId, scope) as Promise<GoalDto[]>;
   }
 
   @Get(':id')
@@ -86,6 +95,10 @@ export class GoalController {
       throw new NotFoundException(`Goal #${id} not found`);
     }
 
+    if (goal.is_global) {
+      goal.children = await this.goalService.findChildren(goal.id);
+    }
+
     return goal as GoalDto;
   }
 
@@ -98,15 +111,30 @@ export class GoalController {
     @Request() req: AuthRequest,
     @Body() dto: CreateGoalDto,
   ): Promise<GoalDto> {
-    const startMs = Date.parse(dto.goal_start);
-    const endMs = Date.parse(dto.goal_end);
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    if (dto.is_global && dto.parent_goal_id) {
       throw new BadRequestException(
-        'goal_start или goal_end не является валидной датой',
+        'global goal cannot have a parent (parent_goal_id)',
       );
     }
-    if (endMs <= startMs) {
-      throw new BadRequestException('goal_end должен быть позже goal_start');
+
+    if (dto.goal_start && dto.goal_end) {
+      const startMs = Date.parse(dto.goal_start);
+      const endMs = Date.parse(dto.goal_end);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        throw new BadRequestException(
+          'goal_start или goal_end не является валидной датой',
+        );
+      }
+      if (endMs <= startMs) {
+        throw new BadRequestException('goal_end должен быть позже goal_start');
+      }
+    }
+
+    if (dto.parent_goal_id) {
+      await this.goalService.assertValidParent(
+        req.user.sub,
+        dto.parent_goal_id,
+      );
     }
 
     const created = await this.goalService.create(req.user.sub, dto);
@@ -124,7 +152,11 @@ export class GoalController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AddQuestionsDto,
   ): Promise<QuestionDto[]> {
-    await this.assertOwnedGoal(req, id);
+    const goal = await this.assertOwnedGoal(req, id);
+
+    if (goal.is_global) {
+      throw new BadRequestException('global goal cannot have questions');
+    }
 
     for (const q of dto.questions) {
       if (q.scheduleType === 'weekly_days') {
@@ -160,13 +192,29 @@ export class GoalController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateGoalDto,
   ): Promise<GoalDto> {
-    await this.assertOwnedGoal(req, id);
+    const goal = await this.assertOwnedGoal(req, id);
 
     if (dto.status) {
       await this.goalService.updateGoalStatus(id, dto.status);
     }
     if (dto.goal_name) {
       await this.goalService.update(id, { goal_name: dto.goal_name });
+    }
+    if ('parent_goal_id' in dto) {
+      if (dto.parent_goal_id !== null && dto.parent_goal_id !== undefined) {
+        if (goal.is_global) {
+          throw new BadRequestException('global goal cannot have a parent');
+        }
+        await this.goalService.assertValidParent(
+          req.user.sub,
+          dto.parent_goal_id,
+        );
+        await this.goalService.update(id, {
+          parent_goal_id: dto.parent_goal_id,
+        });
+      } else {
+        await this.goalService.update(id, { parent_goal_id: null });
+      }
     }
 
     const updated = await this.goalService.findById(id);

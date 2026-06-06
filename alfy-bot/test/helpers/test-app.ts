@@ -26,6 +26,7 @@ export interface TestContext {
 export async function createTestApp(): Promise<TestContext> {
   process.env.JWT_SECRET = 'test-secret';
   process.env.BOT_TOKEN = 'test-bot-token';
+  process.env.ENABLE_TELEGRAM = 'false';
 
   const testDataSource = new DataSource({
     type: 'sqlite',

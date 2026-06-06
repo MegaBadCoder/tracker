@@ -264,7 +264,9 @@ export class ListGoalsScene {
     displayGoals.forEach((goal, index) => {
       message += `${index + 1}. ${goal.goal_name}\n`;
       message += '\n';
-      message += `📅 ${formatDate(new Date(goal.goal_start))} — ${formatDate(new Date(goal.goal_end))}\n`;
+      if (goal.goal_start && goal.goal_end) {
+        message += `📅 ${formatDate(new Date(goal.goal_start))} — ${formatDate(new Date(goal.goal_end))}\n`;
+      }
       if (index < displayGoals.length - 1) {
         message += '\n';
       }
@@ -317,10 +319,14 @@ export class ListGoalsScene {
       reportStatusText = '\n✅ Отчет на сегодня заполнен';
     }
 
+    const periodLine =
+      goal.goal_start && goal.goal_end
+        ? `📅 Период: ${formatDate(new Date(goal.goal_start))} - ${formatDate(new Date(goal.goal_end))}\n`
+        : '';
+
     const message = `📋 ${goal.goal_name}
 
-📅 Период: ${formatDate(new Date(goal.goal_start))} - ${formatDate(new Date(goal.goal_end))}
-📊 Статус: ${statusLabel}
+${periodLine}📊 Статус: ${statusLabel}
 ❓ Вопросов для отчетов: ${goal.questions?.length || 0}${reportStatusText}
 
 Создана: ${formatDate(goal.createdAt)}`.trim();

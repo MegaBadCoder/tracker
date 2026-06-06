@@ -105,7 +105,7 @@ export class EditGoalScene {
 
     ctx.session.goalId = goalId;
     ctx.session.currentStep = 'name';
-    ctx.session.originalGoalEnd = goal.goal_end;
+    ctx.session.originalGoalEnd = goal.goal_end ?? undefined;
 
     await ctx.reply(
       `Редактирование цели: ${goal.goal_name.slice(0, 100)}\n\n📝 Введи новое описание цели:`,

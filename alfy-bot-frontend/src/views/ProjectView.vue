@@ -154,7 +154,7 @@ watch(projectId, (id) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-[100dvh]">
+  <div :class="['flex flex-col', isBoardMode && 'h-[100dvh]']">
     <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" :fluid="isBoardMode">
       <template #right>
         <ViewModeToggle

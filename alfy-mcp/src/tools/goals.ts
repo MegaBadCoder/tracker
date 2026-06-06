@@ -10,14 +10,16 @@ export function registerGoalTools(server: McpServer, client: AlfyRestClient): vo
   server.registerTool(
     'list_goals',
     {
-      description: 'List goals, optionally filtered by status',
+      description: 'List goals, optionally filtered by status or scope',
       inputSchema: {
         status: z.enum(['active', 'completed', 'archived']).optional().describe('Filter by goal status'),
+        scope: z.enum(['global', 'regular', 'all']).optional().describe('Filter by goal scope'),
       },
     },
-    async ({ status }) => {
+    async ({ status, scope }) => {
       const params: Record<string, unknown> = {};
       if (status !== undefined) params['status'] = status;
+      if (scope !== undefined) params['scope'] = scope;
       const goals = await client.get('/goals', params);
       return toText(goals);
     },
@@ -43,12 +45,19 @@ export function registerGoalTools(server: McpServer, client: AlfyRestClient): vo
       description: 'Create a new goal',
       inputSchema: {
         goal_name: z.string().min(1).max(200).describe('Name of the goal'),
-        goal_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Start date (YYYY-MM-DD)'),
-        goal_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('End date (YYYY-MM-DD)'),
+        goal_start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Start date (YYYY-MM-DD); optional for global goals'),
+        goal_end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('End date (YYYY-MM-DD); optional for global goals'),
+        is_global: z.boolean().optional().describe('Whether the goal is global (no date range required)'),
+        parent_goal_id: z.number().int().positive().optional().describe('Parent goal ID to link under'),
       },
     },
-    async ({ goal_name, goal_start, goal_end }) => {
-      const created = await client.post('/goals', { goal_name, goal_start, goal_end });
+    async ({ goal_name, goal_start, goal_end, is_global, parent_goal_id }) => {
+      const body: Record<string, unknown> = { goal_name };
+      if (goal_start !== undefined) body['goal_start'] = goal_start;
+      if (goal_end !== undefined) body['goal_end'] = goal_end;
+      if (is_global !== undefined) body['is_global'] = is_global;
+      if (parent_goal_id !== undefined) body['parent_goal_id'] = parent_goal_id;
+      const created = await client.post('/goals', body);
       return toText(created);
     },
   );
@@ -79,17 +88,19 @@ export function registerGoalTools(server: McpServer, client: AlfyRestClient): vo
   server.registerTool(
     'update_goal',
     {
-      description: 'Update a goal name or status',
+      description: 'Update a goal name, status, or parent link',
       inputSchema: {
         id: z.number().int().positive().describe('Goal ID'),
         goal_name: z.string().min(1).max(200).optional().describe('New goal name'),
         status: z.enum(['active', 'completed', 'archived', 'deleted']).optional().describe('New status'),
+        parent_goal_id: z.number().int().positive().nullable().optional().describe('Parent goal ID to link under, or null to unlink'),
       },
     },
-    async ({ id, goal_name, status }) => {
+    async ({ id, goal_name, status, parent_goal_id }) => {
       const body: Record<string, unknown> = {};
       if (goal_name !== undefined) body['goal_name'] = goal_name;
       if (status !== undefined) body['status'] = status;
+      if (parent_goal_id !== undefined) body['parent_goal_id'] = parent_goal_id;
       const updated = await client.patch(`/goals/${id}`, body);
       return toText(updated);
     },

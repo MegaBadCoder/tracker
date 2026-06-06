@@ -14,11 +14,19 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('../views/HomeView.vue'),
+          meta: { sectionNav: 'goals' },
         },
         {
           path: 'habits',
           name: 'habits',
           component: () => import('../views/HabitsView.vue'),
+          meta: { sectionNav: 'habits' },
+        },
+        {
+          path: 'habits/atomic',
+          name: 'habits-atomic',
+          component: () => import('../views/AtomicHabitsView.vue'),
+          meta: { sectionNav: 'habits' },
         },
         {
           path: 'tasks',
