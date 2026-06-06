@@ -34,7 +34,7 @@ const notificationProviders = isTelegramEnabled()
       { provide: NotificationPort, useClass: CompositeNotificationAdapter },
       TelegramNotificationAdapter,
     ]
-  : [{ provide: NotificationPort, useClass: WebPushNotificationAdapter }];
+  : [{ provide: NotificationPort, useExisting: WebPushNotificationAdapter }];
 
 @Module({
   imports: [
