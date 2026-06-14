@@ -3,7 +3,6 @@ import type { DateValue } from '@internationalized/date'
 import type { FillStatusEntry } from '@/api/reports'
 import type { QuestionType } from '@/types'
 import { getLocalTimeZone, parseDate, today } from '@internationalized/date'
-import { Check } from 'lucide-vue-next'
 import { CalendarCellTrigger, CalendarRoot } from 'reka-ui'
 import { computed, onMounted, ref } from 'vue'
 import { fetchFillStatus, submitAnswer, submitPhotoAnswer } from '@/api/reports'
@@ -84,9 +83,9 @@ function cellClass(date: DateValue): string {
   if (iso === selectedIso.value)
     return '' // дефолтная data-[selected] подсветка
   if (filledSet.value.has(iso))
-    return 'bg-primary/15 text-primary font-medium'
+    return 'bg-green-500/15 text-green-600 font-medium hover:bg-green-500/15 dark:text-green-400'
   if (unfilledSet.value.has(iso))
-    return 'ring-1 ring-inset ring-primary/50 text-foreground font-medium'
+    return 'bg-red-500/15 text-red-600 font-medium hover:bg-red-500/20 dark:text-red-400'
   return 'text-muted-foreground/50'
 }
 
@@ -252,10 +251,6 @@ onMounted(async () => {
                     )"
                   >
                     <span>{{ weekDate.day }}</span>
-                    <Check
-                      v-if="filledSet.has(weekDate.toString()) && weekDate.toString() !== selectedIso"
-                      class="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-2.5 w-2.5"
-                    />
                   </CalendarCellTrigger>
                 </CalendarCell>
               </CalendarGridRow>
@@ -266,10 +261,10 @@ onMounted(async () => {
 
       <div class="flex items-center gap-3 text-xs text-muted-foreground">
         <span class="inline-flex items-center gap-1">
-          <span class="h-2.5 w-2.5 rounded-full ring-1 ring-inset ring-primary/50" /> незаполнено
+          <span class="h-2.5 w-2.5 rounded-full bg-red-500/70" /> незаполнено
         </span>
         <span class="inline-flex items-center gap-1">
-          <Check class="h-3 w-3 text-primary" /> заполнено
+          <span class="h-2.5 w-2.5 rounded-full bg-green-500/70" /> заполнено
         </span>
       </div>
 
