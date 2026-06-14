@@ -45,4 +45,19 @@ export class ReportController {
   ): Promise<AnalyticsEntryDto[]> {
     return this.reportService.getQuestionAnalytics(questionId, req.user.sub);
   }
+
+  @Get(':questionId/unfilled-dates')
+  @ApiOperation({
+    summary: 'Due-даты без ответа для бэкфилла (не более 90, newest-first)',
+  })
+  @ApiOkResponse({ type: [String] })
+  @ApiNotFoundResponse({ description: 'Вопрос или цель не найдены' })
+  @ApiForbiddenResponse({ description: 'Вопрос не принадлежит пользователю' })
+  @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
+  getUnfilledDates(
+    @Request() req: AuthRequest,
+    @Param('questionId', ParseIntPipe) questionId: number,
+  ): Promise<string[]> {
+    return this.reportService.getUnfilledDates(questionId, req.user.sub);
+  }
 }

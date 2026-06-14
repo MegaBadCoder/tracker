@@ -68,6 +68,11 @@ export async function submitAnswer(questionId: number, scheduledDate: string, an
   await api.post(`/questions/${questionId}/answers`, { scheduled_date: scheduledDate, answer })
 }
 
+export async function fetchUnfilledDates(questionId: number): Promise<string[]> {
+  const { data } = await api.get<string[]>(`/questions/${questionId}/unfilled-dates`)
+  return data
+}
+
 export async function submitPhotoAnswer(questionId: number, scheduledDate: string, file: File): Promise<void> {
   const form = new FormData()
   form.append('photo', file)
