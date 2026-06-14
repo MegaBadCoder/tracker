@@ -19,6 +19,7 @@ import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { ReportService } from './application/report.service';
 import { AnalyticsEntryDto } from './dto/question-analytics.dto';
+import { FillStatusEntryDto } from './dto/fill-status.dto';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -46,18 +47,18 @@ export class ReportController {
     return this.reportService.getQuestionAnalytics(questionId, req.user.sub);
   }
 
-  @Get(':questionId/unfilled-dates')
+  @Get(':questionId/fill-status')
   @ApiOperation({
-    summary: 'Due-даты без ответа для бэкфилла (не более 90, newest-first)',
+    summary: 'Статус заполнения по due-дням для календаря бэкфилла',
   })
-  @ApiOkResponse({ type: [String] })
+  @ApiOkResponse({ type: [FillStatusEntryDto] })
   @ApiNotFoundResponse({ description: 'Вопрос или цель не найдены' })
   @ApiForbiddenResponse({ description: 'Вопрос не принадлежит пользователю' })
   @ApiUnauthorizedResponse({ description: 'Невалидный или отсутствующий JWT' })
-  getUnfilledDates(
+  getFillStatus(
     @Request() req: AuthRequest,
     @Param('questionId', ParseIntPipe) questionId: number,
-  ): Promise<string[]> {
-    return this.reportService.getUnfilledDates(questionId, req.user.sub);
+  ): Promise<FillStatusEntryDto[]> {
+    return this.reportService.getFillStatus(questionId, req.user.sub);
   }
 }

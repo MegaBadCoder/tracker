@@ -15,7 +15,6 @@ import { toLocalISO } from '../lib/date';
 
 const NUMERIC_TYPES = new Set(['number', 'rating']);
 const NOT_FILLED_TEXT = 'Не было заполнено';
-const MAX_BACKFILL_DAYS = 90;
 
 export interface QuestionReportItem {
   questionId: number;
@@ -488,10 +487,17 @@ export class ReportService {
     return result;
   }
 
-  async getUnfilledDates(
+  /**
+   * Статус заполнения по всем due-дням вопроса в диапазоне
+   * [goal_start, min(goal_end, today)]. Для каждого due-дня — filled (есть
+   * строка в report_answers) или нет. Не-due дни в результат не входят (фронт
+   * рендерит их приглушённо). Type-agnostic: photo-ответ = строка → filled.
+   * Read-only, owner-check внутри. Цель без диапазона дат → [].
+   */
+  async getFillStatus(
     questionId: number,
     dbUserId: number,
-  ): Promise<string[]> {
+  ): Promise<{ date: string; filled: boolean }[]> {
     // 1. Owner-check: вопрос → цель → user_id
     const question = await this.goalService.findQuestionById(questionId);
     if (!question)
@@ -522,7 +528,7 @@ export class ReportService {
     );
     const answerByDate = new Map(answers.map((a) => [a.scheduled_date, a]));
 
-    // 5. Итерация день за днём: собираем due-даты без ответа
+    // 5. Итерация день за днём: для каждой due-даты — filled или нет
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
@@ -532,7 +538,7 @@ export class ReportService {
       (a.effective_from ?? '').localeCompare(b.effective_from ?? ''),
     );
 
-    const unfilled: string[] = [];
+    const result: { date: string; filled: boolean }[] = [];
     const cursor = new Date(start);
 
     while (cursor <= end) {
@@ -551,16 +557,12 @@ export class ReportService {
 
       if (isDue) {
         const dateKey = toLocalISO(cursor);
-        if (!answerByDate.has(dateKey)) {
-          unfilled.push(dateKey);
-        }
+        result.push({ date: dateKey, filled: answerByDate.has(dateKey) });
       }
 
       cursor.setDate(cursor.getDate() + 1);
     }
 
-    // 6. Newest-first, cap to MAX_BACKFILL_DAYS
-    unfilled.reverse();
-    return unfilled.slice(0, MAX_BACKFILL_DAYS);
+    return result;
   }
 }

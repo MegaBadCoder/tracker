@@ -12,7 +12,7 @@ import { fetchQuestionAnalytics, fetchPhotoGallery, type PhotoGalleryEntry } fro
 import { analyticsToDataPoints, type DataPoint } from '../utils/reportAnswer'
 import type { Question } from '../types'
 import PageContainer from '@/components/PageContainer.vue'
-import QuestionBackfillList from '@/features/goals/ui/QuestionBackfillList.vue'
+import QuestionBackfillCalendar from '@/features/goals/ui/QuestionBackfillCalendar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,7 +147,7 @@ onMounted(async () => {
         Пока нет данных
       </div>
 
-      <QuestionBackfillList
+      <QuestionBackfillCalendar
         v-if="question.schedule"
         :question-id="question.id"
         :type="question.type"
