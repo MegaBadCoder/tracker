@@ -12,6 +12,7 @@ import { fetchQuestionAnalytics, fetchPhotoGallery, type PhotoGalleryEntry } fro
 import { analyticsToDataPoints, type DataPoint } from '../utils/reportAnswer'
 import type { Question } from '../types'
 import PageContainer from '@/components/PageContainer.vue'
+import QuestionBackfillList from '@/features/goals/ui/QuestionBackfillList.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,16 +73,20 @@ async function toggleHabit(value: boolean) {
   }
 }
 
+async function loadVisuals() {
+  if (question.value?.type === 'photo') {
+    photoEntries.value = await fetchPhotoGallery(questionId)
+  } else {
+    const entries = await fetchQuestionAnalytics(questionId)
+    dataPoints.value = analyticsToDataPoints(entries)
+  }
+}
+
 onMounted(async () => {
   try {
     const q = await fetchQuestion(questionId)
     question.value = q
-    if (q.type === 'photo') {
-      photoEntries.value = await fetchPhotoGallery(questionId)
-    } else {
-      const entries = await fetchQuestionAnalytics(questionId)
-      dataPoints.value = analyticsToDataPoints(entries)
-    }
+    await loadVisuals()
   } catch (e: any) {
     if (e?.response?.status === 404) {
       router.replace('/not-found')
@@ -141,6 +146,13 @@ onMounted(async () => {
       <div v-else class="text-sm text-muted-foreground py-8">
         Пока нет данных
       </div>
+
+      <QuestionBackfillList
+        v-if="question.schedule"
+        :question-id="question.id"
+        :type="question.type"
+        @filled="loadVisuals"
+      />
 
       <ScheduleEditor
         v-if="question.schedule"
