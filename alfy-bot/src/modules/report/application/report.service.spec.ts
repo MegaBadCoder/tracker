@@ -30,6 +30,8 @@ describe('ReportService', () => {
 
     scheduleService = {
       isQuestionDueOnDateHistorical: jest.fn().mockReturnValue(true),
+      getScheduleForDate: jest.fn().mockReturnValue(null),
+      isScheduleDueOnDate: jest.fn().mockReturnValue(true),
     };
 
     storage = {
@@ -522,6 +524,141 @@ describe('ReportService', () => {
 
       const result = await service.getReportQueue(1, '2026-02-20');
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getUnfilledDates', () => {
+    const ownQuestion = {
+      id: 5,
+      goal_id: 10,
+      type: 'text',
+      createdAt: new Date('2026-01-01'),
+      schedules: [],
+    };
+    const ownGoal = {
+      id: 10,
+      user_id: 1,
+      goal_start: '2026-06-01',
+      goal_end: '2026-06-30',
+    };
+
+    it('возвращает due-даты без ответа (исключает заполненные)', async () => {
+      goalService.findQuestionById.mockResolvedValue(ownQuestion);
+      goalService.findById.mockResolvedValue(ownGoal);
+      // все даты due (getScheduleForDate → null, isScheduleDueOnDate → всегда true через fallback)
+      scheduleService.getScheduleForDate.mockReturnValue(null);
+      // ответ есть только на 2026-06-01
+      answerRepo.findByQuestionAndDateRange.mockResolvedValue([
+        { scheduled_date: '2026-06-01' },
+      ]);
+
+      // Тест ограничен диапазоном [2026-06-01, today]. Сегодня 2026-06-14 (injected).
+      // Ожидаем даты 2026-06-02 … 2026-06-14 без ответа (13 дат), newest-first.
+      const result = await service.getUnfilledDates(5, 1);
+
+      expect(result).not.toContain('2026-06-01'); // заполнена
+      expect(result[0]).toBe('2026-06-14'); // newest first
+      expect(result[result.length - 1]).toBe('2026-06-02');
+      expect(result).toHaveLength(13);
+    });
+
+    it('возвращает даты newest-first', async () => {
+      goalService.findQuestionById.mockResolvedValue(ownQuestion);
+      goalService.findById.mockResolvedValue({
+        ...ownGoal,
+        goal_start: '2026-06-10',
+        goal_end: '2026-06-14',
+      });
+      scheduleService.getScheduleForDate.mockReturnValue(null);
+      answerRepo.findByQuestionAndDateRange.mockResolvedValue([]);
+
+      const result = await service.getUnfilledDates(5, 1);
+
+      expect(result).toEqual([
+        '2026-06-14',
+        '2026-06-13',
+        '2026-06-12',
+        '2026-06-11',
+        '2026-06-10',
+      ]);
+    });
+
+    it('исключает not-due даты по расписанию', async () => {
+      const scheduleObj = { id: 1 };
+      goalService.findQuestionById.mockResolvedValue({
+        ...ownQuestion,
+        schedules: [scheduleObj],
+      });
+      goalService.findById.mockResolvedValue({
+        ...ownGoal,
+        goal_start: '2026-06-10',
+        goal_end: '2026-06-14',
+      });
+      answerRepo.findByQuestionAndDateRange.mockResolvedValue([]);
+      scheduleService.getScheduleForDate.mockReturnValue(scheduleObj);
+      // только чётные дни due
+      scheduleService.isScheduleDueOnDate.mockImplementation(
+        (_schedule: unknown, _created: unknown, cursor: Date) =>
+          cursor.getDate() % 2 === 0,
+      );
+
+      const result = await service.getUnfilledDates(5, 1);
+
+      // чётные дни в диапазоне 10-14: 10, 12, 14 → newest-first
+      expect(result).toEqual(['2026-06-14', '2026-06-12', '2026-06-10']);
+    });
+
+    it('возвращает [] если у цели нет goal_start/goal_end (не бросает BadRequest)', async () => {
+      goalService.findQuestionById.mockResolvedValue(ownQuestion);
+      goalService.findById.mockResolvedValue({
+        id: 10,
+        user_id: 1,
+        goal_start: null,
+        goal_end: null,
+      });
+
+      await expect(service.getUnfilledDates(5, 1)).resolves.toEqual([]);
+    });
+
+    it('бросает NotFoundException если вопрос не найден', async () => {
+      goalService.findQuestionById.mockResolvedValue(null);
+
+      await expect(service.getUnfilledDates(999, 1)).rejects.toThrow(
+        /not found/i,
+      );
+    });
+
+    it('бросает ForbiddenException если цель принадлежит другому пользователю', async () => {
+      goalService.findQuestionById.mockResolvedValue(ownQuestion);
+      goalService.findById.mockResolvedValue({
+        id: 10,
+        user_id: 999,
+        goal_start: '2026-06-01',
+        goal_end: '2026-06-30',
+      });
+
+      await expect(service.getUnfilledDates(5, 1)).rejects.toThrow(
+        /forbidden/i,
+      );
+    });
+
+    it('обрезает результат до MAX_BACKFILL_DAYS (90) дат', async () => {
+      // Цель на 200 дней: 2026-01-01 … 2026-07-19, все due, ни одного ответа
+      goalService.findQuestionById.mockResolvedValue(ownQuestion);
+      goalService.findById.mockResolvedValue({
+        id: 10,
+        user_id: 1,
+        goal_start: '2026-01-01',
+        goal_end: '2026-07-19',
+      });
+      scheduleService.getScheduleForDate.mockReturnValue(null);
+      answerRepo.findByQuestionAndDateRange.mockResolvedValue([]);
+
+      const result = await service.getUnfilledDates(5, 1);
+
+      expect(result).toHaveLength(90);
+      // Newest-first: первый элемент — самый последний due-день (today = 2026-06-14)
+      expect(result[0]).toBe('2026-06-14');
     });
   });
 

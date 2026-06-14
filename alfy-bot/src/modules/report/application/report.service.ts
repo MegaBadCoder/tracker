@@ -15,6 +15,7 @@ import { toLocalISO } from '../lib/date';
 
 const NUMERIC_TYPES = new Set(['number', 'rating']);
 const NOT_FILLED_TEXT = 'Не было заполнено';
+const MAX_BACKFILL_DAYS = 90;
 
 export interface QuestionReportItem {
   questionId: number;
@@ -485,5 +486,81 @@ export class ReportService {
     }
 
     return result;
+  }
+
+  async getUnfilledDates(
+    questionId: number,
+    dbUserId: number,
+  ): Promise<string[]> {
+    // 1. Owner-check: вопрос → цель → user_id
+    const question = await this.goalService.findQuestionById(questionId);
+    if (!question)
+      throw new NotFoundException(`Question #${questionId} not found`);
+
+    const goal = await this.goalService.findById(question.goal_id!);
+    if (!goal) throw new NotFoundException('Goal not found');
+    if (goal.user_id !== dbUserId) throw new ForbiddenException();
+
+    // 2. Цель без диапазона → пустой список (не ошибка)
+    if (!goal.goal_start || !goal.goal_end) {
+      return [];
+    }
+
+    // 3. Диапазон: [goal_start, min(goal_end, today)]
+    const startDate = goal.goal_start;
+    const endGoal = new Date(goal.goal_end);
+    endGoal.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = toLocalISO(endGoal < today ? endGoal : today);
+
+    // 4. Все ответы за диапазон → Map<дата, ответ>
+    const answers = await this.answerRepo.findByQuestionAndDateRange(
+      questionId,
+      startDate,
+      endDate,
+    );
+    const answerByDate = new Map(answers.map((a) => [a.scheduled_date, a]));
+
+    // 5. Итерация день за днём: собираем due-даты без ответа
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    const sortedSchedules = [...(question.schedules || [])].sort((a, b) =>
+      (a.effective_from ?? '').localeCompare(b.effective_from ?? ''),
+    );
+
+    const unfilled: string[] = [];
+    const cursor = new Date(start);
+
+    while (cursor <= end) {
+      const schedule = this.scheduleService.getScheduleForDate(
+        sortedSchedules,
+        cursor,
+      );
+
+      const isDue = schedule
+        ? this.scheduleService.isScheduleDueOnDate(
+            schedule,
+            toLocalISO(question.createdAt),
+            cursor,
+          )
+        : true;
+
+      if (isDue) {
+        const dateKey = toLocalISO(cursor);
+        if (!answerByDate.has(dateKey)) {
+          unfilled.push(dateKey);
+        }
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    // 6. Newest-first, cap to MAX_BACKFILL_DAYS
+    unfilled.reverse();
+    return unfilled.slice(0, MAX_BACKFILL_DAYS);
   }
 }
