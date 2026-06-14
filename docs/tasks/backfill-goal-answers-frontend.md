@@ -5,6 +5,16 @@
 **Worktree:** .worktrees/feat-backfill-goal-answers-frontend
 **Mode:** interactive
 
+## Итерация (по запросу пользователя): календарь вместо списка
+
+После первичной приёмки UX переделан со списка на **календарь** + отдельная кнопка **«Заполнить за сегодня»** (commit `ba9fce4`).
+
+- Backend: `GET /questions/:id/unfilled-dates` → **`/fill-status`**; метод `getUnfilledDates` → `getFillStatus`, возвращает `{ date, filled }[]` по всем due-дням диапазона (кап 90 убран — календарь маркирует и заполненные дни). DTO `FillStatusEntryDto`.
+- Frontend: `QuestionBackfillList.vue` → **`QuestionBackfillCalendar.vue`** на reka-ui (`CalendarRoot` + ui-обёртки + сырой `CalendarCellTrigger as="button"`). Маркировка: заполнено (✓ + заливка), незаполнено due (обводка, кликабельно), не-due/будущее (приглушено через `isDateUnavailable` + `maxValue=today`). Клик по дню → `AnswerInput` под календарём; кнопка «Заполнить за сегодня» (disabled-состояния: «уже заполнено» / «не запланировано»). Запись по-прежнему через `submitAnswer`/`submitPhotoAnswer`.
+- Тесты: backend `getFillStatus` (статус/расписание/диапазон/owner/empty), frontend `QuestionBackfillCalendar.spec.ts` (кнопка сегодня, клик дня, submit→дата→filled, ошибка). Инварианты прежние.
+
+---
+
 ## Design
 
 ### Цель

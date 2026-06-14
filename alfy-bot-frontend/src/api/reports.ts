@@ -68,8 +68,13 @@ export async function submitAnswer(questionId: number, scheduledDate: string, an
   await api.post(`/questions/${questionId}/answers`, { scheduled_date: scheduledDate, answer })
 }
 
-export async function fetchUnfilledDates(questionId: number): Promise<string[]> {
-  const { data } = await api.get<string[]>(`/questions/${questionId}/unfilled-dates`)
+export interface FillStatusEntry {
+  date: string
+  filled: boolean
+}
+
+export async function fetchFillStatus(questionId: number): Promise<FillStatusEntry[]> {
+  const { data } = await api.get<FillStatusEntry[]>(`/questions/${questionId}/fill-status`)
   return data
 }
 
