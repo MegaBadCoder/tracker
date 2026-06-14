@@ -542,6 +542,17 @@ describe('ReportService', () => {
       goal_end: '2026-06-30',
     };
 
+    // Метод зовёт new Date() для «сегодня» — фиксируем часы, иначе тесты,
+    // завязанные на today=2026-06-14, ломаются в любой другой календарный день.
+    beforeEach(() => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-06-14T12:00:00'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('возвращает due-даты без ответа (исключает заполненные)', async () => {
       goalService.findQuestionById.mockResolvedValue(ownQuestion);
       goalService.findById.mockResolvedValue(ownGoal);
