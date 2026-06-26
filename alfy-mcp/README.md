@@ -1,6 +1,8 @@
 # alfy-mcp
 
-MCP-сервер для [Alfy](https://tracker.rocketup.tech) — предоставляет инструменты для управления задачами, целями и привычками через Claude Desktop или любой MCP-клиент.
+MCP-сервер для [Alfy](../README.md) — предоставляет инструменты для управления задачами, целями и привычками через Claude Desktop, Claude Code или любой MCP-клиент.
+
+ESM-пакет, Node 22+. Тонкая обёртка над REST API [`alfy-bot`](../alfy-bot/): один HTTP-вызов на инструмент (кроме `get_progress` — 3 параллельных), в БД напрямую не ходит. SDK — [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol). Транспорты: stdio + Streamable HTTP (endpoint `/mcp`, порт 3003).
 
 ## Получить токен
 
@@ -88,3 +90,15 @@ URL: `https://tracker.rocketup.tech/mcp`
 | `ALFY_API_BASE` | `http://localhost:3002/api` | Базовый URL API |
 | `ALFY_API_TOKEN` | — | API-токен (обязателен для stdio) |
 | `MCP_HTTP_PORT` | `3003` | Порт HTTP-сервера |
+
+## Разработка
+
+```bash
+npm install
+npm run dev:stdio           # tsx src/cli.ts --stdio (для Claude Desktop/Code)
+npm run dev:http            # tsx src/cli.ts --http (порт 3003, endpoint /mcp)
+npm run build               # tsc → dist/
+npm run start               # node dist/cli.js
+npm run test                # vitest run
+npm run lint                # eslint .
+```

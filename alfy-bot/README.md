@@ -1,98 +1,68 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# alfy-bot
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Бэкенд [Alfy](../README.md) — NestJS-приложение (порт **3002**): REST API под `/api`, Telegram-бот, web-push и единая бизнес-логика для веба, бота и [MCP-сервера](../alfy-mcp/).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Что внутри
 
-## Description
+- **REST API** под префиксом `/api`, Swagger UI — на `/api/docs` (Bearer auth).
+- **Telegram-бот** на telegraf (`nestjs-telegraf`): создание целей, привычек и отчётов прямо в чате, выдача API-токенов для MCP.
+- **Auth**: JWT + API-токены (`JwtOrApiTokenGuard`). Токены хранятся как bcrypt-хеш + 10-символьный prefix-index. Методы входа — Telegram и email/пароль (`nodemailer` для писем верификации/сброса).
+- **Хранилище**: TypeORM + SQLite (`data/database.sqlite`, `synchronize: true`). S3-совместимое объектное хранилище (`@aws-sdk/client-s3`) для фото-ответов в отчётах.
+- **Уведомления**: web-push (VAPID), подписки на устройство.
+- **Планировщик** (`@nestjs/schedule`): повторяющиеся задачи, напоминания.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Архитектура — Clean Architecture по модулям
 
-## Project setup
+Каждый бизнес-модуль в `src/modules/<name>/` следует трёхслойной структуре:
 
-```bash
-$ npm install
-```
+- `domain/` — порты (абстрактные классы как DI-токены `*Port`) и чистые утилиты без зависимостей от фреймворка.
+- `infrastructure/` — реализации портов: TypeORM-репозитории, адаптеры внешних сервисов, schedulers.
+- `*.service.ts` / `application/` — оркестрация, зависит только от портов.
+- `dto/` — class-validator DTO. Корень модуля — `*.controller.ts`, `*.module.ts`, `*.service.ts`.
 
-## Compile and run the project
+Биндинги портов — в `*.module.ts` через `{ provide: SomePort, useClass: SomeAdapter }`. Сервисы запрашивают `*Port`, а не конкретные классы.
 
-```bash
-# development
-$ npm run start
+Модули: `auth`, `bot`, `email`, `goal`, `notification`, `project`, `question`, `report`, `task`, `user`.
 
-# watch mode
-$ npm run start:dev
+Сущности TypeORM собраны в `src/shared/entities/` (общий barrel) и регистрируются в `app.module.ts`. Кросс-модульный код — в `src/shared/` (`SharedModule`). Глобально включены `ValidationPipe({ whitelist: true, transform: true })`, префикс `/api`, CORS для localhost, Swagger Bearer auth.
 
-# production mode
-$ npm run start:prod
-```
+> **Справочник типов вопросов** — единый источник истины в `src/shared/types/question-types.ts` (`QUESTION_TYPES`). Веб читает его через `GET /api/question-types`. Не дублировать на фронте.
 
-## Run tests
+## Таймзоны
+
+Даты в БД хранятся в **UTC**. Доменные функции (`recurrence.utils.ts`) timezone-agnostic и работают через UTC-методы. На границе домена UTC сдвигается к wall-clock пользователя через `shiftToUserWallClock` / `shiftBackToUtc` (`src/modules/task/lib/timezone.ts`); таймзона — из `UserSettingsPort.getTimezone(userId)`.
+
+## Команды
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
+npm run start:dev           # nest start --watch (порт 3002)
+npm run build               # nest build → dist/
+npm run start:prod          # node dist/main
+npm run lint                # eslint --fix
+npm run test                # jest (*.spec.ts)
+npm run test:watch
+npm run test:cov
+npm run test:e2e            # jest --config ./test/jest-e2e.json
+npx jest path/to/file.spec.ts                 # один файл
+npx jest -t "имя теста"                        # один тест по имени
 ```
 
-## Deployment
+Jest настроен в `package.json` (`rootDir: src`, `testRegex: .*\.spec\.ts$`, `ts-jest`).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+> Запуск без Telegram-бота (только веб-API):
+> `ENABLE_TELEGRAM=false npm run start:dev`
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Команды Telegram-бота
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+| Команда | Назначение |
+|---|---|
+| `/start`, `/menu` | Главное меню |
+| `/help` | Справка |
+| `/report` | Создать отчёт по цели |
+| `/cancel` | Отменить текущий диалог |
+| `/mcp_token <название>` | Выпустить API-токен для MCP-клиента |
+| `/mcp_tokens` | Список выпущенных токенов |
+| `/mcp_token_revoke` | Отозвать токен |
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Остальной поток (создание целей, настройка вопросов-привычек, расписаний) — через inline-кнопки.
