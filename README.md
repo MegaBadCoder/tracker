@@ -15,7 +15,6 @@
 - **🌍 Корректные таймзоны и локали.** Все операции с датами уважают IANA-таймзону пользователя; даты в БД хранятся в UTC и сдвигаются к wall-clock пользователя на границе домена. Календарь, локаль и первый день недели — из настроек пользователя.
 - **🗓 Богатый UI задач.** Inbox, проекты со списками и board-колонками, повторяющиеся задачи, календарь с drag-create по сетке часов, Pomodoro-таймер, два независимых drag-and-drop-движка (кастомный на PointerEvents + vuedraggable).
 - **🔔 Уведомления.** Web-push (VAPID) с подписками на устройство.
-- **📦 Production-ready деплой.** Docker Compose + Caddy (авто-HTTPS), три независимо деплоящихся образа, единый reverse-proxy.
 
 ---
 
@@ -26,8 +25,6 @@
 | [`alfy-bot/`](alfy-bot/) | NestJS, TypeORM, SQLite, telegraf | 3002 | REST API (`/api`, Swagger на `/api/docs`), Telegram-бот, web-push, auth (JWT + API-токены) |
 | [`alfy-bot-frontend/`](alfy-bot-frontend/) | Vue 3, Vite, TS, Tailwind v4, Pinia | 5173 | SPA / Telegram WebApp / PWA |
 | [`alfy-mcp/`](alfy-mcp/) | Node 22+, `@modelcontextprotocol/sdk` | 3003 | MCP-сервер — тонкая обёртка над REST для Claude |
-
-Плюс инфраструктура: [`docker-compose.yml`](docker-compose.yml), [`Caddyfile`](Caddyfile), [`scripts/tunnels.sh`](scripts/tunnels.sh).
 
 Архитектурный гайд по всему репозиторию — в [CLAUDE.md](CLAUDE.md).
 
@@ -60,42 +57,3 @@ npm run dev:http           # Streamable HTTP, endpoint /mcp
 > `ENABLE_TELEGRAM=false npm run start:dev`
 
 Подробные команды (тесты, lint, type-check) — в README каждого приложения и в [CLAUDE.md](CLAUDE.md).
-
----
-
-## Деплой
-
-```bash
-docker compose up -d
-```
-
-Caddy слушает 80/443, отдаёт `tracker.rocketup.tech` и проксирует:
-`/api/*` → backend (3002), `/mcp` + `/mcp/*` → alfy-mcp (3003), остальное → frontend (nginx). Образы тянутся из `${REGISTRY_URL}` (см. `.env`).
-
----
-
-## Cloudflare-туннели (dev для Telegram WebApp)
-
-Для тестирования Telegram WebApp нужны публичные URL фронта (5173) и бэкенда (3002). Используются Cloudflare Quick Tunnels.
-
-```bash
-./scripts/tunnels.sh
-```
-
-Скрипт:
-1. Останавливает старые туннели на 5173 и 3002.
-2. Запускает новые туннели.
-3. Обновляет `alfy-bot/.env` (`WEBAPP_URL`) и `alfy-bot-frontend/.env` (`VITE_API_URL`).
-
-Перед запуском должны быть подняты Vite (5173) и бэкенд (3002). После — перезапустить бота и фронт.
-
-Остановка:
-
-```bash
-pkill cloudflared
-# или точечно:
-pkill -f "cloudflared tunnel --url http://localhost:5173"
-pkill -f "cloudflared tunnel --url http://localhost:3002"
-```
-
-Требуется `cloudflared` в `PATH` ([установка](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation)).
