@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useNow } from '@/composables/useNow'
-import { toTimerTask, useTimerStore } from '@/features/task-timer'
+import { getTaskTimerState, toTimerTask, useTimerStore, type TaskTimerState } from '@/features/task-timer'
 import { getActiveTasksAt, getTaskProgressAt, type TaskProgress } from '../lib/active-tasks'
 import { formatPomodoro, formatRemaining } from '../lib/formatters'
 import type { Task } from '../model/types'
@@ -13,21 +13,43 @@ import { useTaskStore } from '../model/task-store'
 interface ActiveRow {
   task: Task
   progress: TaskProgress
+  timerState: TaskTimerState
 }
 
 const { tasks } = storeToRefs(useTaskStore())
 const timerStore = useTimerStore()
+const { activeTaskId, phase, isActive } = storeToRefs(timerStore)
 const now = useNow()
 
 const rows = computed<ActiveRow[]>(() =>
   getActiveTasksAt(tasks.value, now.value)
-    .map(task => ({ task, progress: getTaskProgressAt(task, now.value) }))
+    .map(task => ({
+      task,
+      progress: getTaskProgressAt(task, now.value),
+      timerState: getTaskTimerState(task.id, {
+        activeTaskId: activeTaskId.value,
+        phase: phase.value,
+        isActive: isActive.value,
+      }),
+    }))
     .filter((row): row is ActiveRow => row.progress !== null),
 )
 
 function pomodoroLabel(task: Task): string | null {
   if (!task.isPomodoroTask) return null
   return `${formatPomodoro(task.pomodoroCompleted || 0)}/${task.pomodoroCount || 0}`
+}
+
+/**
+ * Paused sessions resume; idle ones start fresh. startTask() rewinds to the
+ * first phase, so calling it on a live session would discard finished pomodoros.
+ */
+function handlePlay(row: ActiveRow): void {
+  if (row.timerState === 'paused') {
+    timerStore.toggleTimer()
+    return
+  }
+  timerStore.startTask(toTimerTask(row.task))
 }
 </script>
 
@@ -39,7 +61,7 @@ function pomodoroLabel(task: Task): string | null {
 
     <div class="flex flex-col gap-2 mt-1.5">
       <div
-        v-for="{ task, progress } in rows"
+        v-for="{ task, progress, timerState } in rows"
         :key="task.id"
         class="relative overflow-hidden rounded-md border border-sidebar-border bg-sidebar-accent/60 pl-3 pr-2 py-2 transition-colors duration-200 hover:bg-sidebar-accent"
       >
@@ -48,13 +70,27 @@ function pomodoroLabel(task: Task): string | null {
 
         <div class="flex items-center gap-1">
           <span class="truncate flex-1 text-sm font-medium leading-tight">{{ task.title }}</span>
+
+          <span
+            v-if="timerState !== 'idle'"
+            class="shrink-0 flex items-center gap-1 text-[11px]"
+            :class="timerState === 'running' ? 'text-red-500' : 'text-sidebar-foreground/50'"
+          >
+            <span
+              class="size-1.5 rounded-full bg-current"
+              :class="timerState === 'running' && 'animate-pulse motion-reduce:animate-none'"
+            />
+            {{ timerState === 'running' ? 'идёт' : 'пауза' }}
+          </span>
+
+          <!-- Пока сессия тикает, кнопки нет: перезапуск стёр бы отработанные помидоры -->
           <Button
-            v-if="task.isPomodoroTask"
+            v-if="task.isPomodoroTask && timerState !== 'running'"
             variant="ghost"
             size="icon-sm"
             class="relative shrink-0 text-red-500 hover:text-red-500 hover:bg-red-500/10 cursor-pointer before:absolute before:-inset-1.5 before:content-['']"
-            :aria-label="`Запустить помодоро: ${task.title}`"
-            @click="timerStore.startTask(toTimerTask(task))"
+            :aria-label="`${timerState === 'paused' ? 'Продолжить' : 'Запустить'} помодоро: ${task.title}`"
+            @click="handlePlay({ task, progress, timerState })"
           >
             <Play :size="14" />
           </Button>
