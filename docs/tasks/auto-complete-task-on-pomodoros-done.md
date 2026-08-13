@@ -1,6 +1,6 @@
 # Автозакрытие задачи при выполнении всех помидоров
 
-**Status:** reviewing
+**Status:** done
 **Branch:** feat/auto-complete-task-on-pomodoros-done
 **Worktree:** /Users/v/projects/Alfy-worktrees/auto-complete-pomodoros
 **Mode:** interactive
@@ -220,7 +220,30 @@ Notes:
 - Фронтовый lint даёт 1913 проблем по всему репозиторию (стилевые правила `perfectionist`/`antfu`, нарушены и в нетронутых файлах вроде `vitest.config.ts`). По двум изменённым файлам: 82 → 81, то есть долга не добавлено. Приводить два файла к стандарту, который нарушают остальные 49, не стал.
 
 ## Conclusion
-<empty — filled by up:ureview>
+
+Outcome: помидоро-задача автозакрывается на переходе через `pomodoroCount`, и это доезжает до стора и календаря — `24e2d8c` (backend), `9a7b4b6` (frontend).
+
+Invariants:
+- триггер только на переходе — предикат `hasCrossedPomodoroTarget`, 8 юнит-кейсов + живой smoke: после ручного снятия галочки третий помидор задачу не перезакрыл
+- завершение только через `this.update(..., { completed: true })` — прочитано в диффе, второй ветки нет; smoke на recurring дал `nextInstance` со сброшенным счётчиком, то есть отработал существующий `completeRecurringTask`
+- guard'ы `isOverdue` / нет конфига / `target <= 0` / уже выполненная — по тесту на каждый, плюс smoke на задаче без конфига
+- устойчивость к float — кейсы с обеих сторон порога; smoke: `0.5 + 0.5` при цели 1 закрывает
+- предикат без зависимостей фреймворка — в `pomodoro.utils.ts` ноль импортов
+- один HTTP-вызов `/tasks/:id/pomodoro` на фронте — грепом по `src`, единственное вхождение `task-store.ts:215`
+- инкремент не теряется, если задачи нет в сторе — отдельный тест на отправку запроса при пустом сторе
+- календарь, `alfy-mcp`, `modules/bot` не изменялись — их нет в `git diff --name-only 5e4c4bb..HEAD`
+
+Plan adherence: два отклонения, оба зафиксированы ниже в `### Deviations from plan` — починка e2e-харнесса и трёх стухших ассертов. Оба вне первоначального плана, оба потребовались чтобы Phase 1.6 вообще была проверяема.
+
+Review findings:
+- Minor: `previousCompleted` в `task-store.ts` означал булев `completed` (строка 176) и число `pomodoroCompleted` (строка 208) одновременно. Переименовано в `previousPomodoroCompleted`.
+- Ревью инлайновое, без независимого `up:reviewer`: окружение сессии запрещает диспатч субагентов без явной просьбы пользователя. Независимость стадии слабее, чем предполагает скилл.
+
+Future work:
+- `alfy-mcp/src/tools/tasks.ts:128,142` отдают клиенту `UpdateTaskResponse` целиком (`{task: {...}}`) вместо задачи. Найдено consistency-sweep'ом по тем же стухшим ассертам. Justification: инвариант задачи — «`alfy-mcp` и модуль телеграм-бота не изменяются». Пре-существует с задачи про recurring, влияние косметическое.
+- У `PATCH /tasks/:id/pomodoro` нет DTO: `@Body() body: { increment: number }` — тип, а не класс, поэтому глобальный `ValidationPipe` его не проверяет и нечисловой либо отсутствующий `increment` уходит в TypeORM `increment()` без валидации. Justification: новый факт, всплывший на ревью; пре-существует, но диff повысил цену эндпоинта — он теперь переключает `completed`. Ложного автозакрытия не даёт (сравнение с `NaN` всегда false), но счётчик испортить может.
+
+Verified by: живой сервер на :3099 с отдельной БД и реальными curl — подробности в `## Verify`. Полный e2e в worktree требует `--forceExit` и подставных env-переменных, потому что untracked `.env` в worktree отсутствует.
 
 ### Deviations from plan
 

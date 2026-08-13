@@ -205,17 +205,17 @@ export const useTaskStore = defineStore('tasks', () => {
     // fetchTasks resolves) — the increment must still reach the backend, so only
     // the optimistic bump is conditional.
     const task = tasks.value.find(t => t.id === taskId)
-    const previousCompleted = task?.pomodoroCompleted ?? 0
+    const previousPomodoroCompleted = task?.pomodoroCompleted ?? 0
 
     if (task) {
-      task.pomodoroCompleted = Math.round((previousCompleted + increment) * 100) / 100
+      task.pomodoroCompleted = Math.round((previousPomodoroCompleted + increment) * 100) / 100
     }
 
     try {
       const { data } = await api.patch(`/tasks/${taskId}/pomodoro`, { increment })
       return applyUpdateResponse(data as Record<string, unknown>, taskId)
     } catch (err) {
-      if (task) task.pomodoroCompleted = previousCompleted
+      if (task) task.pomodoroCompleted = previousPomodoroCompleted
       console.error('Ошибка сохранения помодоро:', err)
     }
   }
