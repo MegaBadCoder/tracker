@@ -2,7 +2,7 @@
   <div
     data-calendar-event-block
     :class="[
-      'absolute left-0.5 right-0.5 rounded-md px-2 py-1 text-xs overflow-hidden border',
+      'absolute rounded-md px-2 py-1 text-xs overflow-hidden border',
       hidden ? 'invisible' : isOverdue ? 'cursor-not-allowed' : isVirtual ? 'cursor-default' : 'cursor-grab',
       isOverdue
         ? OVERDUE_EVENT_CLASSES
@@ -11,12 +11,13 @@
           : isVirtual
             ? 'border-dashed border-border bg-muted/40 text-muted-foreground dark:border-border/40 dark:bg-muted/60 dark:text-white dark:backdrop-blur-sm'
             : priorityClasses,
+      highlighted && 'ring-2 ring-inset ring-primary z-20',
     ]"
     :style="blockStyle"
     style="touch-action: none"
     @pointerdown="onPointerDown"
   >
-    <div :class="['font-medium truncate flex items-center gap-1', completed && 'line-through']">
+    <div :class="['font-medium flex items-center gap-1 min-w-0', completed && 'line-through']">
       <RoundCheckbox
         v-if="!isVirtual && !isOverdue"
         :model-value="completed"
@@ -26,7 +27,18 @@
         @update:model-value="emit('toggle', event.taskId)"
       />
       <Repeat v-if="event.isRecurring" :size="10" class="shrink-0" />
-      {{ event.title }}
+      <span class="truncate">{{ event.title }}</span>
+      <button
+        v-if="isVirtual"
+        type="button"
+        data-testid="materialize-occurrence"
+        class="ml-auto shrink-0 rounded p-0.5 hover:bg-foreground/10"
+        aria-label="Проявить задачу"
+        @pointerdown.stop
+        @click.stop="emit('materialize', event)"
+      >
+        <CalendarPlus :size="12" />
+      </button>
     </div>
     <div class="text-[10px] opacity-80">
       {{ timeLabel }}
@@ -46,10 +58,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Repeat, Timer } from 'lucide-vue-next'
+import { CalendarPlus, Repeat, Timer } from 'lucide-vue-next'
 import RoundCheckbox from '@/components/ui/roundCheckbox/RoundCheckbox.vue'
 import type { CalendarEvent } from '../model/types'
 import { getPriorityEventClasses, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
+import { eventColumnStyle, type EventColumn } from '../lib/layout-overlapping'
+import { highlightedTaskId } from '@/features/tasks/lib/use-recurring-reschedule'
 
 const HOUR_HEIGHT = 60
 const TOTAL_MINUTES = 24 * 60
@@ -57,18 +71,21 @@ const TOTAL_MINUTES = 24 * 60
 const props = defineProps<{
   event: CalendarEvent
   hidden?: boolean
+  layout?: EventColumn
 }>()
 
 const emit = defineEmits<{
   grab: [event: CalendarEvent, pointerEvent: PointerEvent]
   'resize-start': [event: CalendarEvent, pointerEvent: PointerEvent]
   toggle: [taskId: string]
+  materialize: [event: CalendarEvent]
 }>()
 
 const completed = computed(() => props.event.completed)
 const isVirtual = computed(() => !!props.event.isVirtual)
 const priorityClasses = computed(() => getPriorityEventClasses(props.event.priority))
 const isOverdue = computed(() => !!props.event.task.isOverdue)
+const highlighted = computed(() => highlightedTaskId.value === props.event.taskId)
 
 const blockStyle = computed(() => {
   const top = (props.event.startMinutes / TOTAL_MINUTES) * HOUR_HEIGHT * 24
@@ -76,6 +93,7 @@ const blockStyle = computed(() => {
   return {
     top: `${top}px`,
     height: `${height}px`,
+    ...eventColumnStyle(props.layout ?? { col: 0, cols: 1 }),
   }
 })
 

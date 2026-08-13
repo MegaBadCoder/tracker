@@ -5,6 +5,12 @@ import {
   buildNextInstance,
   isSeriesEnded,
   findNextOccurrenceOnOrAfter,
+  seriesDueDate,
+  applyDueDateReschedule,
+  retargetRecurrenceToDate,
+  isSameUtcDay,
+  isOccurrenceOnSeries,
+  findOccupyingInstance,
 } from './recurrence.utils';
 
 function d(iso: string): Date {
@@ -307,6 +313,15 @@ describe('buildNextInstance', () => {
     expect(instance.checklist).toBeNull();
   });
 
+  it('does not copy recurrenceAnchorDate — next instance starts on the series', () => {
+    const instance = buildNextInstance(
+      makeTask({ recurrenceAnchorDate: d('2026-04-05T10:00:00.000Z') }),
+      nextDueDate,
+      parentId,
+    );
+    expect(instance.recurrenceAnchorDate).toBeNull();
+  });
+
   it('null recurrence on task -> recurrence=null on instance', () => {
     const instance = buildNextInstance(
       makeTask({ recurrence: null }),
@@ -388,5 +403,229 @@ describe('findNextOccurrenceOnOrAfter', () => {
       d('2026-04-29T10:00:00.000Z'),
     );
     expect(result).toBeNull();
+  });
+});
+
+// ── seriesDueDate / applyDueDateReschedule ──────────────────────────
+
+describe('seriesDueDate', () => {
+  it('returns recurrenceAnchorDate when set', () => {
+    expect(
+      seriesDueDate({
+        dueDate: d('2026-04-08T15:00:00.000Z'),
+        recurrenceAnchorDate: d('2026-04-06T10:00:00.000Z'),
+      }),
+    ).toEqual(d('2026-04-06T10:00:00.000Z'));
+  });
+
+  it('falls back to dueDate when anchor is null', () => {
+    expect(
+      seriesDueDate({
+        dueDate: d('2026-04-06T10:00:00.000Z'),
+        recurrenceAnchorDate: null,
+      }),
+    ).toEqual(d('2026-04-06T10:00:00.000Z'));
+  });
+
+  it('returns null when both are null', () => {
+    expect(
+      seriesDueDate({ dueDate: null, recurrenceAnchorDate: null }),
+    ).toBeNull();
+  });
+});
+
+describe('applyDueDateReschedule', () => {
+  const monday = d('2026-04-06T10:00:00.000Z');
+  const wednesday = d('2026-04-08T15:00:00.000Z');
+  const friday = d('2026-04-10T12:00:00.000Z');
+  const weekly = makeRule({ frequency: 'weekly' });
+
+  it('this: sets anchor to old dueDate and moves dueDate', () => {
+    const result = applyDueDateReschedule(
+      { dueDate: monday, recurrenceAnchorDate: null, recurrence: weekly },
+      wednesday,
+      'this',
+    );
+    expect(result.dueDate).toEqual(wednesday);
+    expect(result.recurrenceAnchorDate).toEqual(monday);
+  });
+
+  it('this: does not overwrite an existing anchor on a second move', () => {
+    const result = applyDueDateReschedule(
+      {
+        dueDate: wednesday,
+        recurrenceAnchorDate: monday,
+        recurrence: weekly,
+      },
+      friday,
+      'this',
+    );
+    expect(result.dueDate).toEqual(friday);
+    expect(result.recurrenceAnchorDate).toEqual(monday);
+  });
+
+  it('subsequent: moves dueDate and clears anchor', () => {
+    const result = applyDueDateReschedule(
+      {
+        dueDate: wednesday,
+        recurrenceAnchorDate: monday,
+        recurrence: weekly,
+      },
+      friday,
+      'subsequent',
+    );
+    expect(result.dueDate).toEqual(friday);
+    expect(result.recurrenceAnchorDate).toBeNull();
+  });
+
+  it('clearing dueDate nulls both fields', () => {
+    const result = applyDueDateReschedule(
+      {
+        dueDate: wednesday,
+        recurrenceAnchorDate: monday,
+        recurrence: weekly,
+      },
+      null,
+      'this',
+    );
+    expect(result.dueDate).toBeNull();
+    expect(result.recurrenceAnchorDate).toBeNull();
+  });
+
+  it('this: collapsing back onto the anchor clears it', () => {
+    const result = applyDueDateReschedule(
+      {
+        dueDate: wednesday,
+        recurrenceAnchorDate: monday,
+        recurrence: weekly,
+      },
+      monday,
+      'this',
+    );
+    expect(result.dueDate).toEqual(monday);
+    expect(result.recurrenceAnchorDate).toBeNull();
+  });
+
+  it('non-recurring: moves dueDate and does not set an anchor', () => {
+    const result = applyDueDateReschedule(
+      { dueDate: monday, recurrenceAnchorDate: null, recurrence: null },
+      wednesday,
+      'this',
+    );
+    expect(result.dueDate).toEqual(wednesday);
+    expect(result.recurrenceAnchorDate).toBeNull();
+  });
+});
+
+describe('retargetRecurrenceToDate', () => {
+  const monday = d('2026-04-06T10:00:00.000Z');
+  const wednesday = d('2026-04-08T15:00:00.000Z');
+
+  it('weekly daysOfWeek: сдвигает набор дней на дельту weekday', () => {
+    expect(
+      retargetRecurrenceToDate(
+        makeRule({ frequency: 'weekly', daysOfWeek: [1] }),
+        monday,
+        wednesday,
+      ).daysOfWeek,
+    ).toEqual([3]);
+  });
+
+  it('weekly Mon/Wed/Fri → +2 дня: Wed/Fri/Sun', () => {
+    expect(
+      retargetRecurrenceToDate(
+        makeRule({ frequency: 'weekly', daysOfWeek: [1, 3, 5] }),
+        monday,
+        wednesday,
+      ).daysOfWeek,
+    ).toEqual([0, 3, 5]);
+  });
+
+  it('weekly без daysOfWeek: правило не меняется', () => {
+    const rule = makeRule({ frequency: 'weekly' });
+    expect(retargetRecurrenceToDate(rule, monday, wednesday)).toEqual(rule);
+  });
+
+  it('monthly: dayOfMonth = число toDate', () => {
+    expect(
+      retargetRecurrenceToDate(
+        makeRule({ frequency: 'monthly', dayOfMonth: 6 }),
+        monday,
+        wednesday,
+      ).dayOfMonth,
+    ).toBe(8);
+  });
+});
+
+describe('isSameUtcDay', () => {
+  it('true for same calendar day different time', () => {
+    expect(
+      isSameUtcDay(d('2026-04-13T10:00:00.000Z'), d('2026-04-13T15:30:00.000Z')),
+    ).toBe(true);
+  });
+
+  it('false for adjacent days', () => {
+    expect(
+      isSameUtcDay(d('2026-04-13T10:00:00.000Z'), d('2026-04-14T10:00:00.000Z')),
+    ).toBe(false);
+  });
+});
+
+describe('isOccurrenceOnSeries', () => {
+  const origin = d('2026-04-06T10:00:00.000Z');
+  const weekly = makeRule({ frequency: 'weekly' });
+
+  it('origin itself is not a future occurrence', () => {
+    expect(isOccurrenceOnSeries(origin, weekly, origin)).toBe(false);
+  });
+
+  it('next weekly step is on the series', () => {
+    expect(
+      isOccurrenceOnSeries(origin, weekly, d('2026-04-13T10:00:00.000Z')),
+    ).toBe(true);
+  });
+
+  it('off-grid day is not on the series', () => {
+    expect(
+      isOccurrenceOnSeries(origin, weekly, d('2026-04-08T10:00:00.000Z')),
+    ).toBe(false);
+  });
+
+  it('same calendar day different time still counts as on-series', () => {
+    expect(
+      isOccurrenceOnSeries(origin, weekly, d('2026-04-13T18:00:00.000Z')),
+    ).toBe(true);
+  });
+
+  it('слот дальше 52 интервалов от origin всё ещё на сетке', () => {
+    const daily = makeRule({ frequency: 'daily' });
+    expect(
+      isOccurrenceOnSeries(origin, daily, d('2026-06-05T10:00:00.000Z')),
+    ).toBe(true);
+  });
+});
+
+describe('findOccupyingInstance', () => {
+  const monday = d('2026-04-13T10:00:00.000Z');
+
+  it('finds a member whose series slot is that day', () => {
+    const members = [
+      { dueDate: d('2026-04-06T10:00:00.000Z'), recurrenceAnchorDate: null },
+      {
+        dueDate: d('2026-04-15T15:00:00.000Z'),
+        recurrenceAnchorDate: monday,
+      },
+    ];
+    const found = findOccupyingInstance(members, d('2026-04-13T10:00:00.000Z'));
+    expect(found).toBe(members[1]);
+  });
+
+  it('returns undefined when the slot is free', () => {
+    const members = [
+      { dueDate: d('2026-04-06T10:00:00.000Z'), recurrenceAnchorDate: null },
+    ];
+    expect(
+      findOccupyingInstance(members, d('2026-04-13T10:00:00.000Z')),
+    ).toBeUndefined();
   });
 });

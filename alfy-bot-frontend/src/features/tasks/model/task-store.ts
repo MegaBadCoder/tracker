@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
-import type { Task, ChecklistItem } from './types'
+import type { Task, ChecklistItem, TaskPatch } from './types'
 import { toDate } from '../lib/dateTime'
 
 function serializeDate(value: unknown): string | undefined {
@@ -14,7 +14,9 @@ function serializeDate(value: unknown): string | undefined {
 function serializeTaskDates<T extends Record<string, unknown>>(data: T): T {
   return {
     ...data,
-    ...(data.dueDate !== undefined && { dueDate: serializeDate(data.dueDate) }),
+    ...(data.dueDate !== undefined && {
+      dueDate: data.dueDate === null ? null : serializeDate(data.dueDate),
+    }),
     ...(data.deadline !== undefined && { deadline: serializeDate(data.deadline) }),
   }
 }
@@ -25,6 +27,9 @@ function parseTask(raw: Record<string, unknown>): Task {
   return {
     ...raw,
     dueDate: raw.dueDate ? new Date(raw.dueDate as string) : undefined,
+    recurrenceAnchorDate: raw.recurrenceAnchorDate
+      ? new Date(raw.recurrenceAnchorDate as string)
+      : null,
     deadline: raw.deadline ? new Date(raw.deadline as string) : undefined,
     isPomodoroTask: !!config,
     pomodoroCount: config?.pomodoroCount as number | undefined,
@@ -128,7 +133,7 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  const updateTask = async (taskId: string, updates: Partial<Task>, setLoading = true) => {
+  const updateTask = async (taskId: string, updates: TaskPatch, setLoading = true) => {
     if (taskId.includes('__virtual__')) {
       console.warn('Attempted to update a virtual task instance, ignoring:', taskId)
       return
@@ -151,6 +156,7 @@ export const useTaskStore = defineStore('tasks', () => {
         isPomodoroTask, pomodoroCount, pomodoroDuration,
         shortBreak, longBreak, longBreakInterval, pomodoroCompleted,
         recurringCompletedCount, isAutoCreated, recurringParentId,
+        recurrenceAnchorDate,
         ...rest
       } = updates as Record<string, unknown>
       const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(rest))
@@ -188,13 +194,22 @@ export const useTaskStore = defineStore('tasks', () => {
     const task = tasks.value.find(t => t.id === taskId)
     if (!task) return
 
-    const taskToRestore = { ...task }
+    const snapshot = tasks.value.slice()
     tasks.value = tasks.value.filter(t => t.id !== taskId)
 
     try {
-      await api.delete(`/tasks/${taskId}`)
+      const { data } = await api.delete<{ deletedIds?: string[]; updated?: Record<string, unknown>[] }>(
+        `/tasks/${taskId}`,
+      )
+      const deletedIds = new Set(data?.deletedIds?.length ? data.deletedIds : [taskId])
+      tasks.value = snapshot
+        .filter(t => !deletedIds.has(t.id))
+        .map(t => {
+          const raw = data?.updated?.find(u => u.id === t.id)
+          return raw ? { ...t, ...parseTask(raw) } : t
+        })
     } catch (err) {
-      tasks.value.push(taskToRestore)
+      tasks.value = snapshot
       console.error('Ошибка удаления задачи:', err)
       throw err
     }
@@ -339,6 +354,31 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
+  const materializeOccurrence = async (virtualTaskId: string) => {
+    const sep = '__virtual__'
+    const idx = virtualTaskId.indexOf(sep)
+    if (idx === -1) {
+      throw new Error('Not a virtual occurrence id')
+    }
+    const sourceId = virtualTaskId.slice(0, idx)
+    const timestamp = Number(virtualTaskId.slice(idx + sep.length))
+    if (!sourceId || !Number.isFinite(timestamp)) {
+      throw new Error('Invalid virtual occurrence id')
+    }
+
+    const { data } = await api.post(`/tasks/${sourceId}/materialize`, {
+      occurrenceDate: new Date(timestamp).toISOString(),
+    })
+    const created = parseTask(data as Record<string, unknown>)
+    const existingIndex = tasks.value.findIndex(t => t.id === created.id)
+    if (existingIndex === -1) {
+      tasks.value.unshift(created)
+    } else {
+      tasks.value[existingIndex] = created
+    }
+    return created
+  }
+
   const completedTasks = computed(() => tasks.value.filter(t => t.completed))
   const pendingTasks = computed(() => tasks.value.filter(t => !t.completed))
   const pomodoroTasks = computed(() => tasks.value.filter(t => t.isPomodoroTask))
@@ -363,5 +403,6 @@ export const useTaskStore = defineStore('tasks', () => {
     incrementPomodoro,
     updateChecklist,
     updatePomodoroConfig,
+    materializeOccurrence,
   }
 })

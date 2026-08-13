@@ -16,6 +16,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     completed: false,
     priority: null,
     dueDate: null,
+    recurrenceAnchorDate: null,
     deadline: null,
     location: null,
     tags: null,
@@ -239,6 +240,247 @@ describe('TaskService', () => {
         service.update(1, 'task-1', { title: 'Новое' }),
       ).rejects.toThrow(BadRequestException);
       expect(repo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — reschedule recurring dueDate', () => {
+    const monday = new Date('2026-04-06T10:00:00.000Z');
+    const wednesday = new Date('2026-04-08T15:00:00.000Z');
+    const weekly: RecurrenceRule = { frequency: 'weekly', interval: 1 };
+
+    it('default scope this: sets anchor to old dueDate', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: weekly,
+          dueDate: monday,
+          recurrenceAnchorDate: null,
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        dueDate: wednesday.toISOString(),
+      });
+
+      expect(result.task.dueDate).toEqual(wednesday);
+      expect(result.task.recurrenceAnchorDate).toEqual(monday);
+    });
+
+    it('повторный this не перезаписывает якорь', async () => {
+      const friday = new Date('2026-04-10T12:00:00.000Z');
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: weekly,
+          dueDate: wednesday,
+          recurrenceAnchorDate: monday,
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        dueDate: friday.toISOString(),
+        rescheduleScope: 'this',
+      });
+
+      expect(result.task.dueDate).toEqual(friday);
+      expect(result.task.recurrenceAnchorDate).toEqual(monday);
+    });
+
+    it('subsequent: dueDate новый, якорь сброшен', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: weekly,
+          dueDate: wednesday,
+          recurrenceAnchorDate: monday,
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        dueDate: wednesday.toISOString(),
+        rescheduleScope: 'subsequent',
+      });
+
+      expect(result.task.dueDate).toEqual(wednesday);
+      expect(result.task.recurrenceAnchorDate).toBeNull();
+    });
+
+    it('subsequent с dueDate: daysOfWeek сдвигается на новый день', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: { frequency: 'weekly', interval: 1, daysOfWeek: [1] },
+          dueDate: monday,
+          recurrenceAnchorDate: null,
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        dueDate: wednesday.toISOString(),
+        rescheduleScope: 'subsequent',
+      });
+
+      expect(result.task.recurrenceAnchorDate).toBeNull();
+      expect(result.task.recurrence).toEqual(
+        expect.objectContaining({ daysOfWeek: [3] }),
+      );
+    });
+
+    it('subsequent без dueDate: только сбрасывает якорь', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: weekly,
+          dueDate: wednesday,
+          recurrenceAnchorDate: monday,
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        rescheduleScope: 'subsequent',
+      });
+
+      expect(result.task.dueDate).toEqual(wednesday);
+      expect(result.task.recurrenceAnchorDate).toBeNull();
+    });
+
+    it('subsequent без dueDate: daysOfWeek сдвигается с якоря на dueDate', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: { frequency: 'weekly', interval: 1, daysOfWeek: [1] },
+          dueDate: wednesday,
+          recurrenceAnchorDate: monday,
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        rescheduleScope: 'subsequent',
+      });
+
+      expect(result.task.recurrenceAnchorDate).toBeNull();
+      expect(result.task.recurrence).toEqual(
+        expect.objectContaining({ daysOfWeek: [3] }),
+      );
+    });
+
+    it('reschedule auto-created курсора не сбрасывает isAutoCreated', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          recurrence: weekly,
+          dueDate: monday,
+          recurringParentId: 'root-1',
+          isAutoCreated: true,
+        }),
+      );
+
+      const thisOnly = await service.update(1, 'task-1', {
+        dueDate: wednesday.toISOString(),
+        rescheduleScope: 'this',
+      });
+      expect(thisOnly.task.isAutoCreated).toBe(true);
+
+      repo.findById.mockResolvedValue(thisOnly.task);
+      const subsequent = await service.update(1, 'task-1', {
+        rescheduleScope: 'subsequent',
+      });
+      expect(subsequent.task.isAutoCreated).toBe(true);
+    });
+
+    it('non-recurring PATCH dueDate не ставит якорь', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ recurrence: null, dueDate: monday }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        dueDate: wednesday.toISOString(),
+      });
+
+      expect(result.task.dueDate).toEqual(wednesday);
+      expect(result.task.recurrenceAnchorDate).toBeNull();
+    });
+  });
+
+  describe('materializeOccurrence', () => {
+    const weekly: RecurrenceRule = { frequency: 'weekly', interval: 1 };
+    const monday = new Date('2026-04-06T10:00:00.000Z');
+    const nextMonday = new Date('2026-04-13T10:00:00.000Z');
+
+    it('создаёт инстанс на слоте серии с isAutoCreated=false', async () => {
+      const source = makeTask({
+        id: 'root-1',
+        recurrence: weekly,
+        dueDate: monday,
+        completed: false,
+      });
+      repo.findById.mockResolvedValue(source);
+      repo.findByParentId.mockResolvedValue([source]);
+
+      const result = await service.materializeOccurrence(1, 'root-1', {
+        occurrenceDate: nextMonday.toISOString(),
+      });
+
+      expect(repo.create).toHaveBeenCalledTimes(1);
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.dueDate).toEqual(nextMonday);
+      expect(arg.isAutoCreated).toBe(false);
+      expect(arg.recurringParentId).toBe('root-1');
+      expect(arg.recurrenceAnchorDate).toBeNull();
+      expect(result).toBeDefined();
+    });
+
+    it('completed root: проявляет слот по сетке первой машины', async () => {
+      const source = makeTask({
+        id: 'root-1',
+        recurrence: weekly,
+        dueDate: monday,
+        completed: true,
+        recurringCompletedCount: 1,
+      });
+      repo.findById.mockResolvedValue(source);
+      repo.findByParentId.mockResolvedValue([]);
+
+      await service.materializeOccurrence(1, 'root-1', {
+        occurrenceDate: nextMonday.toISOString(),
+      });
+
+      expect(repo.create).toHaveBeenCalledTimes(1);
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.dueDate).toEqual(nextMonday);
+      expect(arg.isAutoCreated).toBe(false);
+      expect(arg.recurringParentId).toBe('root-1');
+    });
+
+    it('повтор того же дня → 400', async () => {
+      const source = makeTask({
+        id: 'root-1',
+        recurrence: weekly,
+        dueDate: monday,
+      });
+      const existing = makeTask({
+        id: 'mat-1',
+        recurringParentId: 'root-1',
+        dueDate: nextMonday,
+      });
+      repo.findById.mockResolvedValue(source);
+      repo.findByParentId.mockResolvedValue([source, existing]);
+
+      await expect(
+        service.materializeOccurrence(1, 'root-1', {
+          occurrenceDate: nextMonday.toISOString(),
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('день не на сетке серии → 400', async () => {
+      const source = makeTask({
+        id: 'root-1',
+        recurrence: weekly,
+        dueDate: monday,
+      });
+      repo.findById.mockResolvedValue(source);
+      repo.findByParentId.mockResolvedValue([source]);
+
+      await expect(
+        service.materializeOccurrence(1, 'root-1', {
+          occurrenceDate: new Date('2026-04-08T10:00:00.000Z').toISOString(),
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -577,6 +819,80 @@ describe('TaskService', () => {
       // currentDue=April 5 10:00, daily rule → first valid >= April 29 00:00 is April 29 10:00.
       expect(instanceArg.dueDate).toEqual(new Date('2026-04-29T10:00:00.000Z'));
     });
+
+    it('complete после this-only: next instance от якоря, не от сдвинутого dueDate', async () => {
+      jest.setSystemTime(new Date('2026-04-08T15:00:00.000Z'));
+      const task = makeTask({
+        id: 'root-1',
+        recurrence: { frequency: 'weekly', interval: 1 },
+        dueDate: new Date('2026-04-08T15:00:00.000Z'),
+        recurrenceAnchorDate: new Date('2026-04-06T10:00:00.000Z'),
+        completed: false,
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      repo.findById.mockResolvedValue(task);
+      repo.findByParentId.mockResolvedValue([task]);
+
+      await service.update(1, 'root-1', { completed: true });
+
+      const instanceArg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(instanceArg.dueDate).toEqual(new Date('2026-04-13T10:00:00.000Z'));
+      expect(instanceArg.recurrenceAnchorDate).toBeNull();
+    });
+
+    it('complete после subsequent: next по новой сетке, не по исходной', async () => {
+      jest.setSystemTime(new Date('2026-04-08T15:00:00.000Z'));
+      const task = makeTask({
+        id: 'inst-1',
+        recurrence: { frequency: 'weekly', interval: 1, daysOfWeek: [3] },
+        dueDate: new Date('2026-04-08T15:00:00.000Z'),
+        recurrenceAnchorDate: null,
+        completed: false,
+        recurringParentId: 'root-1',
+        isAutoCreated: false,
+        recurringCompletedCount: 0,
+      });
+      const root = makeTask({
+        id: 'root-1',
+        recurrence: { frequency: 'weekly', interval: 1, daysOfWeek: [1] },
+        dueDate: new Date('2026-04-06T10:00:00.000Z'),
+        completed: true,
+        recurringCompletedCount: 1,
+      });
+      repo.findById
+        .mockResolvedValueOnce(task)
+        .mockResolvedValueOnce(root);
+      repo.findByParentId.mockResolvedValue([task]);
+
+      await service.update(1, 'inst-1', { completed: true });
+
+      const instanceArg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(instanceArg.dueDate).toEqual(new Date('2026-04-15T15:00:00.000Z'));
+      expect(instanceArg.recurrence).toEqual(
+        expect.objectContaining({ daysOfWeek: [3] }),
+      );
+    });
+
+    it('complete когда следующий слот проявлен: не create, count++, return occupying', async () => {
+      const task = rootTask();
+      const occupying = makeTask({
+        id: 'mat-1',
+        recurringParentId: 'root-1',
+        dueDate: new Date('2026-04-06T10:00:00.000Z'),
+        recurrence: dailyRule,
+        isAutoCreated: false,
+        completed: false,
+      });
+      repo.findById.mockResolvedValue(task);
+      repo.findByParentId.mockResolvedValue([task, occupying]);
+
+      const result = await service.update(1, 'root-1', { completed: true });
+
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(result.nextInstance).toEqual(occupying);
+      expect(result.task.recurringCompletedCount).toBe(1);
+    });
   });
 
   describe('update — идемпотентность complete', () => {
@@ -600,6 +916,8 @@ describe('TaskService', () => {
         id: 'inst-1',
         recurringParentId: 'root-1',
         completed: false,
+        dueDate: new Date('2026-04-06T10:00:00.000Z'),
+        isAutoCreated: true,
       });
 
       repo.findById.mockResolvedValue(task);
@@ -609,6 +927,7 @@ describe('TaskService', () => {
 
       expect(repo.create).not.toHaveBeenCalled();
       expect(result.nextInstance).toEqual(existingNext);
+      expect(result.task.recurringCompletedCount).toBe(0);
     });
   });
 
@@ -896,33 +1215,86 @@ describe('TaskService', () => {
   });
 
   describe('delete — recurring задача', () => {
-    it('удаление корня -> вызывает deleteUncompletedInSeries + nullifyParentReference', async () => {
+    it('удаление корня -> сносит uncompleted семьи и чистит parentId', async () => {
       const task = makeTask({
         id: 'root-1',
         recurrence: dailyRule,
         recurringParentId: null,
       });
-
-      repo.findById.mockResolvedValue(task);
-
-      await service.delete(1, 'root-1');
-
-      expect(repo.deleteByParentId).toHaveBeenCalledWith('root-1', true);
-      expect(repo.clearParentId).toHaveBeenCalledWith('root-1');
-    });
-
-    it('удаление instance (не корня) -> НЕ вызывает deleteUncompletedInSeries', async () => {
-      const task = makeTask({
+      const child = makeTask({
         id: 'inst-1',
         recurrence: dailyRule,
         recurringParentId: 'root-1',
       });
 
       repo.findById.mockResolvedValue(task);
+      repo.findByParentId
+        .mockResolvedValueOnce([task, child])
+        .mockResolvedValueOnce([task]);
+
+      await service.delete(1, 'root-1');
+
+      expect(repo.deleteByParentId).toHaveBeenCalledWith('root-1', true);
+      expect(repo.clearParentId).toHaveBeenCalledWith('root-1');
+      expect(repo.delete).toHaveBeenCalledWith('root-1', 1);
+    });
+
+    it('удаление не-последнего instance -> только эта строка', async () => {
+      const root = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        recurringParentId: null,
+        completed: true,
+      });
+      const inst = makeTask({
+        id: 'inst-1',
+        recurrence: dailyRule,
+        recurringParentId: 'root-1',
+      });
+      const other = makeTask({
+        id: 'inst-2',
+        recurrence: dailyRule,
+        recurringParentId: 'root-1',
+      });
+
+      repo.findById.mockResolvedValue(inst);
+      repo.findByParentId.mockResolvedValue([root, inst, other]);
 
       await service.delete(1, 'inst-1');
 
       expect(repo.deleteByParentId).not.toHaveBeenCalled();
+      expect(repo.delete).toHaveBeenCalledWith('inst-1', 1);
+    });
+
+    it('удаление последнего live после completed root -> гасит recurrence у root', async () => {
+      const root = makeTask({
+        id: 'root-1',
+        recurrence: dailyRule,
+        recurringParentId: null,
+        completed: true,
+      });
+      const inst = makeTask({
+        id: 'inst-1',
+        recurrence: dailyRule,
+        recurringParentId: 'root-1',
+      });
+
+      repo.findById.mockResolvedValue(inst);
+      repo.findByParentId
+        .mockResolvedValueOnce([root, inst])
+        .mockResolvedValueOnce([root]);
+
+      const result = await service.delete(1, 'inst-1');
+
+      expect(repo.deleteByParentId).toHaveBeenCalledWith('root-1', true);
+      expect(repo.delete).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'root-1', recurrence: null }),
+      );
+      expect(result.deletedIds).toEqual(['inst-1']);
+      expect(result.updated[0]).toEqual(
+        expect.objectContaining({ id: 'root-1', recurrence: null }),
+      );
     });
 
     it('удаление обычной задачи без recurrence -> НЕ вызывает deleteUncompletedInSeries', async () => {

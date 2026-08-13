@@ -124,3 +124,159 @@ describe('tasksToCalendarEvents — past-due recurring skip-to-today', () => {
     expect(taskEvents[0]!.isVirtual).toBe(false)
   })
 })
+
+describe('tasksToCalendarEvents — this-only reschedule keeps series ghosts', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(local(2026, 4, 8, 12, 0))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('real event at dueDate, ghosts from recurrenceAnchorDate (Mon 10:00 → Wed 15:00)', () => {
+    const weekly: RecurrenceRule = { frequency: 'weekly', interval: 1 }
+    const task = baseTask({
+      id: 'moved',
+      dueDate: local(2026, 4, 8, 15, 0),
+      recurrenceAnchorDate: local(2026, 4, 6, 10, 0),
+      recurrence: weekly,
+    })
+    const weekStart = local(2026, 4, 6, 0, 0)
+    const weekEnd = local(2026, 4, 19, 23, 59)
+
+    const events = tasksToCalendarEvents([task], weekStart, weekEnd)
+    const real = events.filter(e => !e.isVirtual)
+    const ghosts = events.filter(e => e.isVirtual)
+
+    expect(real).toHaveLength(1)
+    expect(real[0]!.date).toEqual(local(2026, 4, 8, 15, 0))
+
+    expect(ghosts).toHaveLength(1)
+    expect(ghosts[0]!.date).toEqual(local(2026, 4, 13, 10, 0))
+  })
+})
+
+describe('tasksToCalendarEvents — occupied series slots / ghosts from root', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(local(2026, 4, 6, 12, 0))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const weekly: RecurrenceRule = { frequency: 'weekly', interval: 1 }
+
+  it('не рисует ghost на дне проявленного sibling', () => {
+    const root = baseTask({
+      id: 'root-1',
+      dueDate: local(2026, 4, 6, 10, 0),
+      recurrence: weekly,
+    })
+    const materialized = baseTask({
+      id: 'mat-1',
+      recurringParentId: 'root-1',
+      dueDate: local(2026, 4, 13, 10, 0),
+      recurrence: weekly,
+      isAutoCreated: false,
+    })
+    const weekStart = local(2026, 4, 6, 0, 0)
+    const weekEnd = local(2026, 4, 19, 23, 59)
+
+    const events = tasksToCalendarEvents([root, materialized], weekStart, weekEnd)
+    const ghosts = events.filter(e => e.isVirtual)
+    const reals = events.filter(e => !e.isVirtual)
+
+    expect(reals.map(e => e.taskId).sort()).toEqual(['mat-1', 'root-1'])
+    expect(ghosts).toHaveLength(0)
+  })
+
+  it('ghosts от root, не от проявленной; занятый слот sibling не рисуется', () => {
+    const root = baseTask({
+      id: 'root-1',
+      dueDate: local(2026, 4, 6, 10, 0),
+      recurrence: weekly,
+      completed: true,
+      recurringCompletedCount: 1,
+    })
+    const current = baseTask({
+      id: 'inst-1',
+      recurringParentId: 'root-1',
+      dueDate: local(2026, 4, 13, 10, 0),
+      recurrence: weekly,
+      isAutoCreated: true,
+    })
+    const materialized = baseTask({
+      id: 'mat-1',
+      recurringParentId: 'root-1',
+      dueDate: local(2026, 4, 20, 10, 0),
+      recurrenceAnchorDate: local(2026, 4, 20, 10, 0),
+      recurrence: weekly,
+      isAutoCreated: false,
+    })
+    const weekStart = local(2026, 4, 6, 0, 0)
+    const weekEnd = local(2026, 4, 27, 23, 59)
+
+    const events = tasksToCalendarEvents(
+      [root, current, materialized],
+      weekStart,
+      weekEnd,
+    )
+    const ghosts = events.filter(e => e.isVirtual)
+    const reals = events.filter(e => !e.isVirtual)
+
+    expect(reals).toHaveLength(3)
+    expect(ghosts).toHaveLength(1)
+    expect(ghosts[0]!.date).toEqual(local(2026, 4, 27, 10, 0))
+    expect(ghosts[0]!.taskId.startsWith('inst-1__virtual__')).toBe(true)
+  })
+
+  it('this-only sibling занимает слот якоря, не dueDate', () => {
+    const root = baseTask({
+      id: 'root-1',
+      dueDate: local(2026, 4, 6, 10, 0),
+      recurrence: weekly,
+    })
+    const materialized = baseTask({
+      id: 'mat-1',
+      recurringParentId: 'root-1',
+      dueDate: local(2026, 4, 15, 15, 0),
+      recurrenceAnchorDate: local(2026, 4, 13, 10, 0),
+      recurrence: weekly,
+      isAutoCreated: false,
+    })
+    const weekStart = local(2026, 4, 6, 0, 0)
+    const weekEnd = local(2026, 4, 19, 23, 59)
+
+    const events = tasksToCalendarEvents([root, materialized], weekStart, weekEnd)
+    const ghosts = events.filter(e => e.isVirtual)
+    const reals = events.filter(e => !e.isVirtual)
+
+    expect(reals.map(e => e.date.getDate()).sort((a, b) => a - b)).toEqual([6, 15])
+    expect(ghosts).toHaveLength(0)
+  })
+
+  it('не рисует ghosts если в семье нет живого курсора (только overdue/completed)', () => {
+    const root = baseTask({
+      id: 'root-1',
+      dueDate: local(2026, 4, 6, 18, 0),
+      recurrence: weekly,
+      completed: true,
+    })
+    const overdue = baseTask({
+      id: 'ov-1',
+      recurringParentId: 'root-1',
+      dueDate: local(2026, 4, 8, 18, 0),
+      isOverdue: true,
+      recurrence: weekly,
+    })
+    const weekStart = local(2026, 4, 6, 0, 0)
+    const weekEnd = local(2026, 4, 19, 23, 59)
+
+    const events = tasksToCalendarEvents([root, overdue], weekStart, weekEnd)
+    expect(events.filter(e => e.isVirtual)).toHaveLength(0)
+  })
+})

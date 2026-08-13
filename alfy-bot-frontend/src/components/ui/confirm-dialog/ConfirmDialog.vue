@@ -7,6 +7,16 @@
           {{ options?.message }}
         </AlertDialogDescription>
       </AlertDialogHeader>
+      <label
+        v-if="options?.rememberKey"
+        class="flex items-center gap-2 px-1 text-sm"
+      >
+        <Checkbox
+          :model-value="rememberChecked"
+          @update:model-value="(v) => (rememberChecked = v === true)"
+        />
+        {{ options.rememberLabel }}
+      </label>
       <AlertDialogFooter>
         <AlertDialogCancel @click="handleCancel">
           {{ options?.cancelText || 'Отмена' }}
@@ -24,6 +34,7 @@
 
 <script setup lang="ts">
 import { useConfirm } from '@/composables/useConfirm'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,5 +46,5 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-const { isOpen, options, handleConfirm, handleCancel } = useConfirm()
+const { isOpen, options, handleConfirm, handleCancel, rememberChecked } = useConfirm()
 </script>

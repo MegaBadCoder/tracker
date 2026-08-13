@@ -1,10 +1,11 @@
 import { ref, type Ref, isRef, toRef } from 'vue'
-import type { Task, ChecklistItem } from '../model/types'
+import type { Task, ChecklistItem, TaskPatch } from '../model/types'
+import { useRecurringReschedule, shouldPromptReschedule } from './use-recurring-reschedule'
 
 interface TaskStore {
   tasks: Task[] | Ref<Task[]>
   createTask: (taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) => Promise<Task>
-  updateTask: (id: string, updates: Partial<Task>, setLoading?: boolean) => Promise<unknown>
+  updateTask: (id: string, updates: TaskPatch, setLoading?: boolean) => Promise<unknown>
   deleteTask: (id: string) => Promise<void>
   updateChecklist: (id: string, items: ChecklistItem[]) => Promise<void>
   updatePomodoroConfig: (id: string, config: Record<string, unknown> | null) => Promise<void>
@@ -23,6 +24,10 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
   const autofocusTitle = ref(false)
   const pendingCreateTaskId = ref<string | null>(null)
   const tasks = isRef(store.tasks) ? store.tasks : toRef(store, 'tasks') as Ref<Task[]>
+  const { rescheduleDueDate } = useRecurringReschedule({
+    updateTask: (id, updates, setLoading) => store.updateTask(id, updates, setLoading),
+    confirm,
+  })
 
   function handleOpenTask(task: Task) {
     pendingCreateTaskId.value = null
@@ -84,12 +89,24 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
     }
     const index = tasks.value.findIndex(t => t.id === updatedTask.id)
     const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
+    const optimistic: Task = shouldPromptReschedule(previous ?? undefined, updatedTask.dueDate ?? null)
+      ? {
+          ...updatedTask,
+          recurrenceAnchorDate: previous!.recurrenceAnchorDate ?? previous!.dueDate ?? null,
+        }
+      : updatedTask
 
-    if (index !== -1) tasks.value[index] = updatedTask
-    selectedTask.value = updatedTask
+    if (index !== -1) tasks.value[index] = optimistic
+    selectedTask.value = optimistic
 
     try {
-      await store.updateTask(updatedTask.id, updatedTask, false)
+      const prevDue = previous?.dueDate?.getTime() ?? null
+      const nextDue = updatedTask.dueDate?.getTime() ?? null
+      if (previous && prevDue !== nextDue) {
+        await rescheduleDueDate(previous, updatedTask.dueDate ?? null)
+      } else {
+        await store.updateTask(updatedTask.id, updatedTask, false)
+      }
     } catch {
       if (previous && index !== -1) {
         tasks.value[index] = previous

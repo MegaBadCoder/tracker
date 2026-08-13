@@ -53,6 +53,7 @@
           @drop="onDrop"
           @dragstart="onDragStart"
           @open="onEventOpen"
+          @materialize="onMaterialize"
         />
 
         <!-- Hour grid -->
@@ -70,6 +71,7 @@
           @drop="onDrop"
           @open="onEventOpen"
           @toggle="onToggleTask"
+          @materialize="onMaterialize"
         />
 
       </div>
@@ -80,6 +82,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import { useRecurringReschedule } from '@/features/tasks/lib/use-recurring-reschedule'
+import { useConfirm } from '@/composables/useConfirm'
 import { tasksToCalendarEvents } from '../lib/calendar-events'
 import { isToday, formatDayHeader, formatDateRange, getWeekStart, navigateWeek } from '../lib/week'
 import { useCalendarDnd } from '../lib/use-calendar-dnd'
@@ -97,6 +101,8 @@ const emit = defineEmits<{
 
 const taskStore = useTaskStore()
 const { startDrag } = useCalendarDnd()
+const { rescheduleDueDate } = useRecurringReschedule()
+const { confirm } = useConfirm()
 
 const gridRef = ref<HTMLElement | null>(null)
 const { visibleDays, dateRange, dayOffset, dateFromX, scrollToDate, onScroll } = useInfiniteDays(gridRef)
@@ -145,7 +151,9 @@ async function applyTaskMove(taskId: string, newDate: Date, startMinutes?: numbe
     date.setHours(0, 0, 0, 0)
   }
   try {
-    await taskStore.updateTask(taskId, { dueDate: date }, false)
+    const task = taskStore.tasks.find(t => t.id === taskId)
+    if (!task) return
+    await rescheduleDueDate(task, date)
   } catch (err) {
     console.error('Ошибка перемещения задачи:', err)
   }
@@ -174,6 +182,22 @@ async function onToggleTask(taskId: string) {
 function onEventOpen(event: CalendarEvent) {
   if (!event.isVirtual) {
     emit('open-task', event.task)
+  }
+}
+
+async function onMaterialize(event: CalendarEvent) {
+  const ok = await confirm({
+    title: 'Проявить задачу на этот день?',
+    message: 'На этом дне появится настоящая задача. Призрак пропадёт.',
+    confirmText: 'Проявить',
+    rememberKey: 'alfy:skip-materialize-confirm',
+    rememberLabel: 'Больше не показывать',
+  })
+  if (!ok) return
+  try {
+    await taskStore.materializeOccurrence(event.taskId)
+  } catch (err) {
+    console.error('Ошибка проявления задачи:', err)
   }
 }
 

@@ -8,22 +8,44 @@ import { Task, PomodoroConfig } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { MaterializeOccurrenceDto } from './dto/materialize-occurrence.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 import { ReorderInboxTasksDto } from './dto/reorder-inbox-tasks.dto';
 import { MoveTaskToInboxDto } from './dto/move-task-inbox.dto';
 import {
+  applyDueDateReschedule,
   buildNextInstance,
   findNextOccurrenceOnOrAfter,
+  findOccupyingInstance,
+  isOccurrenceOnSeries,
+  seriesDueDate,
+  retargetRecurrenceToDate,
 } from './domain/recurrence.utils';
 import { hasCrossedPomodoroTarget } from './domain/pomodoro.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
+function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
+  const config = new PomodoroConfig();
+  config.pomodoroCount = src.pomodoroCount;
+  config.pomodoroDuration = src.pomodoroDuration;
+  config.shortBreak = src.shortBreak;
+  config.longBreak = src.longBreak;
+  config.longBreakInterval = src.longBreakInterval;
+  config.pomodoroCompleted = 0;
+  return config;
+}
+
 export interface UpdateTaskResponse {
   task: Task;
   nextInstance?: Task;
   deletedInstanceId?: string;
+}
+
+export interface DeleteTaskResponse {
+  deletedIds: string[];
+  updated: Task[];
 }
 
 @Injectable()
@@ -76,6 +98,87 @@ export class TaskService {
     return this.taskRepo.create(taskData);
   }
 
+  async materializeOccurrence(
+    userId: number,
+    sourceId: string,
+    dto: MaterializeOccurrenceDto,
+  ): Promise<Task> {
+    if (sourceId.includes('__virtual__')) {
+      throw new BadRequestException(
+        'Virtual task instances cannot be modified directly.',
+      );
+    }
+
+    const source = await this.taskRepo.findById(sourceId, userId);
+    if (!source) throw new NotFoundException(`Task #${sourceId} not found`);
+
+    if (source.isOverdue) {
+      throw new BadRequestException('Overdue task cannot be modified.');
+    }
+    if (!source.recurrence) {
+      throw new BadRequestException(
+        'Only recurring tasks can materialize occurrences.',
+      );
+    }
+
+    const timezone = await this.userSettings.getTimezone(userId);
+    const parentId = source.recurringParentId ?? source.id;
+    const rootTask = source.recurringParentId
+      ? await this.taskRepo.findById(parentId, userId)
+      : source;
+    const origin = seriesDueDate({
+      dueDate: source.dueDate,
+      recurrenceAnchorDate: source.recurrenceAnchorDate ?? null,
+    });
+    if (!origin) {
+      throw new BadRequestException('Task has no series slot.');
+    }
+
+    const occurrenceUtc = new Date(dto.occurrenceDate);
+    const originZoned = shiftToUserWallClock(origin, timezone);
+    const occurrenceZoned = shiftToUserWallClock(occurrenceUtc, timezone);
+    const rule = source.recurrence;
+    if (!rule) {
+      throw new BadRequestException(
+        'Only recurring tasks can materialize occurrences.',
+      );
+    }
+    const completedCount = rootTask?.recurringCompletedCount ?? 0;
+
+    if (
+      !isOccurrenceOnSeries(
+        originZoned,
+        rule,
+        occurrenceZoned,
+        completedCount,
+      )
+    ) {
+      throw new BadRequestException(
+        'occurrenceDate is not on the series schedule.',
+      );
+    }
+
+    const members = await this.taskRepo.findByParentId(parentId, true);
+    const occupying = this.findOccupyingMember(
+      members,
+      occurrenceZoned,
+      timezone,
+    );
+    if (occupying) {
+      throw new BadRequestException('This series slot is already occupied.');
+    }
+
+    const instanceData = buildNextInstance(source, occurrenceUtc, parentId);
+    instanceData.isAutoCreated = false;
+    if (source.pomodoroConfig) {
+      (instanceData as any).pomodoroConfig = clonePomodoroConfig(
+        source.pomodoroConfig,
+      );
+    }
+
+    return this.taskRepo.create(instanceData);
+  }
+
   async update(
     userId: number,
     id: string,
@@ -87,7 +190,7 @@ export class TaskService {
       );
     }
 
-    const { dueDate, deadline, recurrence, ...rest } = dto;
+    const { dueDate, deadline, recurrence, rescheduleScope, ...rest } = dto;
 
     const task = await this.taskRepo.findById(id, userId);
     if (!task) throw new NotFoundException(`Task #${id} not found`);
@@ -108,14 +211,35 @@ export class TaskService {
       Object.entries(rest).filter(([, v]) => v !== undefined),
     );
     Object.assign(task, defined);
-    if (dueDate !== undefined)
-      task.dueDate = dueDate ? new Date(dueDate) : null;
+    if (dueDate !== undefined) {
+      const newDue = dueDate ? new Date(dueDate) : null;
+      if ((rescheduleScope ?? 'this') === 'subsequent') {
+        await this.retargetSubsequentRecurrence(task, newDue);
+      }
+      const next = applyDueDateReschedule(
+        {
+          dueDate: task.dueDate,
+          recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
+          recurrence: task.recurrence,
+        },
+        newDue,
+        rescheduleScope ?? 'this',
+      );
+      task.dueDate = next.dueDate;
+      task.recurrenceAnchorDate = next.recurrenceAnchorDate;
+    } else if (rescheduleScope === 'subsequent') {
+      await this.retargetSubsequentRecurrence(task, task.dueDate);
+      task.recurrenceAnchorDate = null;
+    }
     if (deadline !== undefined)
       task.deadline = deadline ? new Date(deadline) : null;
     if (recurrence !== undefined) task.recurrence = recurrence ?? null;
 
-    // Mark user-modified instances as not auto-created
-    if (task.recurringParentId && !dto.completed) {
+    // Content edits detach an auto-created row from "cursor" status.
+    // dueDate / rescheduleScope keep it as the live series cursor.
+    const isRescheduleUpdate =
+      dto.rescheduleScope !== undefined || dueDate !== undefined;
+    if (task.recurringParentId && !dto.completed && !isRescheduleUpdate) {
       task.isAutoCreated = false;
     }
 
@@ -131,29 +255,59 @@ export class TaskService {
     return { task: saved };
   }
 
+  private async retargetSubsequentRecurrence(
+    task: Task,
+    toUtc: Date | null,
+  ): Promise<void> {
+    const fromUtc = seriesDueDate({
+      dueDate: task.dueDate,
+      recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
+    });
+    if (!task.recurrence || !fromUtc || !toUtc) return;
+    const timezone = await this.userSettings.getTimezone(task.userId);
+    task.recurrence = retargetRecurrenceToDate(
+      task.recurrence,
+      shiftToUserWallClock(fromUtc, timezone),
+      shiftToUserWallClock(toUtc, timezone),
+    );
+  }
+
+  private findOccupyingMember(
+    members: Task[],
+    slotZoned: Date,
+    timezone: string,
+  ): Task | undefined {
+    const zoned = members.map((member) => ({
+      member,
+      dueDate: member.dueDate
+        ? shiftToUserWallClock(member.dueDate, timezone)
+        : null,
+      recurrenceAnchorDate: member.recurrenceAnchorDate
+        ? shiftToUserWallClock(member.recurrenceAnchorDate, timezone)
+        : null,
+    }));
+    const occupying = findOccupyingInstance(zoned, slotZoned);
+    return occupying?.member;
+  }
+
   private async completeRecurringTask(
     userId: number,
     task: Task,
   ): Promise<UpdateTaskResponse> {
     const parentId = task.recurringParentId ?? task.id;
-
-    // Idempotency: check if next instance already exists
     const uncompleted = await this.taskRepo.findByParentId(parentId, true);
-    const existingNext = uncompleted.find((t) => t.id !== task.id);
+    const siblings = uncompleted.filter((t) => t.id !== task.id);
 
-    if (existingNext) {
-      task.completed = true;
-      const saved = await this.taskRepo.save(task);
-      return { task: saved, nextInstance: existingNext };
-    }
-
-    // Compute next due date
     let nextInstance: Task | undefined;
 
-    if (task.dueDate && task.recurrence) {
+    const seriesDue = seriesDueDate({
+      dueDate: task.dueDate,
+      recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
+    });
+
+    if (seriesDue && task.recurrence) {
       const timezone = await this.userSettings.getTimezone(userId);
 
-      // Get the root task for completedCount
       const rootTask = task.recurringParentId
         ? await this.taskRepo.findById(parentId, userId)
         : task;
@@ -165,8 +319,7 @@ export class TaskService {
       const startOfTodayLocal = new Date(nowLocal);
       startOfTodayLocal.setUTCHours(0, 0, 0, 0);
 
-      // Shift to user's wall clock so domain sees correct calendar day
-      const zonedDue = shiftToUserWallClock(task.dueDate, timezone);
+      const zonedDue = shiftToUserWallClock(seriesDue, timezone);
       const nextZoned = findNextOccurrenceOnOrAfter(
         zonedDue,
         task.recurrence,
@@ -174,32 +327,38 @@ export class TaskService {
         countAfterComplete,
       );
       const nextDate = nextZoned ? shiftBackToUtc(nextZoned, timezone) : null;
+      const occupying =
+        nextZoned &&
+        this.findOccupyingMember(siblings, nextZoned, timezone);
 
-      if (nextDate) {
-        const instanceData = buildNextInstance(task, nextDate, parentId);
-
-        // Copy pomodoroConfig (cascade entity, not a domain concern)
-        if (task.pomodoroConfig) {
-          const config = new PomodoroConfig();
-          config.pomodoroCount = task.pomodoroConfig.pomodoroCount;
-          config.pomodoroDuration = task.pomodoroConfig.pomodoroDuration;
-          config.shortBreak = task.pomodoroConfig.shortBreak;
-          config.longBreak = task.pomodoroConfig.longBreak;
-          config.longBreakInterval = task.pomodoroConfig.longBreakInterval;
-          config.pomodoroCompleted = 0;
-          (instanceData as any).pomodoroConfig = config;
+      if (occupying) {
+        nextInstance = occupying;
+        if (!occupying.isAutoCreated && rootTask) {
+          rootTask.recurringCompletedCount = countAfterComplete;
+          if (rootTask.id !== task.id) {
+            await this.taskRepo.save(rootTask);
+          } else {
+            task.recurringCompletedCount = countAfterComplete;
+          }
+        }
+      } else {
+        if (nextDate) {
+          const instanceData = buildNextInstance(task, nextDate, parentId);
+          if (task.pomodoroConfig) {
+            (instanceData as any).pomodoroConfig = clonePomodoroConfig(
+              task.pomodoroConfig,
+            );
+          }
+          nextInstance = await this.taskRepo.create(instanceData);
         }
 
-        nextInstance = await this.taskRepo.create(instanceData);
-      }
-
-      // Increment completed count on root
-      if (rootTask) {
-        rootTask.recurringCompletedCount = completedCount + 1;
-        if (rootTask.id !== task.id) {
-          await this.taskRepo.save(rootTask);
-        } else {
-          task.recurringCompletedCount = completedCount + 1;
+        if (rootTask) {
+          rootTask.recurringCompletedCount = countAfterComplete;
+          if (rootTask.id !== task.id) {
+            await this.taskRepo.save(rootTask);
+          } else {
+            task.recurringCompletedCount = countAfterComplete;
+          }
         }
       }
     }
@@ -304,17 +463,62 @@ export class TaskService {
     return { task: refreshed };
   }
 
-  async delete(userId: number, id: string): Promise<void> {
+  async delete(userId: number, id: string): Promise<DeleteTaskResponse> {
     const task = await this.taskRepo.findById(id, userId);
 
-    // Cascade for recurring root tasks
-    if (task?.recurrence && !task.recurringParentId) {
-      await this.taskRepo.deleteByParentId(task.id, true);
-      await this.taskRepo.clearParentId(task.id);
+    if (task && (task.recurrence || task.recurringParentId)) {
+      return this.deleteRecurringFamilyMember(userId, task);
     }
 
     const deleted = await this.taskRepo.delete(id, userId);
     if (!deleted) throw new NotFoundException(`Task #${id} not found`);
+    return { deletedIds: [id], updated: [] };
+  }
+
+  private async deleteRecurringFamilyMember(
+    userId: number,
+    task: Task,
+  ): Promise<DeleteTaskResponse> {
+    const parentId = task.recurringParentId ?? task.id;
+    const family = await this.taskRepo.findByParentId(parentId, false);
+    const liveOthers = family.filter((t) => !t.completed && t.id !== task.id);
+    const isRoot = task.recurringParentId === null;
+    const shouldEndSeries = isRoot || liveOthers.length === 0;
+
+    if (!shouldEndSeries) {
+      const deleted = await this.taskRepo.delete(task.id, userId);
+      if (!deleted) throw new NotFoundException(`Task #${task.id} not found`);
+      return { deletedIds: [task.id], updated: [] };
+    }
+
+    const live = family.filter((t) => !t.completed);
+    const deletedIds = [...new Set([task.id, ...live.map((t) => t.id)])];
+
+    await this.taskRepo.deleteByParentId(parentId, true);
+
+    const leftover = await this.taskRepo.findByParentId(parentId, false);
+    const updated: Task[] = [];
+    for (const member of leftover) {
+      if (member.id === task.id) continue;
+      if (member.recurrence || member.recurringParentId) {
+        member.recurrence = null;
+        if (isRoot) member.recurringParentId = null;
+        updated.push(await this.taskRepo.save(member));
+      }
+    }
+
+    if (isRoot) {
+      await this.taskRepo.clearParentId(parentId);
+    }
+
+    const alreadyDeleted =
+      Boolean(task.recurringParentId) && !task.completed;
+    if (!alreadyDeleted) {
+      const deleted = await this.taskRepo.delete(task.id, userId);
+      if (!deleted) throw new NotFoundException(`Task #${task.id} not found`);
+    }
+
+    return { deletedIds, updated };
   }
 
   async reorderInboxTasks(

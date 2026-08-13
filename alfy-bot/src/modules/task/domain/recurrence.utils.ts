@@ -1,12 +1,15 @@
 import type { RecurrenceRule } from '../../../shared/types/recurrence.types';
 import type { ChecklistData } from '../../../shared/types/checklist.types';
 
+export type RescheduleScope = 'this' | 'subsequent';
+
 /** Plain snapshot of task fields needed by domain logic — no ORM dependency. */
 export interface RecurringTaskSnapshot {
   title: string;
   description: string | null;
   priority: string | null;
   dueDate: Date | null;
+  recurrenceAnchorDate?: Date | null;
   deadline: Date | null;
   location: string | null;
   tags: string[] | null;
@@ -17,6 +20,76 @@ export interface RecurringTaskSnapshot {
   order: number;
   checklist: ChecklistData | null;
   onMissed: 'shift' | 'freeze';
+}
+
+export interface SeriesDueFields {
+  dueDate: Date | null;
+  recurrenceAnchorDate: Date | null;
+}
+
+export interface Rescheduleable extends SeriesDueFields {
+  recurrence: RecurrenceRule | null;
+}
+
+/** Series slot used to project ghosts and spawn the next instance. */
+export function seriesDueDate(task: SeriesDueFields): Date | null {
+  return task.recurrenceAnchorDate ?? task.dueDate;
+}
+
+/**
+ * Move this instance and/or the series anchor.
+ * `this` keeps the original schedule; `subsequent` makes the new dueDate the series slot.
+ */
+export function applyDueDateReschedule(
+  task: Rescheduleable,
+  newDueDate: Date | null,
+  scope: RescheduleScope,
+): SeriesDueFields {
+  if (newDueDate === null) {
+    return { dueDate: null, recurrenceAnchorDate: null };
+  }
+
+  if (!task.recurrence) {
+    return { dueDate: newDueDate, recurrenceAnchorDate: null };
+  }
+
+  if (scope === 'subsequent') {
+    return { dueDate: newDueDate, recurrenceAnchorDate: null };
+  }
+
+  const anchor = task.recurrenceAnchorDate ?? task.dueDate;
+  if (anchor && anchor.getTime() === newDueDate.getTime()) {
+    return { dueDate: newDueDate, recurrenceAnchorDate: null };
+  }
+
+  return { dueDate: newDueDate, recurrenceAnchorDate: anchor };
+}
+
+/**
+ * Shift the rule so remaining occurrences follow `toDate`'s wall-clock
+ * weekday / day-of-month. Dates must already be in user wall-clock UTC fields.
+ */
+export function retargetRecurrenceToDate(
+  rule: RecurrenceRule,
+  fromSlot: Date,
+  toDate: Date,
+): RecurrenceRule {
+  if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+    const delta = (toDate.getUTCDay() - fromSlot.getUTCDay() + 7) % 7;
+    if (delta === 0) return rule;
+    const daysOfWeek = [
+      ...new Set(rule.daysOfWeek.map((day) => (day + delta) % 7)),
+    ].sort((a, b) => a - b);
+    return { ...rule, daysOfWeek };
+  }
+
+  if (rule.frequency === 'monthly') {
+    const dayOfMonth = toDate.getUTCDate();
+    if (rule.dayOfMonth === dayOfMonth) return rule;
+    return { ...rule, dayOfMonth };
+  }
+
+  return rule;
 }
 
 export function isSeriesEnded(
@@ -144,13 +217,14 @@ export interface NextInstanceData {
   description: string | null;
   priority: string | null;
   dueDate: Date;
+  recurrenceAnchorDate: null;
   deadline: Date | null;
   location: string | null;
   tags: string[] | null;
   recurrence: RecurrenceRule | null;
   recurringParentId: string;
   recurringCompletedCount: 0;
-  isAutoCreated: true;
+  isAutoCreated: boolean;
   completed: false;
   userId: number;
   projectId: string | null;
@@ -174,6 +248,7 @@ export function buildNextInstance(
     description: completedTask.description,
     priority: completedTask.priority,
     dueDate: nextDueDate,
+    recurrenceAnchorDate: null,
     deadline: completedTask.deadline,
     location: completedTask.location,
     tags: completedTask.tags ? [...completedTask.tags] : null,
@@ -221,6 +296,49 @@ export function findNextOccurrenceOnOrAfter(
   throw new Error(
     `findNextOccurrenceOnOrAfter exceeded ${MAX_ITERATIONS} iterations for frequency=${rule.frequency}`,
   );
+}
+
+export function isSameUtcDay(a: Date, b: Date): boolean {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  );
+}
+
+/** True if `occurrenceDate` is a future step of the series starting at `originDue`. */
+export function isOccurrenceOnSeries(
+  originDue: Date,
+  rule: RecurrenceRule,
+  occurrenceDate: Date,
+  completedCount = 0,
+): boolean {
+  const startOfOccurrenceDay = new Date(occurrenceDate);
+  startOfOccurrenceDay.setUTCHours(0, 0, 0, 0);
+
+  let landed: Date | null;
+  try {
+    landed = findNextOccurrenceOnOrAfter(
+      originDue,
+      rule,
+      startOfOccurrenceDay,
+      completedCount,
+    );
+  } catch {
+    return false;
+  }
+
+  return landed !== null && isSameUtcDay(landed, occurrenceDate);
+}
+
+export function findOccupyingInstance<T extends SeriesDueFields>(
+  members: T[],
+  slotDate: Date,
+): T | undefined {
+  return members.find((member) => {
+    const slot = seriesDueDate(member);
+    return slot !== null && isSameUtcDay(slot, slotDate);
+  });
 }
 
 function resetChecklist(checklist: ChecklistData | null): ChecklistData | null {

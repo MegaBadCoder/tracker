@@ -67,6 +67,7 @@
         @grab="onGrab"
         @resize-start="onResizeStart"
         @toggle="(taskId) => $emit('toggle', taskId)"
+        @materialize="(event) => $emit('materialize', event)"
       />
 
       <!-- Drag overlay ghost -->
@@ -122,6 +123,7 @@ const emit = defineEmits<{
   drop: [payload: CalendarDropPayload]
   open: [event: CalendarEvent]
   toggle: [taskId: string]
+  materialize: [event: CalendarEvent]
 }>()
 
 const trackRef = ref<HTMLElement | null>(null)
