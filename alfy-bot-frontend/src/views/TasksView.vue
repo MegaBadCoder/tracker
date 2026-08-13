@@ -6,7 +6,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import PageContainer from '@/components/PageContainer.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useProjectStore } from '@/features/projects/model/project-store'
-import { useTimerStore } from '@/features/task-timer'
+import { toTimerTask, useTimerStore } from '@/features/task-timer'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
 import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
@@ -115,14 +115,7 @@ function handleShowTimer(taskId: string) {
   if (!task?.isPomodoroTask)
     return
 
-  startTask({
-    id: task.id,
-    pomodoroTime: task.pomodoroDuration || 25,
-    breakTime: task.shortBreak || 5,
-    longBreakTime: task.longBreak || 15,
-    longBreakInterval: task.longBreakInterval || 4,
-    pomodoroCount: task.pomodoroCount || 4,
-  })
+  startTask(toTimerTask(task))
 }
 
 async function handleDeleteTask(taskId: string) {
