@@ -156,7 +156,7 @@ describe('Tasks (e2e)', () => {
         .send({ title: 'Updated title' })
         .expect(200);
 
-      expect(body.title).toBe('Updated title');
+      expect(body.task.title).toBe('Updated title');
     });
 
     it('toggles completed', async () => {
@@ -166,7 +166,7 @@ describe('Tasks (e2e)', () => {
         .send({ completed: true })
         .expect(200);
 
-      expect(body.completed).toBe(true);
+      expect(body.task.completed).toBe(true);
     });
 
     it('updates dates', async () => {
@@ -176,7 +176,57 @@ describe('Tasks (e2e)', () => {
         .send({ dueDate: '2026-04-01T00:00:00.000Z' })
         .expect(200);
 
-      expect(body.dueDate).toBeTruthy();
+      expect(body.task.dueDate).toBeTruthy();
+    });
+  });
+
+  describe('PATCH /api/tasks/:id/pomodoro', () => {
+    let taskId: string;
+
+    beforeAll(async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/api/tasks')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          title: 'Two pomodoros',
+          isPomodoroTask: true,
+          pomodoroCount: 2,
+          pomodoroDuration: 25,
+        })
+        .expect(201);
+      taskId = body.id;
+    });
+
+    it('first increment leaves the task open', async () => {
+      const { body } = await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}/pomodoro`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ increment: 1 })
+        .expect(200);
+
+      expect(body.task.completed).toBe(false);
+      expect(body.task.pomodoroConfig.pomodoroCompleted).toBe(1);
+    });
+
+    it('increment reaching pomodoroCount completes the task', async () => {
+      const { body } = await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}/pomodoro`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ increment: 1 })
+        .expect(200);
+
+      expect(body.task.completed).toBe(true);
+    });
+
+    it('further increments keep counting without re-completing', async () => {
+      const { body } = await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}/pomodoro`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ increment: 1 })
+        .expect(200);
+
+      expect(body.task.completed).toBe(true);
+      expect(body.task.pomodoroConfig.pomodoroCompleted).toBe(3);
     });
   });
 

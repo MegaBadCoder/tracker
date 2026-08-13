@@ -317,6 +317,104 @@ describe('TaskService', () => {
         NotFoundException,
       );
     });
+
+    // findById is read twice (before/after the increment); a third read happens
+    // inside update() when the task auto-completes.
+    const seedIncrement = (before: Task, after: Task) => {
+      repo.findById
+        .mockResolvedValueOnce(before)
+        .mockResolvedValueOnce(after)
+        .mockResolvedValue(after);
+    };
+
+    const pomodoroTask = (
+      pomodoroCompleted: number,
+      overrides: Partial<Task> = {},
+    ) =>
+      makeTask({
+        pomodoroConfig: makePomodoroConfig({
+          pomodoroCount: 4,
+          pomodoroCompleted,
+        }),
+        ...overrides,
+      });
+
+    it('пересечение порога закрывает задачу', async () => {
+      seedIncrement(pomodoroTask(3), pomodoroTask(4));
+
+      const result = await service.incrementPomodoro(1, 'task-1', 1);
+
+      expect(result.task.completed).toBe(true);
+      expect(repo.save).toHaveBeenCalled();
+    });
+
+    it('порог не достигнут — возвращает свежий счётчик, не закрывая задачу', async () => {
+      seedIncrement(pomodoroTask(3), pomodoroTask(3.6));
+
+      const result = await service.incrementPomodoro(1, 'task-1', 0.6);
+
+      expect(result.task.completed).toBe(false);
+      expect(result.task.pomodoroConfig?.pomodoroCompleted).toBe(3.6);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('уже выполненная задача не закрывается повторно', async () => {
+      seedIncrement(
+        pomodoroTask(3, { completed: true }),
+        pomodoroTask(4, { completed: true }),
+      );
+
+      await service.incrementPomodoro(1, 'task-1', 1);
+
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('overdue задача не закрывается и не бросает', async () => {
+      seedIncrement(
+        pomodoroTask(3, { isOverdue: true }),
+        pomodoroTask(4, { isOverdue: true }),
+      );
+
+      const result = await service.incrementPomodoro(1, 'task-1', 1);
+
+      expect(result.task.completed).toBe(false);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('задача без pomodoroConfig не закрывается', async () => {
+      seedIncrement(makeTask(), makeTask());
+
+      const result = await service.incrementPomodoro(1, 'task-1', 1);
+
+      expect(result.task.completed).toBe(false);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('recurring задача при пересечении порога порождает следующий instance', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+
+      const recurring = (pomodoroCompleted: number) =>
+        pomodoroTask(pomodoroCompleted, {
+          id: 'root-1',
+          recurrence: { frequency: 'daily', interval: 1 } as RecurrenceRule,
+          dueDate: new Date('2026-04-05T10:00:00.000Z'),
+          recurringParentId: null,
+          recurringCompletedCount: 0,
+        });
+      seedIncrement(recurring(3), recurring(4));
+
+      const result = await service.incrementPomodoro(1, 'root-1', 1);
+
+      expect(result.task.completed).toBe(true);
+      expect(repo.create).toHaveBeenCalledTimes(1);
+      const instanceArg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(instanceArg.recurringParentId).toBe('root-1');
+      expect(instanceArg.pomodoroConfig?.pomodoroCompleted).toBe(0);
+      expect(result.nextInstance).toBeDefined();
+
+      jest.useRealTimers();
+    });
   });
 
   describe('delete', () => {
