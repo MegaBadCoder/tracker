@@ -1,6 +1,6 @@
 import type { Task } from '@/features/tasks/model/types'
 import { describe, expect, it } from 'vitest'
-import { getActiveTasksAt } from '@/features/tasks/lib/active-tasks'
+import { getActiveTasksAt, getTaskProgressAt } from '@/features/tasks/lib/active-tasks'
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -85,5 +85,48 @@ describe('getActiveTasksAt', () => {
     const short = plain('2026-08-13T16:00:00', 30, { id: 'short' })
     const result = getActiveTasksAt([short, long], at('2026-08-13T16:10:00'))
     expect(result.map(t => t.id)).toEqual(['long', 'short'])
+  })
+})
+
+describe('getTaskProgressAt', () => {
+  it('на середине окна даёт ratio 0.5 и половину остатка', () => {
+    const task = plain('2026-08-13T12:00:00', 60)
+    expect(getTaskProgressAt(task, at('2026-08-13T12:30:00'))).toEqual({
+      ratio: 0.5,
+      remainingMinutes: 30,
+    })
+  })
+
+  it('в момент старта ratio 0, остаток равен всей длительности', () => {
+    const task = plain('2026-08-13T12:00:00', 60)
+    expect(getTaskProgressAt(task, at('2026-08-13T12:00:00'))).toEqual({
+      ratio: 0,
+      remainingMinutes: 60,
+    })
+  })
+
+  it('за пределами окна ratio зажимается в 0..1, остаток не уходит в минус', () => {
+    const task = plain('2026-08-13T12:00:00', 60)
+    expect(getTaskProgressAt(task, at('2026-08-13T14:00:00'))).toEqual({
+      ratio: 1,
+      remainingMinutes: 0,
+    })
+    expect(getTaskProgressAt(task, at('2026-08-13T11:00:00'))?.ratio).toBe(0)
+  })
+
+  it('учитывает перерывы помидоро: на 12:02 из окна 11:35–12:30 остаётся 28 минут', () => {
+    const task = makeTask({
+      dueDate: new Date('2026-08-13T11:35:00'),
+      isPomodoroTask: true,
+      pomodoroCount: 2,
+      pomodoroDuration: 25,
+      shortBreak: 5,
+    })
+    expect(getTaskProgressAt(task, at('2026-08-13T12:02:00'))?.remainingMinutes).toBe(28)
+  })
+
+  it('задача без окна даёт null', () => {
+    expect(getTaskProgressAt(makeTask(), at('2026-08-13T12:00:00'))).toBeNull()
+    expect(getTaskProgressAt(plain('2026-08-13T00:00:00', 60), at('2026-08-13T00:30:00'))).toBeNull()
   })
 })
