@@ -395,8 +395,12 @@ export const useTimerStore = defineStore('timer', () => {
 
   const isBreakPhase = computed(() => checkPhase.isBreakPhase(phase.value))
 
+  /** Which task the session belongs to — lets callers tell "running" from "running on something else". */
+  const activeTaskId = computed(() => currentSettings.value.taskId)
+
   return {
     isActive,
+    activeTaskId,
     phase,
     timeBlock,
     namePhase,
