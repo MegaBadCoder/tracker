@@ -15,6 +15,7 @@ import { ReportModule } from './modules/report/report.module';
 import { TaskModule } from './modules/task/task.module';
 import { ProjectModule } from './modules/project/project.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { EventsModule } from './modules/events/events.module';
 import { UserModule } from './modules/user/user.module';
 import {
   Goal,
@@ -81,6 +82,7 @@ const telegramImports = isTelegramEnabled()
     TaskModule,
     ProjectModule,
     NotificationModule,
+    EventsModule,
   ],
   controllers: [AppController],
   providers: [

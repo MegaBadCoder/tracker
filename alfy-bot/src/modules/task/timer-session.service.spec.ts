@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TimerSessionService } from './timer-session.service';
 import { TimerSessionRepositoryPort } from './domain/timer-session-repository.port';
 import { NotificationPort } from './domain/notification.port';
+import { UserEventsPort } from '../events/domain/user-events.port';
 import { TimerSession, Task } from '../../shared/entities';
 
 function makeSession(overrides: Partial<TimerSession> = {}): TimerSession {
@@ -27,6 +28,7 @@ describe('TimerSessionService', () => {
   let service: TimerSessionService;
   let timerRepo: Record<string, jest.Mock>;
   let notification: Record<string, jest.Mock>;
+  let events: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     timerRepo = {
@@ -41,11 +43,16 @@ describe('TimerSessionService', () => {
       send: jest.fn().mockResolvedValue(undefined),
     };
 
+    events = {
+      emit: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TimerSessionService,
         { provide: TimerSessionRepositoryPort, useValue: timerRepo },
         { provide: NotificationPort, useValue: notification },
+        { provide: UserEventsPort, useValue: events },
       ],
     }).compile();
 
@@ -66,6 +73,7 @@ describe('TimerSessionService', () => {
 
       expect(timerRepo.create).toHaveBeenCalled();
       expect(timerRepo.save).toHaveBeenCalled();
+      expect(events.emit).toHaveBeenCalledWith(1, 'timer.updated');
       expect(result.taskId).toBe('task-1');
       expect(result.isActive).toBe(true);
     });
@@ -140,6 +148,7 @@ describe('TimerSessionService', () => {
         '⏹ Таймер по задаче "Код ревью" остановлен',
       );
       expect(timerRepo.remove).toHaveBeenCalledWith(session);
+      expect(events.emit).toHaveBeenCalledWith(1, 'timer.updated');
     });
 
     it('ничего не делает если сессии нет', async () => {
@@ -149,6 +158,7 @@ describe('TimerSessionService', () => {
 
       expect(timerRepo.remove).not.toHaveBeenCalled();
       expect(notification.send).not.toHaveBeenCalled();
+      expect(events.emit).not.toHaveBeenCalled();
     });
   });
 
@@ -172,6 +182,7 @@ describe('TimerSessionService', () => {
         1,
         '⏰ Таймер по задаче "Написать отчёт" завершён!',
       );
+      expect(events.emit).toHaveBeenCalledWith(1, 'timer.updated');
     });
 
     it('обрабатывает несколько истёкших сессий', async () => {
@@ -205,6 +216,7 @@ describe('TimerSessionService', () => {
 
       expect(timerRepo.save).not.toHaveBeenCalled();
       expect(notification.send).not.toHaveBeenCalled();
+      expect(events.emit).not.toHaveBeenCalled();
     });
 
     it('вызывает notification.send для каждой истёкшей сессии', async () => {

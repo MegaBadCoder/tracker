@@ -9,7 +9,9 @@ cleanupOutdatedCaches()
 
 registerRoute(
   ({ url }) =>
-    url.origin === self.location.origin && url.pathname.startsWith('/api'),
+    url.origin === self.location.origin &&
+    url.pathname.startsWith('/api') &&
+    !url.pathname.startsWith('/api/events'),
   new NetworkOnly(),
 )
 

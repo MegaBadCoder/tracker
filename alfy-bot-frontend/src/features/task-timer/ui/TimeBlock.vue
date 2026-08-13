@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useTimerStore } from '../model/timer-store'
+import { Pause, Play, Square } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import { Play, Pause, Square } from 'lucide-vue-next'
+import { useSse } from '@/composables/useSse'
+import { useTimerStore } from '../model/timer-store'
 
 const store = useTimerStore()
 const isFullscreen = ref(false)
@@ -54,6 +55,11 @@ document.addEventListener('visibilitychange', async () => {
 
 onMounted(() => {
   store.restoreSession()
+})
+
+useSse('/events', (event) => {
+  if (event === 'timer.updated')
+    void store.restoreSession()
 })
 
 onUnmounted(() => {
