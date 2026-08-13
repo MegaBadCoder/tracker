@@ -77,6 +77,18 @@ describe('currentTaskWidget', () => {
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ id: 'task-1' }))
   })
 
+  // Суть виджета: он обязан сам перестать показывать задачу, когда её окно
+  // истекло, без перезагрузки страницы.
+  it('убирает задачу, когда её окно истекает по тику часов', async () => {
+    const wrapper = mountWith([activeTask({ isPomodoroTask: false, durationMinutes: 60 })])
+    expect(wrapper.text()).toContain('Математика')
+
+    vi.setSystemTime(new Date(NOW.getTime() + 60 * MINUTE))
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    expect(wrapper.text()).not.toContain('Математика')
+  })
+
   it('показывает все активные задачи, когда их несколько', () => {
     const wrapper = mountWith([
       activeTask(),

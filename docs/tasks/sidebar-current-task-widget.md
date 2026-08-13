@@ -1,6 +1,6 @@
 # Виджет «Текущая задача» в сайдбаре
 
-**Status:** reviewing
+**Status:** done
 **Branch:** feat/sidebar-current-task-widget
 **Worktree:** /Users/v/projects/Alfy-worktrees/sidebar-current-task-widget
 **Mode:** interactive
@@ -215,4 +215,25 @@ Notes:
 - Тест виджета изначально падал на моей же фикстуре: для помидоро-задачи `computeTaskDurationMinutes` игнорирует `durationMinutes` и считает окно из настроек. Часы в тесте зафиксированы через `vi.setSystemTime`, иначе прогон ровно в 00:00 попадал бы на all-day guard.
 
 ## Conclusion
-<empty — filled by up:ureview>
+
+Outcome: сайдбар секции задач показывает идущие сейчас задачи с запуском помодоро по кнопке — `20f2a26`, `3ea68af`, `9196aeb`.
+
+Invariants:
+- чистота `getActiveTasksAt` / `toTimerTask` — грепом: ни импортов Vue и Pinia, ни `Date.now()`/`new Date()` внутри
+- граница `end` исключающая — юнит-тест на `now` ровно в `end`; в браузере смежные задачи не показывались вдвоём
+- исключения (без `dueDate`, all-day `00:00`, `completed`, `isOverdue`) — по тесту на каждое; в smoke закрытие обеих задач убрало виджет целиком
+- только `taskStore.tasks` — в `CurrentTaskWidget.vue` нет ни одного упоминания календаря, `tasksToCalendarEvents` не импортируется
+- кнопка только у `isPomodoroTask` — тест плюс визуально: у «Рабочей сессии» кнопки нет
+- один маппинг в `startTask` — три вызова, все через `toTimerTask`
+- `||`-семантика — тест `pomodoroDuration: 0 → 25`, написанный до перевода вызовов
+- оба сайдбара — виджет виден и на десктопе, и в мобильной панели на 375px
+- `features/calendar/**`, `alfy-bot/`, `alfy-mcp` отсутствуют в `git diff --name-only 5e4c4bb..HEAD`
+
+Review findings:
+- Important: реактивность по тику `useNow` — суть фичи — не была покрыта ни одним тестом (юниты фиксировали часы и не прокручивали их, в браузере минуту не ждали). Поведение проверено и работает; добавлен постоянный тест «убирает задачу, когда её окно истекает по тику часов» с `advanceTimersByTimeAsync`.
+
+Future work:
+- `computeTaskDurationMinutes` берёт дефолты через `??`, а `toTimerTask` — через `||`. Для задачи с `pomodoroCount: 0` это расходится: окно выйдет нулевым и в виджет она не попадёт никогда, хотя таймер по ней запустился бы на 4 помидора. Justification: `duration.ts` пре-существует и задачей не затрагивался; на достижимых путях расхождение не проявляется, потому что до кнопки такая задача не доходит.
+- `HourGrid.vue` продолжает держать собственный `setInterval(60_000)` вместо `useNow`. Justification: инвариант задачи — `features/calendar/**` не изменяется.
+
+Verified by: браузерный smoke на живом стенде — детали в `## Verify`. Ревью проведено инлайн, без независимого `up:reviewer`: окружение сессии запрещает диспатч субагентов без явной просьбы пользователя, поэтому независимость стадии слабее, чем предполагает скилл.
