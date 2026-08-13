@@ -1,6 +1,6 @@
 # Автозакрытие задачи при выполнении всех помидоров
 
-**Status:** executing
+**Status:** reviewing
 **Branch:** feat/auto-complete-task-on-pomodoros-done
 **Worktree:** /Users/v/projects/Alfy-worktrees/auto-complete-pomodoros
 **Mode:** interactive
@@ -183,7 +183,41 @@ Phase 1 → Phase 2: фронт-тесты мокают форму ответа,
 - Rollback: обе фазы — отдельные коммиты, откатываются независимо; при откате только Phase 2 бэкенд продолжит закрывать задачи, фронт увидит это после `fetchTasks`.
 
 ## Verify
-<empty — filled by up:uverify>
+
+**Result:** passed
+
+Прогонялось в worktree `/Users/v/projects/Alfy-worktrees/auto-complete-pomodoros` на `9a7b4b6`.
+
+Positive:
+- backend unit 349/349, e2e 31/31, frontend 51 файл / 321 тест, `vue-tsc` чисто
+- предикат: полный переход, дробный переход, float-дребезг снизу
+- сервис: пересечение порога закрывает задачу; recurring порождает `nextInstance` с `pomodoroCompleted = 0`
+- фронт: ответ с `completed: true` применяется к стору; `nextInstance` попадает в стор
+
+Negative:
+- порог не достигнут → счётчик свежий, `completed` не менялся
+- уже выполненная / `isOverdue` / без `pomodoroConfig` / `target = 0` → не закрывается, не бросает
+- ошибка API → оптимистичный бамп откатывается к снимку
+- фаза перерыва → инкремент не пишется
+
+Invariants:
+- `/tasks/:id/pomodoro` вызывается ровно из одного места на фронте — `task-store.ts:215`
+- `pomodoro.utils.ts` не имеет ни одного импорта
+- автозакрытие идёт только через `this.update(..., { completed: true })`, второй ветки завершения нет
+- инкремент уходит на бэк и когда задачи нет в локальном сторе
+- `features/calendar`, `alfy-mcp`, `modules/bot` в диффе обеих фаз отсутствуют
+
+Smoke: живой сервер на :3099 (отдельная БД), реальные curl —
+`pomodoroCount=2`: +1 → `completed:false, done:1`; +1 → `completed:true, done:2`.
+Escape-hatch: снять галочку → +1 → `completed:false, done:3` (не перезакрывается).
+Дробное: `pomodoroCount=1`, +0.5 → открыта; +0.5 → `completed:true`.
+Recurring daily: +1 → `completed:true` + `nextInstance` на следующий день, `pomodoroCompleted=0`, `recurringParentId` проставлен.
+Без конфига: +5 → `completed:false`.
+
+Notes:
+- В worktree нет untracked `.env`, поэтому e2e и smoke запускались с подставными `SMTP_*` / `BOT_TOKEN` / `JWT_SECRET` в командной строке. Копирование реального `.env` с секретами намеренно не делалось.
+- Полный `npm run test:e2e` в worktree не завершается сам из-за открытых хендлов в teardown (тесты при этом проходят) — прогонялось с `--forceExit`. В основном дереве с настоящим `.env` завершается штатно, так что это свойство подставного окружения, а не регрессия.
+- Фронтовый lint даёт 1913 проблем по всему репозиторию (стилевые правила `perfectionist`/`antfu`, нарушены и в нетронутых файлах вроде `vitest.config.ts`). По двум изменённым файлам: 82 → 81, то есть долга не добавлено. Приводить два файла к стандарту, который нарушают остальные 49, не стал.
 
 ## Conclusion
 <empty — filled by up:ureview>
