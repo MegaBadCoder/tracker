@@ -8,8 +8,8 @@ import { habitsNavLinks } from '@/router/habits-nav'
 import { tasksNavLinks } from '@/router/tasks-nav'
 import AppSidebar from './AppSidebar.vue'
 
-const ProjectTreeNav = defineAsyncComponent(() =>
-  import('@/features/projects/ui/ProjectTreeNav.vue'),
+const TasksSidebarSection = defineAsyncComponent(() =>
+  import('./TasksSidebarSection.vue'),
 )
 
 const route = useRoute()
@@ -22,7 +22,7 @@ const sectionNavRegistry: Record<string, NavLink[]> = {
 }
 
 const sectionExtraRegistry: Record<string, Component> = {
-  tasks: ProjectTreeNav,
+  tasks: TasksSidebarSection,
 }
 
 const sectionLinks = computed<NavLink[] | undefined>(() => {
