@@ -66,7 +66,7 @@ export interface TaskCardEmits {
   (e: 'open', task: Task): void
 }
 
-export type TaskPatch = Partial<Task> & {
+export type TaskPatch = Omit<Partial<Task>, 'dueDate'> & {
   rescheduleScope?: RescheduleScope
   dueDate?: Date | null
 }
