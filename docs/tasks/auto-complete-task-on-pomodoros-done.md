@@ -2,7 +2,7 @@
 
 **Status:** executing
 **Branch:** feat/auto-complete-task-on-pomodoros-done
-**Worktree:** none (работаем в /Users/v/projects/Alfy)
+**Worktree:** /Users/v/projects/Alfy-worktrees/auto-complete-pomodoros
 **Mode:** interactive
 
 ## Design
@@ -191,6 +191,7 @@ Phase 1 → Phase 2: фронт-тесты мокают форму ответа,
 ### Deviations from plan
 
 - Добавлены `alfy-bot/test/setup-e2e-env.ts` + `setupFiles` в `test/jest-e2e.json` — план их не предусматривал. Без них Phase 1.6 непроверяема: `app.module.ts` вычисляет `isTelegramEnabled()` во время импорта модуля, а `test/helpers/test-app.ts:29` выставляет `ENABLE_TELEGRAM=false` только внутри `createTestApp()`, то есть уже после импорта. Telegraf стартовал и валил каждый suite, использующий `createTestApp`, с `401: Bot Token is required`. Было 4 из 31 проходящих e2e, стало 31 из 31.
+- Задача переехала в worktree `/Users/v/projects/Alfy-worktrees/auto-complete-pomodoros` между Phase 1 и Phase 2. Причина внешняя: в основном дереве `/Users/v/projects/Alfy` кто-то застэшил незакоммиченную Phase 2 (`stash@{0}`, «wip pomodoro frontend») и переключился на `feat/reschedule-recurring-this-vs-series`, где идёт параллельная работа. Ничего не потеряно — Phase 1 была в коммите `24e2d8c`, Phase 2 восстановлена из стэша в worktree.
 - Починены три стухших ассерта в `tasks.e2e-spec.ts` (`PATCH /api/tasks/:id`): `body.title` / `body.completed` / `body.dueDate` → `body.task.*`. Эндпоинт возвращает `UpdateTaskResponse` со времён задачи про recurring; тесты просто никогда не доходили до ассертов из-за поломки выше. Этот эндпоинт задачей не затрагивался.
 
 ### Hands-off decisions

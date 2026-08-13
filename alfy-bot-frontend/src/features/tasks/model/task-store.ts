@@ -47,6 +47,42 @@ export const useTaskStore = defineStore('tasks', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  /**
+   * Apply a backend UpdateTaskResponse — { task, nextInstance?, deletedInstanceId? } —
+   * to the store. Shared by every endpoint that returns that shape.
+   */
+  const applyUpdateResponse = (response: Record<string, unknown>, taskId: string): Task => {
+    const taskData = response.task ? response.task as Record<string, unknown> : response
+    const updatedTask = parseTask(taskData)
+
+    const index = tasks.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+      const existing = tasks.value[index]!
+      tasks.value[index] = { ...existing, ...updatedTask, checklist: existing.checklist }
+    }
+
+    // Handle recurring: add or refresh next instance in store.
+    // On complete -> brand-new instance; on uncomplete -> promoted existing instance with updated fields.
+    if (response.nextInstance) {
+      const nextInstance = parseTask(response.nextInstance as Record<string, unknown>)
+      const existingIndex = tasks.value.findIndex(t => t.id === nextInstance.id)
+      if (existingIndex === -1) {
+        tasks.value.unshift(nextInstance)
+      } else {
+        const existing = tasks.value[existingIndex]!
+        tasks.value[existingIndex] = { ...existing, ...nextInstance, checklist: existing.checklist }
+      }
+    }
+
+    // Handle recurring: remove deleted instance from store
+    if (response.deletedInstanceId) {
+      const deletedId = response.deletedInstanceId as string
+      tasks.value = tasks.value.filter(t => t.id !== deletedId)
+    }
+
+    return updatedTask
+  }
+
   const fetchTasks = async () => {
     loading.value = true
     error.value = null
@@ -119,37 +155,7 @@ export const useTaskStore = defineStore('tasks', () => {
       } = updates as Record<string, unknown>
       const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(rest))
 
-      // Backend returns UpdateTaskResponse: { task, nextInstance?, deletedInstanceId? }
-      const response = data as Record<string, unknown>
-      const taskData = response.task ? response.task as Record<string, unknown> : response
-      const updatedTask = parseTask(taskData)
-
-      const index = tasks.value.findIndex(t => t.id === taskId)
-      if (index !== -1) {
-        const existing = tasks.value[index]!
-        tasks.value[index] = { ...existing, ...updatedTask, checklist: existing.checklist }
-      }
-
-      // Handle recurring: add or refresh next instance in store.
-      // On complete -> brand-new instance; on uncomplete -> promoted existing instance with updated fields.
-      if (response.nextInstance) {
-        const nextInstance = parseTask(response.nextInstance as Record<string, unknown>)
-        const existingIndex = tasks.value.findIndex(t => t.id === nextInstance.id)
-        if (existingIndex === -1) {
-          tasks.value.unshift(nextInstance)
-        } else {
-          const existing = tasks.value[existingIndex]!
-          tasks.value[existingIndex] = { ...existing, ...nextInstance, checklist: existing.checklist }
-        }
-      }
-
-      // Handle recurring: remove deleted instance from store
-      if (response.deletedInstanceId) {
-        const deletedId = response.deletedInstanceId as string
-        tasks.value = tasks.value.filter(t => t.id !== deletedId)
-      }
-
-      return updatedTask
+      return applyUpdateResponse(data as Record<string, unknown>, taskId)
     } catch (err) {
       if (setLoading) {
         error.value = err instanceof Error ? err.message : 'Ошибка обновления задачи'
@@ -195,15 +201,21 @@ export const useTaskStore = defineStore('tasks', () => {
   }
 
   const incrementPomodoro = async (taskId: string, increment: number) => {
+    // The task may not be in the store yet (the timer restores its session before
+    // fetchTasks resolves) — the increment must still reach the backend, so only
+    // the optimistic bump is conditional.
     const task = tasks.value.find(t => t.id === taskId)
-    if (!task || !task.isPomodoroTask) return
+    const previousCompleted = task?.pomodoroCompleted ?? 0
 
-    task.pomodoroCompleted = Math.round(((task.pomodoroCompleted || 0) + increment) * 100) / 100
+    if (task) {
+      task.pomodoroCompleted = Math.round((previousCompleted + increment) * 100) / 100
+    }
 
     try {
-      await api.patch(`/tasks/${taskId}/pomodoro`, { increment })
+      const { data } = await api.patch(`/tasks/${taskId}/pomodoro`, { increment })
+      return applyUpdateResponse(data as Record<string, unknown>, taskId)
     } catch (err) {
-      task.pomodoroCompleted = Math.round(((task.pomodoroCompleted || 0) - increment) * 100) / 100
+      if (task) task.pomodoroCompleted = previousCompleted
       console.error('Ошибка сохранения помодоро:', err)
     }
   }
