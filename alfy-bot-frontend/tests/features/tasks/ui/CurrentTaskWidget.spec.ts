@@ -56,9 +56,32 @@ describe('currentTaskWidget', () => {
   it('показывает название активной помидоро-задачи и кнопку запуска', () => {
     const wrapper = mountWith([activeTask()])
 
-    expect(wrapper.text()).toContain('Текущая задача')
+    expect(wrapper.text()).toContain('Идёт сейчас')
     expect(wrapper.text()).toContain('Математика')
     expect(wrapper.find('button').exists()).toBe(true)
+  })
+
+  it('показывает остаток времени и счётчик помидоров', () => {
+    // Окно 2x25+5 = 55 мин, прошло 10 → осталось 45.
+    const wrapper = mountWith([activeTask({ pomodoroCompleted: 1 })])
+
+    expect(wrapper.text()).toContain('осталось 45 мин')
+    expect(wrapper.text()).toContain('1/2')
+  })
+
+  it('у не-помидоро задачи остаток есть, счётчика помидоров нет', () => {
+    const wrapper = mountWith([activeTask({ isPomodoroTask: false, durationMinutes: 60 })])
+
+    expect(wrapper.text()).toContain('осталось 50 мин')
+    expect(wrapper.text()).not.toContain('/')
+  })
+
+  it('прогресс-бар отражает долю пройденного окна', () => {
+    // 10 из 55 минут ≈ 18%
+    const wrapper = mountWith([activeTask()])
+    const fill = wrapper.find('[aria-hidden="true"] > div')
+
+    expect(fill.attributes('style')).toContain('width: 18%')
   })
 
   it('не показывает кнопку у не-помидоро задачи', () => {

@@ -22,6 +22,18 @@ export function formatDueDate(value: unknown, opts?: { includeYear?: boolean }):
   return formatDate(date, hasTime ? DATE_WITH_TIME : DATE_SHORT)
 }
 
+/** Compact "сколько осталось" for the sidebar: «45 мин», «3 ч 12 мин», «2 ч». */
+export function formatRemaining(minutes: number): string {
+  if (minutes < 1) return 'меньше минуты'
+
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+
+  if (hours === 0) return `${rest} мин`
+  if (rest === 0) return `${hours} ч`
+  return `${hours} ч ${rest} мин`
+}
+
 export const formatPomodoro = (value: number): string => {
   const rounded = Math.round(value * 100) / 100
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
