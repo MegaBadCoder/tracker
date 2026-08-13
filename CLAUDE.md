@@ -87,6 +87,10 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 
 **Route-коллизии под общим префиксом.** Несколько контроллеров могут делить один префикс (например `@Controller('goals')` в `GoalModule` и в `ReportModule`). Тогда `@Get(':id')` одного контроллера перехватывает одиночный литерал (`goals/report-queue`) другого, и `ParseIntPipe` отдаёт 400. Порядок матчинга = import-порядку модулей в `AppModule` — полагаться на него хрупко. Express 5 / path-to-regexp v8 **не поддерживают** inline-regex `:id(\d+)` (приложение не стартует). Решение: давать литеральным маршрутам **многосегментный** путь, который одиночный `:id` не может захватить (`goals/reports/queue`, не `goals/report-queue`). Регрессия — `alfy-bot/test/web-goal-reports-routing.e2e-spec.ts`.
 
+**Env для e2e ставится в `setupFiles`, не в хелпере.** `AppModule` решает, поднимать ли Telegraf, на этапе **импорта модуля** (`const telegramImports = isTelegramEnabled()`). Любой `process.env.ENABLE_TELEGRAM = 'false'` внутри `createTestApp()` опаздывает: `import { AppModule }` в шапке спеки уже отработал, бот стартует и валит весь suite с `401: Bot Token is required`. Поэтому переменные живут в `alfy-bot/test/setup-e2e-env.ts`, подключённом через `setupFiles` в `test/jest-e2e.json`. Не переносить их обратно в хелпер.
+
+**Эндпоинты, возвращающие `UpdateTaskResponse`.** `PATCH /tasks/:id` и `PATCH /tasks/:id/pomodoro` отдают не задачу, а обёртку `{ task, nextInstance?, deletedInstanceId? }` — из-за повторяющихся задач, где завершение порождает следующий инстанс. Потребители должны читать `body.task`, а не `body`. На фронте разбор один — `applyUpdateResponse` в `features/tasks/model/task-store.ts`.
+
 # Frontend architecture (FSD-like)
 
 `alfy-bot-frontend/src/` устроен как feature-sliced:
