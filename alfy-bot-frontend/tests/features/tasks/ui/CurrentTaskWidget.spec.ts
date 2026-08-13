@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CurrentTaskWidget from '@/features/tasks/ui/CurrentTaskWidget.vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
-import { useTimerStore } from '@/features/task-timer'
+import { toTimerTask, useTimerStore } from '@/features/task-timer'
 
 vi.mock('@/api/client', () => ({
   api: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn(), put: vi.fn() },
@@ -56,9 +56,32 @@ describe('currentTaskWidget', () => {
   it('показывает название активной помидоро-задачи и кнопку запуска', () => {
     const wrapper = mountWith([activeTask()])
 
-    expect(wrapper.text()).toContain('Текущая задача')
+    expect(wrapper.text()).toContain('Идёт сейчас')
     expect(wrapper.text()).toContain('Математика')
     expect(wrapper.find('button').exists()).toBe(true)
+  })
+
+  it('показывает остаток времени и счётчик помидоров', () => {
+    // Окно 2x25+5 = 55 мин, прошло 10 → осталось 45.
+    const wrapper = mountWith([activeTask({ pomodoroCompleted: 1 })])
+
+    expect(wrapper.text()).toContain('осталось 45 мин')
+    expect(wrapper.text()).toContain('1/2')
+  })
+
+  it('у не-помидоро задачи остаток есть, счётчика помидоров нет', () => {
+    const wrapper = mountWith([activeTask({ isPomodoroTask: false, durationMinutes: 60 })])
+
+    expect(wrapper.text()).toContain('осталось 50 мин')
+    expect(wrapper.text()).not.toContain('/')
+  })
+
+  it('прогресс-бар отражает долю пройденного окна', () => {
+    // 10 из 55 минут ≈ 18%
+    const wrapper = mountWith([activeTask()])
+    const fill = wrapper.find('[aria-hidden="true"] > div')
+
+    expect(fill.attributes('style')).toContain('width: 18%')
   })
 
   it('не показывает кнопку у не-помидоро задачи', () => {
@@ -87,6 +110,56 @@ describe('currentTaskWidget', () => {
     await vi.advanceTimersByTimeAsync(60_000)
 
     expect(wrapper.text()).not.toContain('Математика')
+  })
+
+  it('тикающая сессия по этой задаче — метка вместо кнопки', async () => {
+    const wrapper = mountWith([activeTask()])
+    const timer = useTimerStore()
+    timer.startTask(toTimerTask(activeTask()))
+    timer.isActive = true
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('идёт')
+    // Кнопки нет намеренно: startTask отмотал бы сессию к первой фазе.
+    expect(wrapper.find('button').exists()).toBe(false)
+  })
+
+  // startTask только взводит сессию, тикать она начинает отдельно — поэтому
+  // сразу после клика строка оказывается именно в этом состоянии.
+  it('взведённая, но не тикающая сессия показывается как пауза и сохраняет кнопку', async () => {
+    const wrapper = mountWith([activeTask()])
+    const timer = useTimerStore()
+    timer.startTask(toTimerTask(activeTask()))
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('пауза')
+    expect(wrapper.text()).not.toContain('идёт')
+    expect(wrapper.find('button').attributes('aria-label')).toContain('Продолжить')
+  })
+
+  it('кнопка на паузе продолжает сессию, а не начинает заново', async () => {
+    const wrapper = mountWith([activeTask()])
+    const timer = useTimerStore()
+    timer.startTask(toTimerTask(activeTask()))
+    await wrapper.vm.$nextTick()
+
+    const resume = vi.spyOn(timer, 'toggleTimer').mockImplementation(() => {})
+    const restart = vi.spyOn(timer, 'startTask').mockImplementation(() => {})
+    await wrapper.find('button').trigger('click')
+
+    expect(resume).toHaveBeenCalled()
+    expect(restart).not.toHaveBeenCalled()
+  })
+
+  it('таймер по другой задаче кнопку не убирает', async () => {
+    const wrapper = mountWith([activeTask()])
+    const timer = useTimerStore()
+    timer.startTask(toTimerTask(activeTask({ id: 'другая' })))
+    timer.isActive = true
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('идёт')
+    expect(wrapper.find('button').attributes('aria-label')).toContain('Запустить')
   })
 
   it('показывает все активные задачи, когда их несколько', () => {
