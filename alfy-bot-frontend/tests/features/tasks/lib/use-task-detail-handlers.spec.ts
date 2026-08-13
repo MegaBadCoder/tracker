@@ -56,6 +56,28 @@ describe('useTaskDetailHandlers', () => {
     expect(store.updateTask).toHaveBeenCalledWith('1', task, false)
   })
 
+  it('handleUpdateTask при смене dueDate у recurring спрашивает про серию', async () => {
+    const monday = new Date(2026, 3, 6, 10, 0)
+    const wednesday = new Date(2026, 3, 8, 15, 0)
+    const original = makeTask({
+      id: '1',
+      dueDate: monday,
+      recurrence: { frequency: 'weekly', interval: 1 },
+    })
+    store = createMockStore([original])
+    confirmFn.mockResolvedValueOnce(false)
+    const { handleUpdateTask } = useTaskDetailHandlers(store as any, confirmFn)
+
+    await handleUpdateTask({ ...original, dueDate: wednesday })
+
+    expect(store.updateTask).toHaveBeenCalledWith(
+      '1',
+      { dueDate: wednesday, rescheduleScope: 'this' },
+      false,
+    )
+    expect(confirmFn).toHaveBeenCalled()
+  })
+
   it('handleDeleteFromDialog закрывает dialog, подтверждает и удаляет задачу', async () => {
     const { handleDeleteFromDialog, isDetailOpen, selectedTask, handleOpenTask } = setup()
     handleOpenTask(makeTask())

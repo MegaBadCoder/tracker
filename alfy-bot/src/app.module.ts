@@ -34,6 +34,7 @@ import {
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
 import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
+import { RecurringSeriesRepairService } from './shared/database/recurring-series-repair.service';
 import { SharedModule } from './shared/shared.module';
 
 const telegramImports = isTelegramEnabled()
@@ -87,6 +88,7 @@ const telegramImports = isTelegramEnabled()
     ScheduleMigrationService,
     QuestionMigrationService,
     AuthMethodMigrationService,
+    RecurringSeriesRepairService,
   ],
 })
 export class AppModule {}

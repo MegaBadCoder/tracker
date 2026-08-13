@@ -15,6 +15,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     completed: false,
     priority: null,
     dueDate: null,
+    recurrenceAnchorDate: null,
     deadline: null,
     location: null,
     tags: null,
@@ -193,6 +194,36 @@ describe('OverdueRecurringService', () => {
       const [, successor] = repo.freezeAndCreateNext.mock.calls[0];
       expect(successor.pomodoroConfig).toBeUndefined();
     });
+
+    it('следующий слот занят проявленным → freeze без successor', async () => {
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        dueDate: new Date('2026-04-28T09:00:00.000Z'),
+        completed: false,
+        isOverdue: false,
+        recurrence: dailyRule,
+        onMissed: 'freeze',
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      const occupying = makeTask({
+        id: 'mat-1',
+        recurringParentId: 't1',
+        dueDate: new Date('2026-04-29T09:00:00.000Z'),
+        isAutoCreated: false,
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+      repo.findByParentId.mockResolvedValue([candidate, occupying]);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      expect(repo.freezeAndCreateNext).toHaveBeenCalledWith('t1', null);
+    });
   });
 
   describe('processForUser — shift branch', () => {
@@ -223,6 +254,67 @@ describe('OverdueRecurringService', () => {
       const saved = repo.save.mock.calls[0][0];
       expect(saved.dueDate.getTime()).toBe(
         new Date('2026-04-29T09:00:00.000Z').getTime(),
+      );
+    });
+
+    it('this-only: next от якоря, якорь сбрасывается', async () => {
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        dueDate: new Date('2026-04-28T15:00:00.000Z'),
+        recurrenceAnchorDate: new Date('2026-04-27T09:00:00.000Z'),
+        completed: false,
+        isOverdue: false,
+        recurrence: dailyRule,
+        onMissed: 'shift',
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      const saved = repo.save.mock.calls[0][0];
+      expect(saved.dueDate.getTime()).toBe(
+        new Date('2026-04-29T09:00:00.000Z').getTime(),
+      );
+      expect(saved.recurrenceAnchorDate).toBeNull();
+    });
+
+    it('занятый слот → прыгает через него', async () => {
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        dueDate: new Date('2026-04-28T09:00:00.000Z'),
+        completed: false,
+        isOverdue: false,
+        recurrence: dailyRule,
+        onMissed: 'shift',
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      const occupying = makeTask({
+        id: 'mat-1',
+        recurringParentId: 't1',
+        dueDate: new Date('2026-04-29T09:00:00.000Z'),
+        isAutoCreated: false,
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+      repo.findByParentId.mockResolvedValue([candidate, occupying]);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      const saved = repo.save.mock.calls[0][0];
+      expect(saved.dueDate.getTime()).toBe(
+        new Date('2026-04-30T09:00:00.000Z').getTime(),
       );
     });
 

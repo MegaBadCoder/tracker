@@ -39,6 +39,9 @@ export class Task {
   dueDate: Date | null;
 
   @Column({ type: 'datetime', nullable: true })
+  recurrenceAnchorDate: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
   deadline: Date | null;
 
   @Column({ type: 'integer', nullable: true })

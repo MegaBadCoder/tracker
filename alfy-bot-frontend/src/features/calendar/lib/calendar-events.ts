@@ -1,10 +1,11 @@
-import { isSameDay } from 'date-fns'
+import { isSameDay, startOfDay } from 'date-fns'
 import type { Task } from '@/features/tasks/model/types'
 import type { CalendarEvent } from '../model/types'
 import { computeTaskDurationMinutes } from '@/features/tasks/lib/duration'
 import {
   computeNextDueDate,
   findNextOccurrenceOnOrAfter,
+  seriesDueDate,
 } from '@/features/tasks/model/recurrence'
 
 function taskToEvent(task: Task, date: Date, isVirtual = false): CalendarEvent {
@@ -31,56 +32,95 @@ function taskToEvent(task: Task, date: Date, isVirtual = false): CalendarEvent {
   }
 }
 
+function familyId(task: Task): string {
+  return task.recurringParentId ?? task.id
+}
+
+function isLiveCursor(task: Task): boolean {
+  return !task.completed && !task.isOverdue
+}
+
+function occupiedSlotKeys(members: Task[]): Set<number> {
+  const keys = new Set<number>()
+  for (const member of members) {
+    const slot = seriesDueDate(member)
+    if (slot) keys.add(startOfDay(slot).getTime())
+    if (member.dueDate) keys.add(startOfDay(new Date(member.dueDate)).getTime())
+  }
+  return keys
+}
+
+function emitGhosts(
+  root: Task,
+  occupied: Set<number>,
+  weekStart: Date,
+  weekEnd: Date,
+  events: CalendarEvent[],
+) {
+  if (!root.recurrence) return
+  const seriesDue = seriesDueDate(root)
+  if (!seriesDue) return
+
+  const completedCount = root.recurringCompletedCount ?? 0
+
+  const maybeEmit = (date: Date) => {
+    if (date < weekStart || date > weekEnd) return
+    if (occupied.has(startOfDay(date).getTime())) return
+    events.push(taskToEvent(root, date, true))
+  }
+
+  let current = seriesDue
+  const startOfToday = new Date()
+  startOfToday.setHours(0, 0, 0, 0)
+  if (seriesDue < startOfToday) {
+    const skipped = findNextOccurrenceOnOrAfter(
+      seriesDue,
+      root.recurrence,
+      startOfToday,
+      completedCount,
+    )
+    if (!skipped) return
+    current = skipped
+    maybeEmit(skipped)
+  }
+
+  for (let i = 0; i < 52; i++) {
+    const next = computeNextDueDate(current, root.recurrence, completedCount)
+    if (!next) break
+    if (next > weekEnd) break
+    if (next >= weekStart) maybeEmit(next)
+    current = next
+  }
+}
+
 export function tasksToCalendarEvents(tasks: Task[], weekStart: Date, weekEnd: Date): CalendarEvent[] {
   const events: CalendarEvent[] = []
+  const families = new Map<string, Task[]>()
 
   for (const task of tasks) {
-    if (!task.dueDate) continue
-
-    const dueDate = new Date(task.dueDate)
-    const isRecurring = !!task.recurrence
-
-    // Add the real event if it falls in range
-    if (dueDate >= weekStart && dueDate <= weekEnd) {
-      events.push(taskToEvent(task, dueDate))
-    }
-
-    // Generate virtual future occurrences for uncompleted recurring tasks
-    if (isRecurring && !task.completed && task.recurrence) {
-      let current = dueDate
-      const completedCount = task.recurringCompletedCount ?? 0
-
-      // Skip-to-today: for past-due recurring tasks we must not project ghosts
-      // onto past dates between dueDate and today. Mirrors the backend
-      // findNextOccurrenceOnOrAfter logic in completeRecurringTask.
-      const startOfToday = new Date()
-      startOfToday.setHours(0, 0, 0, 0)
-      if (dueDate < startOfToday) {
-        const skipped = findNextOccurrenceOnOrAfter(
-          dueDate,
-          task.recurrence,
-          startOfToday,
-          completedCount,
-        )
-        if (!skipped) continue
-        current = skipped
-        if (skipped <= weekEnd && skipped >= weekStart && !isSameDay(skipped, dueDate)) {
-          events.push(taskToEvent(task, skipped, true))
-        }
-      }
-
-      for (let i = 0; i < 52; i++) {
-        const next = computeNextDueDate(current, task.recurrence, completedCount)
-        if (!next) break
-        if (next > weekEnd) break
-
-        if (next >= weekStart && !isSameDay(next, dueDate)) {
-          events.push(taskToEvent(task, next, true))
-        }
-
-        current = next
+    if (task.dueDate) {
+      const dueDate = new Date(task.dueDate)
+      if (dueDate >= weekStart && dueDate <= weekEnd) {
+        events.push(taskToEvent(task, dueDate))
       }
     }
+
+    if (task.recurrence || task.recurringParentId) {
+      const id = familyId(task)
+      const members = families.get(id)
+      if (members) members.push(task)
+      else families.set(id, [task])
+    }
+  }
+
+  for (const [, members] of families) {
+    const live = members.filter(isLiveCursor)
+    const source =
+      live.find(t => !t.recurringParentId)
+      ?? live.find(t => t.isAutoCreated)
+      ?? live[0]
+    if (!source?.recurrence) continue
+    emitGhosts(source, occupiedSlotKeys(members), weekStart, weekEnd, events)
   }
 
   return events

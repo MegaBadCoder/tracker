@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import CalendarEventBlock from '@/features/calendar/ui/CalendarEventBlock.vue'
 import type { CalendarEvent } from '@/features/calendar/model/types'
 import type { Task } from '@/features/tasks/model/types'
+import { highlightedTaskId } from '@/features/tasks/lib/use-recurring-reschedule'
 
 const makeTask = (overrides: Partial<Task> = {}): Task => ({
   id: '1',
@@ -60,6 +61,21 @@ describe('CalendarEventBlock', () => {
     expect(wrapper.emitted('grab')).toBeUndefined()
   })
 
+  it('кнопка CalendarPlus только на virtual, click эмитит materialize', async () => {
+    const virtual = mount(CalendarEventBlock, {
+      props: { event: makeEvent({ isVirtual: true }) },
+    })
+    const btn = virtual.find('[data-testid="materialize-occurrence"]')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    expect(virtual.emitted('materialize')).toHaveLength(1)
+
+    const real = mount(CalendarEventBlock, {
+      props: { event: makeEvent({ isVirtual: false }) },
+    })
+    expect(real.find('[data-testid="materialize-occurrence"]').exists()).toBe(false)
+  })
+
   // === Resize handle тесты ===
 
   // Позитивные
@@ -110,5 +126,26 @@ describe('CalendarEventBlock', () => {
       props: { event: makeEvent({ resizable: true }) },
     })
     expect(wrapper.text()).not.toContain('мин')
+  })
+
+  it('пересекающаяся колонка задаёт left/width, не на всю ширину', () => {
+    const wrapper = mount(CalendarEventBlock, {
+      props: { event: makeEvent(), layout: { col: 1, cols: 2 } },
+    })
+    const style = wrapper.attributes('style') ?? ''
+    expect(style).toContain('left: calc(50% + 2px)')
+    expect(style).toContain('width: calc(50% - 4px)')
+  })
+
+  it('подсвечивает блок когда highlightedTaskId совпадает', () => {
+    highlightedTaskId.value = '1'
+    const wrapper = mount(CalendarEventBlock, {
+      props: { event: makeEvent() },
+    })
+    expect(wrapper.classes()).toContain('ring-primary')
+  })
+
+  afterEach(() => {
+    highlightedTaskId.value = null
   })
 })

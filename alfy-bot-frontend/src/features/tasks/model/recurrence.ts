@@ -104,6 +104,13 @@ export function findNextOccurrenceOnOrAfter(
   )
 }
 
+export function seriesDueDate(task: {
+  dueDate?: Date | null
+  recurrenceAnchorDate?: Date | null
+}): Date | null {
+  return task.recurrenceAnchorDate ?? task.dueDate ?? null
+}
+
 function computeRawNext(currentDue: Date, rule: RecurrenceRule): Date {
   const { frequency, interval } = rule
 

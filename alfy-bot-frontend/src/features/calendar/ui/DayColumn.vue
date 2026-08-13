@@ -12,17 +12,20 @@
       v-for="event in events"
       :key="event.taskId"
       :event="event"
+      :layout="columns.get(event.taskId)"
       :hidden="event.taskId === draggedTaskId"
       @grab="(ev, pe) => $emit('grab', ev, pe)"
       @resize-start="(ev, pe) => $emit('resize-start', ev, pe)"
       @toggle="(taskId) => $emit('toggle', taskId)"
+      @materialize="(event) => $emit('materialize', event)"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { CalendarEvent, CalendarDropPayload } from '../model/types'
+import { assignEventColumns } from '../lib/layout-overlapping'
 import CalendarEventBlock from './CalendarEventBlock.vue'
 
 const props = defineProps<{
@@ -37,9 +40,11 @@ const emit = defineEmits<{
   grab: [event: CalendarEvent, pointerEvent: PointerEvent]
   'resize-start': [event: CalendarEvent, pointerEvent: PointerEvent]
   toggle: [taskId: string]
+  materialize: [event: CalendarEvent]
 }>()
 
 const isDragOver = ref(false)
+const columns = computed(() => assignEventColumns(props.events))
 
 function onDrop(e: DragEvent) {
   isDragOver.value = false

@@ -1,5 +1,5 @@
 import { PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateTaskDto } from './create-task.dto';
 
@@ -8,6 +8,11 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @IsOptional()
   @IsBoolean()
   completed?: boolean;
+
+  @ApiPropertyOptional({ enum: ['this', 'subsequent'] })
+  @IsOptional()
+  @IsIn(['this', 'subsequent'])
+  rescheduleScope?: 'this' | 'subsequent';
 
   // Explicitly exclude checklist — use PUT /tasks/:id/checklist instead
   checklist?: never;

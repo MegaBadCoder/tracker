@@ -2,6 +2,8 @@ import type { RecurrenceRule } from './recurrence'
 
 export type Priority = 'high' | 'medium' | 'low'
 
+export type RescheduleScope = 'this' | 'subsequent'
+
 export interface ChecklistItem {
   id: string
   text: string
@@ -18,6 +20,7 @@ export interface Task {
   title: string
   completed: boolean
   dueDate?: Date
+  recurrenceAnchorDate?: Date | null
   deadline?: Date
   durationMinutes?: number
   priority?: Priority
@@ -61,4 +64,9 @@ export interface TaskCardEmits {
   (e: 'showTimer', id: string): void
   (e: 'delete', id: string): void
   (e: 'open', task: Task): void
+}
+
+export type TaskPatch = Partial<Task> & {
+  rescheduleScope?: RescheduleScope
+  dueDate?: Date | null
 }

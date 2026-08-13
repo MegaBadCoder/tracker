@@ -74,4 +74,17 @@ describe('AllDaySection', () => {
 
     expect(wrapper.emitted('dragstart')).toBeDefined()
   })
+
+  it('кнопка проявления только на virtual chip, click эмитит materialize', async () => {
+    const virtualEvent = makeEvent({ isVirtual: true, taskId: '1__virtual__1' })
+    const wrapper = mount(AllDaySection, {
+      props: { ...defaultProps, events: [virtualEvent] },
+    })
+    const btn = wrapper.find('[data-testid="materialize-occurrence"]')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    expect(wrapper.emitted('materialize')![0]![0]).toMatchObject({
+      taskId: '1__virtual__1',
+    })
+  })
 })

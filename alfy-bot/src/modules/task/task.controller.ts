@@ -25,6 +25,7 @@ import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
 import { ReorderInboxTasksDto } from './dto/reorder-inbox-tasks.dto';
 import { MoveTaskToInboxDto } from './dto/move-task-inbox.dto';
+import { MaterializeOccurrenceDto } from './dto/materialize-occurrence.dto';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -138,6 +139,16 @@ export class TaskController {
     @Param('id') id: string,
   ) {
     return this.taskService.updatePomodoroConfig(req.user.sub, id, null);
+  }
+
+  @Post(':id/materialize')
+  @ApiOperation({ summary: 'Проявить виртуальное вхождение повторяющейся задачи' })
+  async materialize(
+    @Request() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: MaterializeOccurrenceDto,
+  ) {
+    return this.taskService.materializeOccurrence(req.user.sub, id, dto);
   }
 
   @Patch(':id')

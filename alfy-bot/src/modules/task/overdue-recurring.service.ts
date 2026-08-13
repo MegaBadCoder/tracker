@@ -6,6 +6,8 @@ import {
   buildNextInstance,
   computeNextDueDate,
   findNextOccurrenceOnOrAfter,
+  findOccupyingInstance,
+  seriesDueDate,
 } from './domain/recurrence.utils';
 import { shiftBackToUtc, shiftToUserWallClock } from './lib/timezone';
 
@@ -61,11 +63,30 @@ export class OverdueRecurringService {
         : task;
       const completedCount = rootTask?.recurringCompletedCount ?? 0;
 
-      const zonedDue = shiftToUserWallClock(task.dueDate!, tz);
+      const seriesDue = seriesDueDate({
+        dueDate: task.dueDate,
+        recurrenceAnchorDate: task.recurrenceAnchorDate ?? null,
+      });
+      const zonedDue = shiftToUserWallClock(seriesDue!, tz);
+
+      const members = await this.taskRepo.findByParentId(parentId, true);
+      const others = members.filter((m) => m.id !== task.id);
+      const slotOccupied = (slotZoned: Date) =>
+        !!findOccupyingInstance(
+          others.map((m) => ({
+            dueDate: m.dueDate ? shiftToUserWallClock(m.dueDate, tz) : null,
+            recurrenceAnchorDate: m.recurrenceAnchorDate
+              ? shiftToUserWallClock(m.recurrenceAnchorDate, tz)
+              : null,
+          })),
+          slotZoned,
+        );
 
       if (task.onMissed === 'freeze') {
         const nextZoned = computeNextDueDate(zonedDue, rule, completedCount);
-        const nextDate = nextZoned ? shiftBackToUtc(nextZoned, tz) : null;
+        const occupied = nextZoned ? slotOccupied(nextZoned) : false;
+        const nextDate =
+          nextZoned && !occupied ? shiftBackToUtc(nextZoned, tz) : null;
         let successorData: Partial<Task> | null = nextDate
           ? buildNextInstance(task, nextDate, parentId)
           : null;
@@ -84,12 +105,17 @@ export class OverdueRecurringService {
           startOfTodayLocal,
           completedCount,
         );
+        let cursor = nextZoned;
+        while (cursor && slotOccupied(cursor)) {
+          cursor = computeNextDueDate(cursor, rule, completedCount);
+        }
 
-        if (nextZoned === null) {
+        if (cursor === null) {
           task.recurrence = null;
           await this.taskRepo.save(task);
         } else {
-          task.dueDate = shiftBackToUtc(nextZoned, tz);
+          task.dueDate = shiftBackToUtc(cursor, tz);
+          task.recurrenceAnchorDate = null;
           await this.taskRepo.save(task);
         }
       }

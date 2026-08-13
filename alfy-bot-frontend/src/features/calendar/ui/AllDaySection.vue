@@ -21,7 +21,7 @@
           v-for="event in getEventsForDay(day)"
           :key="event.taskId"
           :class="[
-            'text-[10px] px-1.5 py-0.5 rounded truncate max-w-full border',
+            'text-[10px] px-1.5 py-0.5 rounded max-w-full border flex items-center gap-0.5',
             event.task.isOverdue
               ? 'cursor-not-allowed'
               : event.isVirtual
@@ -34,12 +34,24 @@
                 : event.isVirtual
                   ? 'border-dashed border-border/60 bg-muted'
                   : chipClasses(event),
+            highlightedTaskId === event.taskId && 'ring-2 ring-primary',
           ]"
           :draggable="!event.isVirtual && !event.task.isOverdue"
           @dragstart="onDragStart($event, event)"
           @click.stop="$emit('open', event)"
         >
-          {{ event.title }}
+          <span class="truncate">{{ event.title }}</span>
+          <button
+            v-if="event.isVirtual"
+            type="button"
+            data-testid="materialize-occurrence"
+            class="shrink-0 rounded p-0.5 hover:bg-foreground/10"
+            aria-label="Проявить задачу"
+            @pointerdown.stop
+            @click.stop="$emit('materialize', event)"
+          >
+            <CalendarPlus :size="10" />
+          </button>
         </div>
       </div>
     </div>
@@ -48,9 +60,11 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { CalendarPlus } from 'lucide-vue-next'
 import { isSameDay } from 'date-fns'
 import type { CalendarEvent, CalendarDropPayload } from '../model/types'
 import { getPriorityEventClasses, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
+import { highlightedTaskId } from '@/features/tasks/lib/use-recurring-reschedule'
 
 const props = defineProps<{
   visibleDays: Date[]
@@ -64,6 +78,7 @@ const emit = defineEmits<{
   drop: [payload: CalendarDropPayload]
   dragstart: [event: DragEvent, taskId: string]
   open: [event: CalendarEvent]
+  materialize: [event: CalendarEvent]
 }>()
 
 const dragOverDay = ref<string | null>(null)
