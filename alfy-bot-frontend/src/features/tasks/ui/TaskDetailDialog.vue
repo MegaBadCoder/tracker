@@ -552,7 +552,7 @@ import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
 import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
 import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
-import { useTimerStore } from '@/features/task-timer'
+import { toTimerTask, useTimerStore } from '@/features/task-timer'
 
 const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
   overdue: 'text-red-500',
@@ -676,14 +676,7 @@ const timerStore = useTimerStore()
 
 function handleStartTimer() {
   if (!props.task?.isPomodoroTask) return
-  timerStore.startTask({
-    id: props.task.id,
-    pomodoroTime: props.task.pomodoroDuration || 25,
-    breakTime: props.task.shortBreak || 5,
-    longBreakTime: props.task.longBreak || 15,
-    longBreakInterval: props.task.longBreakInterval || 4,
-    pomodoroCount: props.task.pomodoroCount || 4,
-  })
+  timerStore.startTask(toTimerTask(props.task))
 }
 
 // Project
