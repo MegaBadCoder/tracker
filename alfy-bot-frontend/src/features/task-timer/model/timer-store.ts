@@ -1,6 +1,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/client'
+import { useTaskStore } from '@/features/tasks/model/task-store'
 import type { TimerSettings, TimerSession, PhaseInfo, SessionState, Task, TimerSWMessage } from '../types'
 import { useSounds } from '@/composables/useSounds'
 
@@ -164,11 +165,9 @@ export const useTimerStore = defineStore('timer', () => {
 
     if (fraction <= 0) return
 
-    try {
-      await api.patch(`/tasks/${taskId}/pomodoro`, { increment: fraction })
-    } catch (err) {
-      console.error('Ошибка сохранения помодоро:', err)
-    }
+    // Delegated so the store applies the response — the backend may auto-complete
+    // the task once its pomodoro target is reached. Error handling lives there.
+    await useTaskStore().incrementPomodoro(taskId, fraction)
   }
 
   function calculateSeconds(minutes: number): number {

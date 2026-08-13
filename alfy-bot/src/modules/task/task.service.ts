@@ -16,6 +16,7 @@ import {
   buildNextInstance,
   findNextOccurrenceOnOrAfter,
 } from './domain/recurrence.utils';
+import { hasCrossedPomodoroTarget } from './domain/pomodoro.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
@@ -274,10 +275,33 @@ export class TaskService {
     userId: number,
     taskId: string,
     increment: number,
-  ): Promise<void> {
+  ): Promise<UpdateTaskResponse> {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
+
+    const before = task.pomodoroConfig?.pomodoroCompleted ?? 0;
+    const target = task.pomodoroConfig?.pomodoroCount ?? 0;
+
     await this.taskRepo.incrementPomodoroCompleted(taskId, increment);
+
+    // Re-read for the authoritative counter: the increment is applied by SQL,
+    // and the fresh value is what the client needs for its X/Y badge.
+    const refreshed = (await this.taskRepo.findById(taskId, userId)) ?? task;
+    const after = refreshed.pomodoroConfig?.pomodoroCompleted ?? before;
+
+    // The increment is the primary effect — guard so auto-completion can never
+    // throw on top of a counter that is already persisted.
+    const shouldAutoComplete =
+      !!task.pomodoroConfig &&
+      !task.completed &&
+      !task.isOverdue &&
+      hasCrossedPomodoroTarget(before, after, target);
+
+    if (shouldAutoComplete) {
+      return this.update(userId, taskId, { completed: true });
+    }
+
+    return { task: refreshed };
   }
 
   async delete(userId: number, id: string): Promise<void> {
