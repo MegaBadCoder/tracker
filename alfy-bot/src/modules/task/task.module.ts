@@ -9,6 +9,7 @@ import {
 import { AuthModule } from '../auth/auth.module';
 import { UserModule } from '../user/user.module';
 import { NotificationModule } from '../notification/notification.module';
+import { EventsModule } from '../events/events.module';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { TimerSessionRepositoryPort } from './domain/timer-session-repository.port';
 import { NotificationPort } from './domain/notification.port';
@@ -42,6 +43,7 @@ const notificationProviders = isTelegramEnabled()
     AuthModule,
     UserModule,
     NotificationModule,
+    EventsModule,
   ],
   controllers: [TaskController],
   providers: [

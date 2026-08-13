@@ -30,6 +30,11 @@ export const useTimerStore = defineStore('timer', () => {
   const timerInterval: Ref<ReturnType<typeof setInterval> | null> = ref(null)
   const { play: playSound } = useSounds()
   let swListenerRegistered = false
+  let sseMutedUntil = 0
+
+  function muteRemoteRestore(ms = 1500): void {
+    sseMutedUntil = Date.now() + ms
+  }
 
   const checkPhase = {
     isWorkPhase: (phaseNumber: number): boolean => phaseNumber % 2 === 1,
@@ -200,6 +205,8 @@ export const useTimerStore = defineStore('timer', () => {
     const taskId = currentSettings.value.taskId
     if (!taskId) return
 
+    muteRemoteRestore()
+
     try {
       if (isActive.value) {
         const expiresAt = new Date(Date.now() + timeBlock.value * 1000).toISOString()
@@ -229,9 +236,14 @@ export const useTimerStore = defineStore('timer', () => {
   async function restoreSession(): Promise<void> {
     registerSWListener()
 
+    if (Date.now() < sseMutedUntil) return
+
     try {
       const { data: session } = await api.get('/tasks/timer')
-      if (!session) return
+      if (!session) {
+        clearLocalSession()
+        return
+      }
 
       if (session.task?.pomodoroConfig) {
         const cfg = session.task.pomodoroConfig
@@ -244,6 +256,8 @@ export const useTimerStore = defineStore('timer', () => {
           taskId: session.taskId,
         }
       }
+
+      stopLocalTicker()
 
       const sessionState = determineSessionState(session)
 
@@ -318,28 +332,34 @@ export const useTimerStore = defineStore('timer', () => {
     }
   }
 
-  async function resetToInitialState(): Promise<void> {
+  function stopLocalTicker(): void {
     if (timerInterval.value) {
       clearInterval(timerInterval.value)
       timerInterval.value = null
     }
-
     const timerId = currentSettings.value.taskId || 'pomodoro'
     sendToSW({ type: 'TIMER_STOP', data: { id: timerId } })
-
     isActive.value = false
     expiresAt.value = null
+  }
+
+  function clearLocalSession(): void {
+    stopLocalTicker()
     phase.value = 0
     timeBlock.value = 0
     namePhase.value = ''
+    updateTitle()
+  }
+
+  async function resetToInitialState(): Promise<void> {
+    muteRemoteRestore()
+    clearLocalSession()
 
     try {
       await api.delete('/tasks/timer')
     } catch (err) {
       console.error('Ошибка деактивации таймера:', err)
     }
-
-    updateTitle()
   }
 
   function startTask(task: Task): void {

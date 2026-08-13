@@ -2,13 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { TimerSession } from '../../shared/entities/timer-session.entity';
 import { TimerSessionRepositoryPort } from './domain/timer-session-repository.port';
 import { NotificationPort } from './domain/notification.port';
+import { UserEventsPort } from '../events/domain/user-events.port';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
+
+export const TIMER_UPDATED_EVENT = 'timer.updated';
 
 @Injectable()
 export class TimerSessionService {
   constructor(
     private readonly timerRepo: TimerSessionRepositoryPort,
     private readonly notification: NotificationPort,
+    private readonly events: UserEventsPort,
   ) {}
 
   async upsert(
@@ -36,7 +40,9 @@ export class TimerSessionService {
       });
     }
 
-    return this.timerRepo.save(session);
+    const saved = await this.timerRepo.save(session);
+    this.events.emit(userId, TIMER_UPDATED_EVENT);
+    return saved;
   }
 
   async getLatest(userId: number): Promise<TimerSession | null> {
@@ -55,6 +61,7 @@ export class TimerSessionService {
       `⏹ Таймер по задаче "${session.task?.title}" остановлен`,
     );
     await this.timerRepo.remove(session);
+    this.events.emit(userId, TIMER_UPDATED_EVENT);
   }
 
   async processExpiredTimers(): Promise<void> {
@@ -68,6 +75,7 @@ export class TimerSessionService {
         session.userId,
         `⏰ Таймер по задаче "${session.task?.title}" завершён!`,
       );
+      this.events.emit(session.userId, TIMER_UPDATED_EVENT);
     }
   }
 }

@@ -6,6 +6,17 @@ tracker.rocketup.tech {
 		}
 	}
 
+	@sse path /api/events /api/events/*
+	handle @sse {
+		reverse_proxy backend:3002 {
+			flush_interval -1
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
+	}
+
 	handle /api/* {
 		reverse_proxy backend:3002
 	}
