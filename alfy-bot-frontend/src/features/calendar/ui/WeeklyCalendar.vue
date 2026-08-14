@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CalendarDropPayload, CalendarEvent, CalendarViewMode } from '../model/types'
 import { useElementSize } from '@vueuse/core'
-import { addDays, startOfDay } from 'date-fns'
+import { addDays, endOfDay, startOfDay } from 'date-fns'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useRecurringReschedule } from '@/features/tasks/lib/use-recurring-reschedule'
@@ -10,7 +10,7 @@ import { tasksToCalendarEvents } from '../lib/calendar-events'
 import { useCalendarDnd } from '../lib/use-calendar-dnd'
 import { useGrabScroll } from '../lib/use-grab-scroll'
 import { DAY_WIDTH, GUTTER_WIDTH, TRACK_WIDTH, useInfiniteDays } from '../lib/use-infinite-days'
-import { formatDateRange, formatDayHeader, formatDayTitle, getWeekStart, isToday, navigateWeek } from '../lib/week'
+import { formatDateRange, formatDayHeader, formatDayTitle, getWeekStart, isDateInRange, isToday, navigateWeek, pickDayViewDate } from '../lib/week'
 import AllDaySection from './AllDaySection.vue'
 import CalendarHeader from './CalendarHeader.vue'
 import HourGrid from './HourGrid.vue'
@@ -33,12 +33,16 @@ const isDayView = computed(() => viewMode.value === 'day')
 const {
   visibleDays: weekDays,
   dateRange,
-  centerDate,
   dayOffset: weekDayOffset,
   dateFromX: weekDateFromX,
   scrollToDate,
   onScroll: onWeekScroll,
+  captureScrollLeft,
+  restoreScrollLeft,
 } = useInfiniteDays(gridRef)
+const savedWeekScrollLeft = ref<number | null>(null)
+const savedWeekRange = ref<{ start: Date, end: Date } | null>(null)
+const suppressWeekScroll = ref(false)
 const { width: gridWidth } = useElementSize(gridRef)
 const {
   grabbing,
@@ -69,7 +73,7 @@ function dateFromX(x: number): Date {
 }
 
 function onScroll() {
-  if (isDayView.value)
+  if (isDayView.value || suppressWeekScroll.value)
     return
   onWeekScroll()
 }
@@ -92,10 +96,11 @@ const calendarEvents = computed(() => {
   const days = visibleDays.value
   if (days.length === 0)
     return []
-  const start = days[0]!
-  const end = new Date(days[days.length - 1]!)
-  end.setHours(23, 59, 59, 999)
-  return tasksToCalendarEvents(taskStore.tasks, start, end)
+  return tasksToCalendarEvents(
+    taskStore.tasks,
+    startOfDay(days[0]!),
+    endOfDay(days[days.length - 1]!),
+  )
 })
 
 function scrollToCurrentHour() {
@@ -107,20 +112,34 @@ function scrollToCurrentHour() {
 
 function onViewModeChange(mode: CalendarViewMode) {
   if (mode === 'day') {
-    selectedDate.value = startOfDay(centerDate.value)
-  }
-  viewMode.value = mode
-  nextTick(() => {
-    if (!gridRef.value)
-      return
-    if (mode === 'day') {
-      gridRef.value.scrollLeft = 0
+    savedWeekScrollLeft.value = captureScrollLeft()
+    savedWeekRange.value = { start: dateRange.value.start, end: dateRange.value.end }
+    selectedDate.value = pickDayViewDate(dateRange.value)
+    viewMode.value = mode
+    nextTick(() => {
       if (isToday(selectedDate.value))
         scrollToCurrentHour()
-    }
-    else {
+    })
+    return
+  }
+
+  const savedLeft = savedWeekScrollLeft.value
+  const savedRange = savedWeekRange.value
+  const restoreWeek = savedLeft != null && savedRange != null
+    && isDateInRange(selectedDate.value, savedRange.start, savedRange.end)
+
+  suppressWeekScroll.value = true
+  if (restoreWeek && savedLeft != null)
+    restoreScrollLeft(savedLeft)
+  viewMode.value = mode
+  nextTick(() => {
+    if (restoreWeek && savedLeft != null)
+      restoreScrollLeft(savedLeft)
+    else
       scrollToDate(selectedDate.value)
-    }
+    requestAnimationFrame(() => {
+      suppressWeekScroll.value = false
+    })
   })
 }
 

@@ -1,4 +1,4 @@
-import { addDays, addWeeks, eachDayOfInterval, format, isSameDay, startOfWeek } from 'date-fns'
+import { addDays, addWeeks, eachDayOfInterval, format, isSameDay, startOfDay, startOfWeek } from 'date-fns'
 import { dateFnsLocale, weekStartsOn } from '@/composables/useLocale'
 
 export function getWeekStart(date: Date): Date {
@@ -41,6 +41,21 @@ export function formatDayHeader(date: Date): { dayName: string, dayNumber: strin
 
 export function formatDayTitle(date: Date): string {
   return format(date, 'd MMMM yyyy', { locale: dateFnsLocale.value })
+}
+
+export function isDateInRange(date: Date, start: Date, end: Date): boolean {
+  const t = startOfDay(date).getTime()
+  return t >= startOfDay(start).getTime() && t <= startOfDay(end).getTime()
+}
+
+export function pickDayViewDate(
+  range: { start: Date, end: Date },
+  today: Date = new Date(),
+): Date {
+  const t = startOfDay(today)
+  if (isDateInRange(t, range.start, range.end))
+    return t
+  return startOfDay(range.start)
 }
 
 export function formatDateRange(start: Date, end: Date): string {
