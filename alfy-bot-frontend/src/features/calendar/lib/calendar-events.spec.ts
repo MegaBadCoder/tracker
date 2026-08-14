@@ -279,4 +279,33 @@ describe('tasksToCalendarEvents — occupied series slots / ghosts from root', (
     const events = tasksToCalendarEvents([root, overdue], weekStart, weekEnd)
     expect(events.filter(e => e.isVirtual)).toHaveLength(0)
   })
+
+  it('однодневное окно (day view) показывает реальный timed event, не ghost', () => {
+    const due = local(2026, 4, 29, 10, 0)
+    const task = baseTask({
+      id: 'daily-1',
+      dueDate: due,
+      recurrence: dailyRule,
+    })
+    const start = local(2026, 4, 29, 0, 0)
+    const end = local(2026, 4, 29, 23, 59)
+
+    const events = tasksToCalendarEvents([task], start, end)
+    expect(events.filter(e => !e.isVirtual)).toHaveLength(1)
+    expect(events.filter(e => e.isVirtual)).toHaveLength(0)
+  })
+
+  it('день без dueDate у daily-серии — только ghost (центр вьюпорта ≠ сегодня)', () => {
+    const task = baseTask({
+      id: 'daily-1',
+      dueDate: local(2026, 4, 29, 10, 0),
+      recurrence: dailyRule,
+    })
+    const start = local(2026, 5, 1, 0, 0)
+    const end = local(2026, 5, 1, 23, 59)
+
+    const events = tasksToCalendarEvents([task], start, end)
+    expect(events.filter(e => !e.isVirtual)).toHaveLength(0)
+    expect(events.filter(e => e.isVirtual)).toHaveLength(1)
+  })
 })

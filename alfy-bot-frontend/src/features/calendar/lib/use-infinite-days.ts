@@ -60,9 +60,20 @@ export function useInfiniteDays(gridRef: Ref<HTMLElement | null>) {
     })
   }
 
+  function captureScrollLeft(): number {
+    return scrollLeft.value
+  }
+
+  function restoreScrollLeft(left: number) {
+    scrollLeft.value = left
+    if (gridRef.value)
+      gridRef.value.scrollLeft = left
+  }
+
   function scrollToDate(date: Date, smooth = false) {
     if (!gridRef.value) return
     const target = dayOffset(date)
+    scrollLeft.value = target
     gridRef.value.scrollTo({ left: target, behavior: smooth ? 'smooth' : 'instant' })
   }
 
@@ -83,5 +94,16 @@ export function useInfiniteDays(gridRef: Ref<HTMLElement | null>) {
     cancelAnimationFrame(rafId)
   })
 
-  return { visibleDays, dateRange, centerDate, dayOffset, dateFromX, scrollToDate, initScroll, onScroll }
+  return {
+    visibleDays,
+    dateRange,
+    centerDate,
+    dayOffset,
+    dateFromX,
+    scrollToDate,
+    initScroll,
+    onScroll,
+    captureScrollLeft,
+    restoreScrollLeft,
+  }
 }
