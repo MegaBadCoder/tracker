@@ -12,7 +12,7 @@
     <button
       v-if="modelValue"
       class="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-muted/60 transition-colors cursor-pointer"
-      @click="$emit('update:modelValue', undefined)"
+      @click="$emit('update:modelValue', null)"
     >
       <X :size="14" />
       Убрать
@@ -27,10 +27,10 @@ import { PRIORITY_LABELS, PRIORITIES } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
 
 defineProps<{
-  modelValue: Priority | undefined
+  modelValue: Priority | null | undefined
 }>()
 
 defineEmits<{
-  (e: 'update:modelValue', value: Priority | undefined): void
+  (e: 'update:modelValue', value: Priority | null): void
 }>()
 </script>

@@ -2,21 +2,27 @@
   <div
     data-calendar-event-block
     :class="[
-      'absolute rounded-md px-2 py-1 text-xs overflow-hidden border',
+      'absolute rounded-md px-2 py-1 text-xs overflow-hidden',
       hidden ? 'invisible' : isOverdue ? 'cursor-not-allowed' : isVirtual ? 'cursor-default' : 'cursor-grab',
       isOverdue
         ? OVERDUE_EVENT_CLASSES
         : completed
-          ? 'bg-emerald-100 border-emerald-300 text-emerald-900 dark:bg-emerald-500/25 dark:border-emerald-500/40 dark:text-white dark:backdrop-blur-sm'
+          ? COMPLETED_EVENT_CLASSES
           : isVirtual
-            ? 'border-dashed border-border bg-muted/40 text-muted-foreground dark:border-border/40 dark:bg-muted/60 dark:text-white dark:backdrop-blur-sm'
-            : priorityClasses,
+            ? VIRTUAL_EVENT_CLASSES
+            : DEFAULT_EVENT_CLASSES,
       highlighted && 'ring-2 ring-inset ring-primary z-20',
     ]"
     :style="blockStyle"
     style="touch-action: none"
     @pointerdown="onPointerDown"
   >
+    <span
+      v-if="showPriorityMarks"
+      data-testid="event-side-stripe"
+      :class="[EVENT_SIDE_STRIPE_CLASSES, event.priority && getPriorityStripeClass(event.priority)]"
+      aria-hidden="true"
+    />
     <div :class="['font-medium flex items-center gap-1 min-w-0', completed && 'line-through']">
       <RoundCheckbox
         v-if="!isVirtual && !isOverdue"
@@ -27,6 +33,14 @@
         @update:model-value="emit('toggle', event.taskId)"
       />
       <Repeat v-if="event.isRecurring" :size="10" class="shrink-0" />
+      <Flag
+        v-if="showPriorityMarks"
+        :size="10"
+        data-testid="priority-flag"
+        class="shrink-0"
+        :class="event.priority && getPriorityColor(event.priority)"
+        :aria-label="event.priority && PRIORITY_LABELS[event.priority]"
+      />
       <span class="truncate">{{ event.title }}</span>
       <button
         v-if="isVirtual"
@@ -58,10 +72,18 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CalendarPlus, Repeat, Timer } from 'lucide-vue-next'
+import { CalendarPlus, Flag, Repeat, Timer } from 'lucide-vue-next'
 import RoundCheckbox from '@/components/ui/roundCheckbox/RoundCheckbox.vue'
 import type { CalendarEvent } from '../model/types'
-import { getPriorityEventClasses, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
+import { PRIORITY_LABELS } from '@/features/tasks/model/constants'
+import { getPriorityColor, getPriorityStripeClass } from '@/features/tasks/lib/priority'
+import {
+  COMPLETED_EVENT_CLASSES,
+  DEFAULT_EVENT_CLASSES,
+  EVENT_SIDE_STRIPE_CLASSES,
+  OVERDUE_EVENT_CLASSES,
+  VIRTUAL_EVENT_CLASSES,
+} from '../lib/calendar-styles'
 import { eventColumnStyle, type EventColumn } from '../lib/layout-overlapping'
 import { highlightedTaskId } from '@/features/tasks/lib/use-recurring-reschedule'
 
@@ -83,8 +105,10 @@ const emit = defineEmits<{
 
 const completed = computed(() => props.event.completed)
 const isVirtual = computed(() => !!props.event.isVirtual)
-const priorityClasses = computed(() => getPriorityEventClasses(props.event.priority))
 const isOverdue = computed(() => !!props.event.task.isOverdue)
+const showPriorityMarks = computed(() =>
+  !!props.event.priority && !isOverdue.value && !isVirtual.value && !completed.value,
+)
 const highlighted = computed(() => highlightedTaskId.value === props.event.taskId)
 
 const blockStyle = computed(() => {

@@ -13,10 +13,10 @@ import type { Priority } from '../model/types'
 import PriorityPickerContent from './PriorityPickerContent.vue'
 
 defineProps<{
-  modelValue: Priority | undefined
+  modelValue: Priority | null | undefined
 }>()
 
 defineEmits<{
-  (e: 'update:modelValue', value: Priority | undefined): void
+  (e: 'update:modelValue', value: Priority | null): void
 }>()
 </script>

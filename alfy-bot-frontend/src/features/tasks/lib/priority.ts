@@ -17,6 +17,16 @@ export const getPriorityClasses = (priority?: Priority): string => {
   return PRIORITY_COLORS[priority]
 }
 
+const PRIORITY_STRIPE_COLORS: Record<Priority, string> = {
+  high: 'bg-red-500',
+  medium: 'bg-yellow-500',
+  low: 'bg-green-500',
+}
+
 export const getPriorityColor = (priority: Priority): string => {
   return PRIORITY_ICON_COLORS[priority]
+}
+
+export const getPriorityStripeClass = (priority: Priority): string => {
+  return PRIORITY_STRIPE_COLORS[priority]
 }

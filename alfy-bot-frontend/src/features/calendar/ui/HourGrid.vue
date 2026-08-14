@@ -75,10 +75,15 @@
         v-if="showOverlay && draggedEvent"
         :style="[overlayStyle, { height: overlayHeight + 'px' }]"
         :class="[
-          'rounded-md px-2 py-1 text-xs overflow-hidden border pointer-events-none opacity-90 z-50 cursor-grabbing',
+          'relative rounded-md px-2 py-1 text-xs overflow-hidden pointer-events-none opacity-90 z-50 cursor-grabbing',
           ghostClasses,
         ]"
       >
+        <span
+          v-if="!draggedEvent.completed && !draggedEvent.task.isOverdue && draggedEvent.priority"
+          :class="[EVENT_SIDE_STRIPE_CLASSES, draggedEvent.priority && getPriorityStripeClass(draggedEvent.priority)]"
+          aria-hidden="true"
+        />
         <div class="font-medium truncate">{{ draggedEvent.title }}</div>
         <div class="text-[10px] opacity-70">{{ overlayTimeLabel }}</div>
       </div>
@@ -101,7 +106,8 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { isSameDay } from 'date-fns'
 import type { CalendarEvent, CalendarDropPayload } from '../model/types'
 import { isToday } from '../lib/week'
-import { getPriorityEventClasses } from '../lib/calendar-styles'
+import { DEFAULT_EVENT_CLASSES, EVENT_SIDE_STRIPE_CLASSES } from '../lib/calendar-styles'
+import { getPriorityStripeClass } from '@/features/tasks/lib/priority'
 import { useCreateSlotDrag } from '../lib/use-create-slot-drag'
 import { usePointerDnd } from '../lib/use-pointer-dnd'
 import DayColumn from './DayColumn.vue'
@@ -156,7 +162,7 @@ const ghostClasses = computed(() => {
   if (!draggedEvent.value) return ''
   return draggedEvent.value.completed
     ? 'bg-muted border-border'
-    : getPriorityEventClasses(draggedEvent.value.priority)
+    : DEFAULT_EVENT_CLASSES
 })
 
 const now = ref(new Date())

@@ -124,7 +124,7 @@
         </DropdownMenuTrigger>
         <PriorityPicker
           :model-value="form.priority"
-          @update:model-value="form.priority = $event"
+          @update:model-value="form.priority = $event ?? undefined"
         />
       </DropdownMenu>
 

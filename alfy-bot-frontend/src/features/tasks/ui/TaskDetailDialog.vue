@@ -334,14 +334,14 @@
                 v-if="effectiveEditable && localPriority"
                 class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                 aria-label="Очистить приоритет"
-                @click.stop="localPriority = undefined; emitUpdate({ priority: undefined })"
+                @click.stop="localPriority = undefined; emitUpdate({ priority: null })"
               >
                 <X :size="14" />
               </button>
             </div>
             <PriorityPicker
               :model-value="localPriority"
-              @update:model-value="localPriority = $event; emitUpdate({ priority: $event })"
+              @update:model-value="localPriority = $event ?? undefined; emitUpdate({ priority: $event })"
             />
           </DropdownMenu>
 
@@ -560,7 +560,7 @@ const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
   normal: '',
   none: '',
 }
-import type { Task, ChecklistItem } from '../model/types'
+import type { Task, ChecklistItem, TaskPatch } from '../model/types'
 import type { RecurrenceRule } from '../model/recurrence'
 import { formatRecurrence } from '../model/recurrence'
 import TagsEditor from './TagsEditor.vue'
@@ -706,8 +706,8 @@ function onMissedChange(value: 'shift' | 'freeze') {
 }
 
 // Drawer-specific handlers (auto-close for single-select)
-function onPriorityDrawerChange(value: Priority | undefined) {
-  localPriority.value = value
+function onPriorityDrawerChange(value: Priority | null) {
+  localPriority.value = value ?? undefined
   emitUpdate({ priority: value })
   activeDrawer.value = null
 }
@@ -901,7 +901,7 @@ function autosizeTextarea(el: HTMLTextAreaElement) {
   el.style.height = `${el.scrollHeight}px`
 }
 
-function emitUpdate(partial: Partial<Task>) {
+function emitUpdate(partial: TaskPatch) {
   if (!props.task) return
   emit('update', { ...props.task, ...partial })
 }

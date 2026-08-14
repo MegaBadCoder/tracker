@@ -42,13 +42,42 @@ describe('CalendarEventBlock', () => {
     expect(wrapper.classes()).not.toContain('opacity-40')
   })
 
-  it('обычная задача рендерится с priority-классами', () => {
+  it('приоритет — флаг, карточка без цветной заливки', () => {
     const wrapper = mount(CalendarEventBlock, {
       props: { event: makeEvent({ priority: 'high' }) },
     })
-    // high-priority стили адаптивны к теме: светлый базовый класс + dark-вариант
-    expect(wrapper.classes()).toContain('bg-red-100')
-    expect(wrapper.classes()).toContain('dark:bg-red-500/25')
+    expect(wrapper.classes()).toContain('bg-primary/15')
+    expect(wrapper.classes()).not.toContain('bg-red-100')
+    expect(wrapper.classes()).not.toContain('border-primary/40')
+    const flag = wrapper.find('[data-testid="priority-flag"]')
+    expect(flag.exists()).toBe(true)
+    expect(flag.classes()).toContain('text-red-500')
+    expect(wrapper.find('[data-testid="event-side-stripe"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="event-side-stripe"]').classes()).toContain('bg-red-500')
+  })
+
+  it('без приоритета нет флага и нет полоски', () => {
+    const wrapper = mount(CalendarEventBlock, {
+      props: { event: makeEvent() },
+    })
+    expect(wrapper.find('[data-testid="priority-flag"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="event-side-stripe"]').exists()).toBe(false)
+  })
+
+  it('выполненная и просроченная с приоритетом — без флага и полоски', () => {
+    const done = mount(CalendarEventBlock, {
+      props: { event: makeEvent({ priority: 'high', completed: true }) },
+    })
+    expect(done.find('[data-testid="priority-flag"]').exists()).toBe(false)
+    expect(done.find('[data-testid="event-side-stripe"]').exists()).toBe(false)
+    expect(done.classes()).toContain('bg-emerald-100')
+
+    const overdue = mount(CalendarEventBlock, {
+      props: { event: makeEvent({ priority: 'high', task: makeTask({ isOverdue: true }) }) },
+    })
+    expect(overdue.find('[data-testid="priority-flag"]').exists()).toBe(false)
+    expect(overdue.find('[data-testid="event-side-stripe"]').exists()).toBe(false)
+    expect(overdue.classes()).toContain('bg-red-500/85')
   })
 
   // Негативные
