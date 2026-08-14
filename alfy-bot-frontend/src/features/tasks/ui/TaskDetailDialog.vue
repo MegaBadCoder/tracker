@@ -903,6 +903,6 @@ function autosizeTextarea(el: HTMLTextAreaElement) {
 
 function emitUpdate(partial: TaskPatch) {
   if (!props.task) return
-  emit('update', { ...props.task, ...partial })
+  emit('update', { ...props.task, ...partial } as Task)
 }
 </script>

@@ -55,10 +55,10 @@ export class CreateTaskDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 'high', enum: ['high', 'medium', 'low'] })
+  @ApiPropertyOptional({ example: 'high', enum: ['high', 'medium', 'low'], nullable: true })
   @IsOptional()
   @IsString()
-  priority?: 'high' | 'medium' | 'low';
+  priority?: 'high' | 'medium' | 'low' | null;
 
   @ApiPropertyOptional({ example: '2026-03-15T00:00:00.000Z' })
   @IsOptional()
