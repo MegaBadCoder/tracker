@@ -1,102 +1,23 @@
-<template>
-  <div class="flex flex-col bg-card overflow-hidden">
-    <CalendarHeader
-      :label="rangeLabel"
-      @navigate="onNavigate"
-      @today="onToday"
-    />
-
-    <!-- Single scroll container for both axes -->
-    <div
-      ref="gridRef"
-      :class="['flex-1 min-h-0 overflow-auto select-none', grabCursor]"
-      @scroll="onScroll"
-      @mousedown="onGrabMouseDown"
-      @mousemove="onGrabMouseMove"
-      @mouseup="onGrabMouseUp"
-    >
-      <div :style="{ width: TRACK_WIDTH + GUTTER_WIDTH + 'px' }" class="relative">
-
-        <!-- Day headers: sticky top -->
-        <div class="sticky top-0 z-30 bg-card border-b border-border flex" style="height: 52px">
-          <div class="w-14 shrink-0 border-r border-border/40 sticky left-0 z-40 bg-card" />
-          <div class="relative" :style="{ width: TRACK_WIDTH + 'px', height: '52px' }">
-            <div
-              v-for="day in visibleDays"
-              :key="'h-' + day.toISOString()"
-              :class="[
-                'absolute top-0 text-center py-2 border-r border-border/40',
-                isToday(day) && 'bg-primary/5',
-              ]"
-              :style="{ left: dayOffset(day) + 'px', width: DAY_WIDTH + 'px', height: '52px' }"
-            >
-              <div class="text-[10px] uppercase text-muted-foreground">{{ formatDayHeader(day).dayName }}</div>
-              <div
-                :class="[
-                  'text-sm font-medium',
-                  isToday(day) && 'text-primary',
-                ]"
-              >
-                {{ formatDayHeader(day).dayNumber }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- All-day section: sticky below headers -->
-        <AllDaySection
-          :visible-days="visibleDays"
-          :day-offset="dayOffset"
-          :day-width="DAY_WIDTH"
-          :track-width="TRACK_WIDTH"
-          :events="calendarEvents"
-          @drop="onDrop"
-          @dragstart="onDragStart"
-          @open="onEventOpen"
-          @materialize="onMaterialize"
-        />
-
-        <!-- Hour grid -->
-        <HourGrid
-          :visible-days="visibleDays"
-          :day-offset="dayOffset"
-          :date-from-x="dateFromX"
-          :day-width="DAY_WIDTH"
-          :track-width="TRACK_WIDTH"
-          :events="calendarEvents"
-          :grid-ref="gridRef"
-          :on-task-moved="onTaskMoved"
-          :on-task-resized="onTaskResized"
-          :on-slot-create="onSlotCreate"
-          @drop="onDrop"
-          @open="onEventOpen"
-          @toggle="onToggleTask"
-          @materialize="onMaterialize"
-        />
-
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useTaskStore } from '@/features/tasks/model/task-store'
-import { useRecurringReschedule } from '@/features/tasks/lib/use-recurring-reschedule'
+import type { CalendarDropPayload, CalendarEvent, CalendarViewMode } from '../model/types'
+import { useElementSize } from '@vueuse/core'
+import { addDays, startOfDay } from 'date-fns'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useConfirm } from '@/composables/useConfirm'
+import { useRecurringReschedule } from '@/features/tasks/lib/use-recurring-reschedule'
+import { useTaskStore } from '@/features/tasks/model/task-store'
 import { tasksToCalendarEvents } from '../lib/calendar-events'
-import { isToday, formatDayHeader, formatDateRange, getWeekStart, navigateWeek } from '../lib/week'
 import { useCalendarDnd } from '../lib/use-calendar-dnd'
-import { useInfiniteDays, DAY_WIDTH, TRACK_WIDTH, GUTTER_WIDTH } from '../lib/use-infinite-days'
 import { useGrabScroll } from '../lib/use-grab-scroll'
-import type { CalendarEvent, CalendarDropPayload } from '../model/types'
-import CalendarHeader from './CalendarHeader.vue'
+import { DAY_WIDTH, GUTTER_WIDTH, TRACK_WIDTH, useInfiniteDays } from '../lib/use-infinite-days'
+import { formatDateRange, formatDayHeader, formatDayTitle, getWeekStart, isToday, navigateWeek } from '../lib/week'
 import AllDaySection from './AllDaySection.vue'
+import CalendarHeader from './CalendarHeader.vue'
 import HourGrid from './HourGrid.vue'
 
 const emit = defineEmits<{
   'open-task': [task: import('@/features/tasks/model/types').Task]
-  'create-task': [payload: { date: Date; startMinutes: number; durationMinutes: number }]
+  'create-task': [payload: { date: Date, startMinutes: number, durationMinutes: number }]
 }>()
 
 const taskStore = useTaskStore()
@@ -105,38 +26,121 @@ const { rescheduleDueDate } = useRecurringReschedule()
 const { confirm } = useConfirm()
 
 const gridRef = ref<HTMLElement | null>(null)
-const { visibleDays, dateRange, dayOffset, dateFromX, scrollToDate, onScroll } = useInfiniteDays(gridRef)
+const viewMode = ref<CalendarViewMode>('week')
+const selectedDate = ref(startOfDay(new Date()))
+const isDayView = computed(() => viewMode.value === 'day')
+
 const {
-  grabbing, ctrlHeld,
+  visibleDays: weekDays,
+  dateRange,
+  centerDate,
+  dayOffset: weekDayOffset,
+  dateFromX: weekDateFromX,
+  scrollToDate,
+  onScroll: onWeekScroll,
+} = useInfiniteDays(gridRef)
+const { width: gridWidth } = useElementSize(gridRef)
+const {
+  grabbing,
+  ctrlHeld,
   onMouseDown: onGrabMouseDown,
   onMouseMove: onGrabMouseMove,
   onMouseUp: onGrabMouseUp,
 } = useGrabScroll(gridRef)
 
+const dayColumnWidth = computed(() => Math.max(200, (gridWidth.value || 800) - GUTTER_WIDTH))
+const dayWidth = computed(() => isDayView.value ? dayColumnWidth.value : DAY_WIDTH)
+const trackWidth = computed(() => isDayView.value ? dayColumnWidth.value : TRACK_WIDTH)
+
+const visibleDays = computed(() =>
+  isDayView.value ? [selectedDate.value] : weekDays.value,
+)
+
+function dayOffset(date: Date): number {
+  if (isDayView.value)
+    return 0
+  return weekDayOffset(date)
+}
+
+function dateFromX(x: number): Date {
+  if (isDayView.value)
+    return selectedDate.value
+  return weekDateFromX(x)
+}
+
+function onScroll() {
+  if (isDayView.value)
+    return
+  onWeekScroll()
+}
+
 const grabCursor = computed(() => {
-  if (grabbing.value) return 'cursor-grabbing'
-  if (ctrlHeld.value) return 'cursor-grab'
+  if (grabbing.value)
+    return 'cursor-grabbing'
+  if (ctrlHeld.value)
+    return 'cursor-grab'
   return ''
 })
 
-const rangeLabel = computed(() => formatDateRange(dateRange.value.start, dateRange.value.end))
+const rangeLabel = computed(() => {
+  if (isDayView.value)
+    return formatDayTitle(selectedDate.value)
+  return formatDateRange(dateRange.value.start, dateRange.value.end)
+})
 
 const calendarEvents = computed(() => {
   const days = visibleDays.value
-  if (days.length === 0) return []
+  if (days.length === 0)
+    return []
   const start = days[0]!
   const end = new Date(days[days.length - 1]!)
   end.setHours(23, 59, 59, 999)
   return tasksToCalendarEvents(taskStore.tasks, start, end)
 })
 
+function scrollToCurrentHour() {
+  if (!gridRef.value)
+    return
+  const hour = new Date().getHours()
+  gridRef.value.scrollTop = Math.max(0, (hour - 1) * 60)
+}
+
+function onViewModeChange(mode: CalendarViewMode) {
+  if (mode === 'day') {
+    selectedDate.value = startOfDay(centerDate.value)
+  }
+  viewMode.value = mode
+  nextTick(() => {
+    if (!gridRef.value)
+      return
+    if (mode === 'day') {
+      gridRef.value.scrollLeft = 0
+      if (isToday(selectedDate.value))
+        scrollToCurrentHour()
+    }
+    else {
+      scrollToDate(selectedDate.value)
+    }
+  })
+}
+
 function onNavigate(direction: number) {
+  if (isDayView.value) {
+    selectedDate.value = addDays(selectedDate.value, direction)
+    return
+  }
   const currentWeekStart = getWeekStart(dateRange.value.start)
   scrollToDate(navigateWeek(currentWeekStart, direction), true)
 }
 
 function onToday() {
-  scrollToDate(new Date(), true)
+  const today = startOfDay(new Date())
+  if (isDayView.value) {
+    selectedDate.value = today
+    nextTick(scrollToCurrentHour)
+    return
+  }
+  scrollToDate(today, true)
 }
 
 function onDragStart(e: DragEvent, taskId: string) {
@@ -147,14 +151,17 @@ async function applyTaskMove(taskId: string, newDate: Date, startMinutes?: numbe
   const date = new Date(newDate)
   if (startMinutes !== undefined) {
     date.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0)
-  } else {
+  }
+  else {
     date.setHours(0, 0, 0, 0)
   }
   try {
     const task = taskStore.tasks.find(t => t.id === taskId)
-    if (!task) return
+    if (!task)
+      return
     await rescheduleDueDate(task, date)
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Ошибка перемещения задачи:', err)
   }
 }
@@ -166,7 +173,8 @@ async function onTaskMoved(taskId: string, newDate: Date, startMinutes: number) 
 async function onTaskResized(taskId: string, durationMinutes: number) {
   try {
     await taskStore.updateTask(taskId, { durationMinutes }, false)
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Ошибка изменения длительности:', err)
   }
 }
@@ -174,7 +182,8 @@ async function onTaskResized(taskId: string, durationMinutes: number) {
 async function onToggleTask(taskId: string) {
   try {
     await taskStore.toggleTask(taskId)
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Ошибка переключения задачи:', err)
   }
 }
@@ -193,16 +202,19 @@ async function onMaterialize(event: CalendarEvent) {
     rememberKey: 'alfy:skip-materialize-confirm',
     rememberLabel: 'Больше не показывать',
   })
-  if (!ok) return
+  if (!ok)
+    return
   try {
     await taskStore.materializeOccurrence(event.taskId)
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Ошибка проявления задачи:', err)
   }
 }
 
 function onDrop(payload: CalendarDropPayload) {
-  if (payload.isVirtual) return
+  if (payload.isVirtual)
+    return
   applyTaskMove(payload.taskId, payload.newDate, payload.startMinutes)
 }
 
@@ -216,3 +228,84 @@ onMounted(() => {
   }
 })
 </script>
+
+<template>
+  <div class="flex flex-col bg-card overflow-hidden">
+    <CalendarHeader
+      :label="rangeLabel"
+      :view-mode="viewMode"
+      @navigate="onNavigate"
+      @today="onToday"
+      @update:view-mode="onViewModeChange"
+    />
+
+    <!-- Single scroll container for both axes -->
+    <div
+      ref="gridRef"
+      class="flex-1 min-h-0 overflow-y-auto select-none" :class="[isDayView ? 'overflow-x-hidden' : 'overflow-x-auto', grabCursor]"
+      @scroll="onScroll"
+      @mousedown="onGrabMouseDown"
+      @mousemove="onGrabMouseMove"
+      @mouseup="onGrabMouseUp"
+    >
+      <div :style="{ width: `${trackWidth + GUTTER_WIDTH}px` }" class="relative">
+        <!-- Day headers: sticky top -->
+        <div class="sticky top-0 z-30 bg-card border-b border-border flex" style="height: 52px">
+          <div class="w-14 shrink-0 border-r border-border/40 sticky left-0 z-40 bg-card" />
+          <div class="relative" :style="{ width: `${trackWidth}px`, height: '52px' }">
+            <div
+              v-for="day in visibleDays"
+              :key="`h-${day.toISOString()}`"
+              class="absolute top-0 text-center py-2 border-r border-border/40" :class="[
+                isToday(day) && 'bg-primary/5',
+              ]"
+              :style="{ left: `${dayOffset(day)}px`, width: `${dayWidth}px`, height: '52px' }"
+            >
+              <div class="text-[10px] uppercase text-muted-foreground">
+                {{ formatDayHeader(day).dayName }}
+              </div>
+              <div
+                class="text-sm font-medium" :class="[
+                  isToday(day) && 'text-primary',
+                ]"
+              >
+                {{ formatDayHeader(day).dayNumber }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- All-day section: sticky below headers -->
+        <AllDaySection
+          :visible-days="visibleDays"
+          :day-offset="dayOffset"
+          :day-width="dayWidth"
+          :track-width="trackWidth"
+          :events="calendarEvents"
+          @drop="onDrop"
+          @dragstart="onDragStart"
+          @open="onEventOpen"
+          @materialize="onMaterialize"
+        />
+
+        <!-- Hour grid -->
+        <HourGrid
+          :visible-days="visibleDays"
+          :day-offset="dayOffset"
+          :date-from-x="dateFromX"
+          :day-width="dayWidth"
+          :track-width="trackWidth"
+          :events="calendarEvents"
+          :grid-ref="gridRef"
+          :on-task-moved="onTaskMoved"
+          :on-task-resized="onTaskResized"
+          :on-slot-create="onSlotCreate"
+          @drop="onDrop"
+          @open="onEventOpen"
+          @toggle="onToggleTask"
+          @materialize="onMaterialize"
+        />
+      </div>
+    </div>
+  </div>
+</template>

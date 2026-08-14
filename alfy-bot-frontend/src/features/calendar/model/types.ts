@@ -1,4 +1,4 @@
-import type { Task, Priority } from '@/features/tasks/model/types'
+import type { Priority, Task } from '@/features/tasks/model/types'
 
 export interface CalendarEvent {
   taskId: string
@@ -15,6 +15,8 @@ export interface CalendarEvent {
   resizable: boolean
   pomodoroLabel?: string
 }
+
+export type CalendarViewMode = 'week' | 'day'
 
 export interface CalendarDropPayload {
   taskId: string

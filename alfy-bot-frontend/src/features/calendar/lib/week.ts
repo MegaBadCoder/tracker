@@ -1,4 +1,4 @@
-import { startOfWeek, addWeeks, eachDayOfInterval, addDays, isSameDay, format } from 'date-fns'
+import { addDays, addWeeks, eachDayOfInterval, format, isSameDay, startOfWeek } from 'date-fns'
 import { dateFnsLocale, weekStartsOn } from '@/composables/useLocale'
 
 export function getWeekStart(date: Date): Date {
@@ -32,11 +32,15 @@ export function formatWeekRange(weekStart: Date): string {
   return `${startDay} ${startMonth} \u2013 ${endDay} ${endMonth} ${year}`
 }
 
-export function formatDayHeader(date: Date): { dayName: string; dayNumber: string } {
+export function formatDayHeader(date: Date): { dayName: string, dayNumber: string } {
   return {
     dayName: format(date, 'EEEEEE', { locale: dateFnsLocale.value }),
     dayNumber: format(date, 'd'),
   }
+}
+
+export function formatDayTitle(date: Date): string {
+  return format(date, 'd MMMM yyyy', { locale: dateFnsLocale.value })
 }
 
 export function formatDateRange(start: Date, end: Date): string {
