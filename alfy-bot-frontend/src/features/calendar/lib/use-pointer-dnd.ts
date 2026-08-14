@@ -1,6 +1,7 @@
-import { ref, computed, type Ref, type CSSProperties } from 'vue'
-import { startOfDay } from 'date-fns'
+import type { CSSProperties, MaybeRefOrGetter, Ref } from 'vue'
 import type { CalendarEvent } from '../model/types'
+import { startOfDay } from 'date-fns'
+import { computed, ref, toValue } from 'vue'
 
 const MAX_MINUTES = 23 * 60 + 55
 
@@ -8,7 +9,7 @@ export interface PointerDndOptions {
   trackEl: Ref<HTMLElement | null>
   dayOffset: (date: Date) => number
   dateFromX: (x: number) => Date
-  dayWidth: number
+  dayWidth: MaybeRefOrGetter<number>
   onMoved: (taskId: string, newDate: Date, startMinutes: number) => Promise<void>
   onClicked?: (event: CalendarEvent) => void
   onResized?: (taskId: string, durationMinutes: number) => Promise<void>
@@ -39,7 +40,7 @@ export function usePointerDnd(options: PointerDndOptions) {
     position: 'absolute',
     top: `${overlayTop.value}px`,
     left: `${overlayLeft.value}px`,
-    width: `${options.dayWidth - 4}px`,
+    width: `${toValue(options.dayWidth) - 4}px`,
   }))
 
   const overlayTimeLabel = computed(() => {
@@ -52,7 +53,8 @@ export function usePointerDnd(options: PointerDndOptions) {
 
   function onGrab(event: CalendarEvent, e: PointerEvent) {
     const track = options.trackEl.value
-    if (!track) return
+    if (!track)
+      return
 
     isDragging.value = true
     showOverlay.value = false
@@ -83,7 +85,8 @@ export function usePointerDnd(options: PointerDndOptions) {
       previewDate.value = date
       overlayLeft.value = options.dayOffset(date) + 2
 
-      if (!showOverlay.value) showOverlay.value = true
+      if (!showOverlay.value)
+        showOverlay.value = true
     }
 
     const cleanup = () => {
@@ -106,7 +109,8 @@ export function usePointerDnd(options: PointerDndOptions) {
 
       if (movedTime || movedDay) {
         await options.onMoved(event.taskId, previewDate.value, previewMinutes.value)
-      } else if (!showOverlay.value && options.onClicked) {
+      }
+      else if (!showOverlay.value && options.onClicked) {
         options.onClicked(event)
       }
 
@@ -125,7 +129,8 @@ export function usePointerDnd(options: PointerDndOptions) {
 
   function onResizeStart(event: CalendarEvent, e: PointerEvent) {
     const track = options.trackEl.value
-    if (!track) return
+    if (!track)
+      return
 
     isDragging.value = true
     showOverlay.value = false
@@ -147,7 +152,8 @@ export function usePointerDnd(options: PointerDndOptions) {
       const newDuration = Math.max(newBottom - event.startMinutes, MIN_RESIZE_DURATION)
       overlayHeight.value = newDuration
 
-      if (!showOverlay.value) showOverlay.value = true
+      if (!showOverlay.value)
+        showOverlay.value = true
     }
 
     const cleanup = () => {

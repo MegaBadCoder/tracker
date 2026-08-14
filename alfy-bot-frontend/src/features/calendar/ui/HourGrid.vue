@@ -132,7 +132,7 @@ const { showOverlay, draggedTaskId, draggedEvent, overlayStyle, overlayHeight, o
   trackEl: trackRef,
   dayOffset: (d: Date) => props.dayOffset(d),
   dateFromX: (x: number) => props.dateFromX(x),
-  dayWidth: props.dayWidth,
+  dayWidth: () => props.dayWidth,
   onMoved: (taskId, newDate, startMinutes) => props.onTaskMoved(taskId, newDate, startMinutes),
   onClicked: (event) => emit('open', event),
   onResized: (taskId, durationMinutes) => props.onTaskResized(taskId, durationMinutes),
@@ -148,7 +148,7 @@ const {
   trackEl: trackRef,
   dayOffset: (d: Date) => props.dayOffset(d),
   dateFromX: (x: number) => props.dateFromX(x),
-  dayWidth: props.dayWidth,
+  dayWidth: () => props.dayWidth,
   onCreated: (date, startMinutes, durationMinutes) => props.onSlotCreate(date, startMinutes, durationMinutes),
 })
 

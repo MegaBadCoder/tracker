@@ -1,4 +1,5 @@
-import { ref, computed, type Ref, type CSSProperties } from 'vue'
+import type { CSSProperties, MaybeRefOrGetter, Ref } from 'vue'
+import { computed, ref, toValue } from 'vue'
 
 const MAX_MINUTES = 23 * 60 + 55
 const SHOW_OVERLAY_THRESHOLD_PX = 3
@@ -10,7 +11,7 @@ export interface CreateSlotDragOptions {
   trackEl: Ref<HTMLElement | null>
   dayOffset: (date: Date) => number
   dateFromX: (x: number) => Date
-  dayWidth: number
+  dayWidth: MaybeRefOrGetter<number>
   onCreated: (date: Date, startMinutes: number, durationMinutes: number) => Promise<void>
 }
 
@@ -39,7 +40,7 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
     position: 'absolute',
     top: `${overlayTop.value}px`,
     left: `${overlayLeft.value}px`,
-    width: `${options.dayWidth - 4}px`,
+    width: `${toValue(options.dayWidth) - 4}px`,
   }))
 
   const overlayTimeLabel = computed(() => {
@@ -49,14 +50,19 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
   })
 
   function onPointerDown(e: PointerEvent) {
-    if (e.button !== 0) return
-    if (e.ctrlKey || e.metaKey) return
+    if (e.button !== 0)
+      return
+    if (e.ctrlKey || e.metaKey)
+      return
     const target = e.target as HTMLElement | null
-    if (!target) return
-    if (target.closest('[data-calendar-event-block]')) return
+    if (!target)
+      return
+    if (target.closest('[data-calendar-event-block]'))
+      return
 
     const track = options.trackEl.value
-    if (!track) return
+    if (!track)
+      return
 
     const rect = track.getBoundingClientRect()
     const initialX = e.clientX - rect.left
@@ -94,7 +100,8 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
         if (!showOverlay.value) {
           const dx = Math.abs(ev.clientX - rect.left - initialX)
           const dy = Math.abs(y - initialY)
-          if (dx < SHOW_OVERLAY_THRESHOLD_PX && dy < SHOW_OVERLAY_THRESHOLD_PX) return
+          if (dx < SHOW_OVERLAY_THRESHOLD_PX && dy < SHOW_OVERLAY_THRESHOLD_PX)
+            return
           showOverlay.value = true
         }
 
@@ -149,7 +156,8 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
     }, LONG_PRESS_DELAY_MS)
 
     function onWaitMove(ev: PointerEvent) {
-      if (timerFired) return
+      if (timerFired)
+        return
       const dx = ev.clientX - initialClientX
       const dy = ev.clientY - initialClientY
       if (Math.sqrt(dx * dx + dy * dy) > TOUCH_DRAG_THRESHOLD_PX) {
@@ -158,7 +166,8 @@ export function useCreateSlotDrag(options: CreateSlotDragOptions) {
     }
 
     function onWaitEnd() {
-      if (!timerFired) cleanupWait()
+      if (!timerFired)
+        cleanupWait()
     }
 
     function cleanupWait() {
