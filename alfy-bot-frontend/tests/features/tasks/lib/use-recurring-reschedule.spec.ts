@@ -89,7 +89,7 @@ describe('useRecurringReschedule', () => {
     expect(confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         confirmText: 'Сместить все',
-        cancelText: 'Оставить как есть',
+        cancelText: 'Текущую',
       }),
     )
     expect(highlightedTaskId.value).toBeNull()
