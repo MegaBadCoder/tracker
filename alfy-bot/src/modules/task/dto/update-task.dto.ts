@@ -14,6 +14,11 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @IsIn(['this', 'subsequent'])
   rescheduleScope?: 'this' | 'subsequent';
 
+  @ApiPropertyOptional({ enum: ['high', 'medium', 'low'], nullable: true })
+  @IsOptional()
+  @IsIn(['high', 'medium', 'low'])
+  priority?: 'high' | 'medium' | 'low' | null;
+
   // Explicitly exclude checklist — use PUT /tasks/:id/checklist instead
   checklist?: never;
 

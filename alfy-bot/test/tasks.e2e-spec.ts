@@ -178,6 +178,22 @@ describe('Tasks (e2e)', () => {
 
       expect(body.task.dueDate).toBeTruthy();
     });
+
+    it('clears priority with null', async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ priority: 'high' })
+        .expect(200);
+
+      const { body } = await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ priority: null })
+        .expect(200);
+
+      expect(body.task.priority).toBeNull();
+    });
   });
 
   describe('PATCH /api/tasks/:id/pomodoro', () => {

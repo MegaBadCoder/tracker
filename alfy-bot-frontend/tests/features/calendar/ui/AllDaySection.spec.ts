@@ -49,6 +49,24 @@ describe('AllDaySection', () => {
     expect(chip.classes()).not.toContain('opacity-50')
   })
 
+  it('приоритет — флаг, чип без цветной заливки', () => {
+    const wrapper = mount(AllDaySection, {
+      props: {
+        ...defaultProps,
+        events: [makeEvent({ priority: 'high' })],
+      },
+    })
+    const chip = wrapper.find('[draggable="true"]')
+    expect(chip.classes()).toContain('bg-primary/15')
+    expect(chip.classes()).not.toContain('bg-red-100')
+    expect(chip.classes()).not.toContain('border-primary/40')
+    const flag = wrapper.find('[data-testid="priority-flag"]')
+    expect(flag.exists()).toBe(true)
+    expect(flag.classes()).toContain('text-red-500')
+    expect(wrapper.find('[data-testid="event-side-stripe"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="event-side-stripe"]').classes()).toContain('bg-red-500')
+  })
+
   it('клик по event chip эмитит open с CalendarEvent', async () => {
     const event = makeEvent()
     const wrapper = mount(AllDaySection, {

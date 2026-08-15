@@ -21,7 +21,7 @@
           v-for="event in getEventsForDay(day)"
           :key="event.taskId"
           :class="[
-            'text-[10px] px-1.5 py-0.5 rounded max-w-full border flex items-center gap-0.5',
+            'relative overflow-hidden text-[10px] px-1.5 py-0.5 rounded max-w-full flex items-center gap-0.5',
             event.task.isOverdue
               ? 'cursor-not-allowed'
               : event.isVirtual
@@ -30,16 +30,30 @@
             event.task.isOverdue
               ? OVERDUE_EVENT_CLASSES
               : event.completed
-                ? 'bg-muted border-border line-through'
+                ? 'border bg-muted border-border line-through'
                 : event.isVirtual
-                  ? 'border-dashed border-border/60 bg-muted'
-                  : chipClasses(event),
+                  ? 'border border-dashed border-border/60 bg-muted'
+                  : DEFAULT_EVENT_CLASSES,
             highlightedTaskId === event.taskId && 'ring-2 ring-primary',
           ]"
           :draggable="!event.isVirtual && !event.task.isOverdue"
           @dragstart="onDragStart($event, event)"
           @click.stop="$emit('open', event)"
         >
+          <span
+            v-if="showsPriorityMarks(event)"
+            data-testid="event-side-stripe"
+            :class="[EVENT_SIDE_STRIPE_CLASSES, event.priority && getPriorityStripeClass(event.priority)]"
+            aria-hidden="true"
+          />
+          <Flag
+            v-if="showsPriorityMarks(event)"
+            :size="10"
+            data-testid="priority-flag"
+            class="shrink-0"
+            :class="event.priority && getPriorityColor(event.priority)"
+            :aria-label="event.priority && PRIORITY_LABELS[event.priority]"
+          />
           <span class="truncate">{{ event.title }}</span>
           <button
             v-if="event.isVirtual"
@@ -60,10 +74,12 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { CalendarPlus } from 'lucide-vue-next'
+import { CalendarPlus, Flag } from 'lucide-vue-next'
 import { isSameDay } from 'date-fns'
 import type { CalendarEvent, CalendarDropPayload } from '../model/types'
-import { getPriorityEventClasses, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
+import { PRIORITY_LABELS } from '@/features/tasks/model/constants'
+import { getPriorityColor, getPriorityStripeClass } from '@/features/tasks/lib/priority'
+import { DEFAULT_EVENT_CLASSES, EVENT_SIDE_STRIPE_CLASSES, OVERDUE_EVENT_CLASSES } from '../lib/calendar-styles'
 import { highlightedTaskId } from '@/features/tasks/lib/use-recurring-reschedule'
 
 const props = defineProps<{
@@ -87,8 +103,8 @@ function getEventsForDay(day: Date): CalendarEvent[] {
   return props.events.filter(e => e.isAllDay && isSameDay(e.date, day))
 }
 
-function chipClasses(event: CalendarEvent): string {
-  return getPriorityEventClasses(event.priority)
+function showsPriorityMarks(event: CalendarEvent): boolean {
+  return !!event.priority && !event.task.isOverdue && !event.isVirtual && !event.completed
 }
 
 function onDragStart(e: DragEvent, event: CalendarEvent) {

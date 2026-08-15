@@ -225,6 +225,17 @@ describe('TaskService', () => {
       expect(result.task.title).toBe('Новое название');
     });
 
+    it('priority: null сбрасывает приоритет', async () => {
+      repo.findById.mockResolvedValue(makeTask({ priority: 'high' }));
+
+      const result = await service.update(1, 'task-1', { priority: null });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ priority: null }),
+      );
+      expect(result.task.priority).toBeNull();
+    });
+
     it('бросает NotFoundException если задача не найдена', async () => {
       repo.findById.mockResolvedValue(null);
 
