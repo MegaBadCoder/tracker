@@ -1,6 +1,6 @@
 # alfy-mcp
 
-MCP-сервер для [Alfy](../README.md) — предоставляет инструменты для управления задачами, целями и привычками через Claude Desktop, Claude Code или любой MCP-клиент.
+MCP-сервер для [Alfy](../README.md) — предоставляет инструменты для управления задачами, проектами, целями и привычками через Claude Desktop, Claude Code или любой MCP-клиент.
 
 ESM-пакет, Node 22+. Тонкая обёртка над REST API [`alfy-bot`](../alfy-bot/): один HTTP-вызов на инструмент (кроме `get_progress` — 3 параллельных), в БД напрямую не ходит. SDK — [`@modelcontextprotocol/sdk`](https://github.com/modelcontextprotocol). Транспорты: stdio + Streamable HTTP (endpoint `/mcp`, порт 3003).
 
@@ -63,6 +63,18 @@ URL: `https://tracker.rocketup.tech/mcp`
 | `update_task` | Обновить поля задачи |
 | `complete_task` | Отметить задачу выполненной |
 | `delete_task` | Удалить задачу |
+
+Перенос задачи: `update_task` с `projectId` (UUID) или `null` (Inbox).
+
+### Проекты
+
+| Инструмент | Описание |
+|---|---|
+| `list_projects` | Плоский список: `id, title, parentId, description, viewMode, icon, color, order` |
+| `create_project` | Создать проект (`title`, опц. `parentId`, `description`, `viewMode`, `icon`, `color`) |
+| `update_project` | Обновить поля; `null` снимает `parentId` / `description` / `icon` / `color` |
+| `delete_project` | Удалить. Нужен `confirm: true`. 409, если есть дочерние проекты или задачи |
+| `reorder_projects` | Порядок: полный массив `orderedIds` |
 
 ### Привычки / Вопросы (Habits)
 
