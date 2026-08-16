@@ -118,4 +118,29 @@ describe('useTaskDetailHandlers', () => {
     expect(isDetailOpen.value).toBe(false)
     expect(store.deleteTask).not.toHaveBeenCalled()
   })
+
+  it('handleUpdatePomodoroConfig ставит isPomodoroTask на selectedTask', async () => {
+    const task = makeTask({ id: '1' })
+    store = createMockStore([task])
+    const { handleOpenTask, handleUpdatePomodoroConfig, selectedTask } = useTaskDetailHandlers(store as any, confirmFn)
+    handleOpenTask(task)
+
+    await handleUpdatePomodoroConfig('1', { pomodoroCount: 2, pomodoroDuration: 25 })
+
+    expect(selectedTask.value!.isPomodoroTask).toBe(true)
+    expect(selectedTask.value!.pomodoroCount).toBe(2)
+    expect(store.updatePomodoroConfig).toHaveBeenCalledWith('1', { pomodoroCount: 2, pomodoroDuration: 25 })
+  })
+
+  it('handleUpdatePomodoroConfig с null снимает isPomodoroTask', async () => {
+    const task = makeTask({ id: '1', isPomodoroTask: true, pomodoroCount: 4 })
+    store = createMockStore([task])
+    const { handleOpenTask, handleUpdatePomodoroConfig, selectedTask } = useTaskDetailHandlers(store as any, confirmFn)
+    handleOpenTask(task)
+
+    await handleUpdatePomodoroConfig('1', null)
+
+    expect(selectedTask.value!.isPomodoroTask).toBe(false)
+    expect(store.updatePomodoroConfig).toHaveBeenCalledWith('1', null)
+  })
 })

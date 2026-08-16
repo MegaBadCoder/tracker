@@ -530,6 +530,22 @@ describe('TaskService', () => {
       expect(result.pomodoroConfig).toBeNull();
     });
 
+    it('создаёт конфиг если его не было', async () => {
+      repo.findById.mockResolvedValue(makeTask({ pomodoroConfig: null }));
+
+      const result = await service.updatePomodoroConfig(1, 'task-1', {
+        pomodoroCount: 2,
+      });
+
+      expect(repo.updatePomodoroConfig).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'task-1', pomodoroConfig: null }),
+        { pomodoroCount: 2 },
+      );
+      expect(result.pomodoroConfig).toEqual(
+        expect.objectContaining({ pomodoroCount: 2 }),
+      );
+    });
+
     it('бросает NotFoundException для несуществующей задачи', async () => {
       repo.findById.mockResolvedValue(null);
 
