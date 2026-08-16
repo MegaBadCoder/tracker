@@ -94,8 +94,16 @@ export class GoalDto {
   @ApiPropertyOptional({ example: '2026-05-01', nullable: true })
   goal_end: string | null;
 
-  @ApiProperty({ example: 'active', enum: ['active', 'completed', 'deleted'] })
+  @ApiProperty({ example: 'active', enum: ['active', 'completed', 'archived', 'deleted'] })
   status: string;
+
+  @ApiPropertyOptional({
+    example: 'success',
+    enum: ['success', 'failure'],
+    nullable: true,
+    description: 'Результат завершения: успех или неудача. null пока цель активна',
+  })
+  outcome: 'success' | 'failure' | null;
 
   @ApiProperty({
     example: false,

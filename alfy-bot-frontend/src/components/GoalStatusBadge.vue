@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type { GoalStatus } from '../types'
+import type { GoalOutcome, GoalStatus } from '../types'
 
-const props = defineProps<{ status: GoalStatus }>()
+const props = defineProps<{ status: GoalStatus, outcome?: GoalOutcome | null }>()
 
 const config: Record<GoalStatus, { label: string, classes: string, dot: string }> = {
   active: {
@@ -10,9 +10,9 @@ const config: Record<GoalStatus, { label: string, classes: string, dot: string }
     dot: 'bg-green-500',
   },
   completed: {
-    label: 'Завершена',
-    classes: 'text-gray-500 dark:text-gray-400',
-    dot: 'bg-gray-400',
+    label: 'Достигнута',
+    classes: 'text-emerald-700 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
   },
   archived: {
     label: 'В архиве',
@@ -26,7 +26,15 @@ const config: Record<GoalStatus, { label: string, classes: string, dot: string }
   },
 }
 
-const cfg = config[props.status]
+const failed = {
+  label: 'Неудача',
+  classes: 'text-rose-700 dark:text-rose-400',
+  dot: 'bg-rose-500',
+}
+
+const cfg = props.status === 'completed' && props.outcome === 'failure'
+  ? failed
+  : config[props.status]
 </script>
 
 <template>

@@ -27,6 +27,7 @@ export interface QuestionWithScheduleItem {
 
 export interface UpdateGoalDto {
   status?: 'active' | 'completed' | 'archived' | 'deleted'
+  outcome?: 'success' | 'failure' | null
   goal_name?: string
   parent_goal_id?: number | null
 }

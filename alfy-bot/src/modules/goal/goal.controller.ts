@@ -196,6 +196,12 @@ export class GoalController {
 
     if (dto.status) {
       await this.goalService.updateGoalStatus(id, dto.status);
+      if (dto.status !== 'completed') {
+        await this.goalService.update(id, { outcome: null });
+      }
+    }
+    if (dto.outcome !== undefined) {
+      await this.goalService.update(id, { outcome: dto.outcome });
     }
     if (dto.goal_name) {
       await this.goalService.update(id, { goal_name: dto.goal_name });

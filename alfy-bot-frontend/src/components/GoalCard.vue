@@ -50,7 +50,7 @@ function subGoalsLabel(n: number) {
 
       <!-- status + global badge -->
       <div class="mb-3 flex items-center gap-2">
-        <GoalStatusBadge :status="goal.status" />
+        <GoalStatusBadge :status="goal.status" :outcome="goal.outcome" />
         <span
           v-if="goal.is_global"
           class="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"

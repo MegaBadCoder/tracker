@@ -411,6 +411,11 @@ ${periodLine}📊 Статус: ${statusLabel}
     status: GoalStatus,
   ) {
     await this.goalService.updateGoalStatus(goalId, status);
+    if (status === GOAL_STATUSES.COMPLETED) {
+      await this.goalService.update(goalId, { outcome: 'success' });
+    } else if (status === GOAL_STATUSES.ACTIVE) {
+      await this.goalService.update(goalId, { outcome: null });
+    }
 
     let message = '';
     switch (status) {

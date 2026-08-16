@@ -17,6 +17,16 @@ export class UpdateGoalDto {
   goal_name?: string;
 
   @ApiPropertyOptional({
+    example: 'success',
+    enum: ['success', 'failure'],
+    nullable: true,
+    description: 'Флаг завершения. Шлётся вместе со status=completed',
+  })
+  @IsOptional()
+  @IsIn(['success', 'failure'])
+  outcome?: 'success' | 'failure' | null;
+
+  @ApiPropertyOptional({
     example: 1,
     description:
       'ID родительской global-цели. null — отвязать цель от родителя',

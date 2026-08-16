@@ -290,3 +290,69 @@ describe('goalView — добавление вопроса', () => {
     wrapper.unmount()
   })
 })
+
+describe('goalView — завершение цели', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setActivePinia(createPinia())
+    const store = useQuestionTypesStore()
+    store.types = SERVER_TYPES
+    store.loaded = true
+    routeParams.id = '5'
+    vi.mocked(fetchGoalById).mockResolvedValue(makeGoal())
+    vi.mocked(fetchGoalReportStatus).mockResolvedValue({
+      goalId: 5,
+      date: '2026-06-04',
+      lastUnfilledDate: null,
+      questions: [],
+      allDone: true,
+    })
+  })
+
+  it('Успех → PATCH status=completed, outcome=success', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.updateGoal).mockResolvedValue({
+      ...makeGoal(),
+      status: 'completed',
+      outcome: 'success',
+    })
+    const wrapper = mountGoal()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="goal-complete-cta"]').trigger('click')
+    await flushPromises()
+
+    const success = document.body.querySelector('[data-testid="complete-success"]') as HTMLButtonElement
+    expect(success).toBeTruthy()
+    success.click()
+    await flushPromises()
+
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith(5, {
+      status: 'completed',
+      outcome: 'success',
+    })
+    wrapper.unmount()
+  })
+
+  it('Неудача → PATCH outcome=failure', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.updateGoal).mockResolvedValue({
+      ...makeGoal(),
+      status: 'completed',
+      outcome: 'failure',
+    })
+    const wrapper = mountGoal()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="goal-complete-cta"]').trigger('click')
+    await flushPromises()
+    ;(document.body.querySelector('[data-testid="complete-failure"]') as HTMLButtonElement).click()
+    await flushPromises()
+
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith(5, {
+      status: 'completed',
+      outcome: 'failure',
+    })
+    wrapper.unmount()
+  })
+})
