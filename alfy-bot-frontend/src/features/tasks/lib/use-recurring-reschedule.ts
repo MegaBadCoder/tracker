@@ -49,9 +49,9 @@ export function useRecurringReschedule(deps?: Partial<RescheduleDeps>) {
       )
       const shiftSubsequent = await confirm({
         title: 'Сместить расписание?',
-        message: 'Сместить все последующие или оставить как есть?',
+        message: 'Сместить все последующие или только текущую?',
         confirmText: 'Сместить все',
-        cancelText: 'Оставить как есть',
+        cancelText: 'Текущую',
       })
       if (shiftSubsequent) {
         await updateTask(task.id, { rescheduleScope: 'subsequent' }, false)
