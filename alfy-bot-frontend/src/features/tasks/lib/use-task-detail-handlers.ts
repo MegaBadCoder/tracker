@@ -143,20 +143,24 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
     }
   }
 
-  async function handleUpdatePomodoroConfig(taskId: string, config: Record<string, unknown>) {
+  async function handleUpdatePomodoroConfig(taskId: string, config: Record<string, unknown> | null) {
     const index = tasks.value.findIndex(t => t.id === taskId)
     const previous: Task | null = index !== -1 ? { ...tasks.value[index] } as Task : null
+    const patch: Partial<Task> = config === null
+      ? { isPomodoroTask: false }
+      : { ...config, isPomodoroTask: true }
 
     if (index !== -1) {
-      tasks.value[index] = { ...tasks.value[index], ...config } as Task
+      tasks.value[index] = { ...tasks.value[index], ...patch } as Task
     }
     if (selectedTask.value?.id === taskId) {
-      selectedTask.value = { ...selectedTask.value, ...config } as Task
+      selectedTask.value = { ...selectedTask.value, ...patch } as Task
     }
 
     try {
       await store.updatePomodoroConfig(taskId, config)
-    } catch {
+    }
+    catch {
       if (previous && index !== -1) {
         tasks.value[index] = previous
         selectedTask.value = previous

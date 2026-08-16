@@ -108,16 +108,21 @@
           </div>
 
           <!-- Pomodoro section -->
-          <div v-if="task.isPomodoroTask" class="space-y-3">
+          <div v-if="task.isPomodoroTask || effectiveEditable" class="space-y-3">
             <div class="flex items-center gap-2">
               <div class="flex items-center justify-center w-7 h-7 rounded-md bg-red-50 dark:bg-red-500/10">
                 <Timer :size="14" class="text-red-500" />
               </div>
               <span class="text-sm font-medium">Помодоро</span>
-              <span class="ml-auto text-xs tabular-nums text-muted-foreground">
+              <span class="flex-1" />
+              <span
+                v-if="task.isPomodoroTask"
+                class="text-xs tabular-nums text-muted-foreground"
+              >
                 {{ formatPomodoro(task.pomodoroCompleted || 0) }}/{{ localPomodoroCount }}
               </span>
               <Button
+                v-if="task.isPomodoroTask"
                 variant="ghost"
                 size="icon"
                 class="h-7 w-7 shrink-0"
@@ -125,8 +130,14 @@
               >
                 <Play :size="14" class="text-red-500" />
               </Button>
+              <Switch
+                v-if="effectiveEditable"
+                :checked="!!task.isPomodoroTask"
+                @update:checked="onPomodoroToggle"
+              />
             </div>
             <PomodoroSettings
+              v-if="task.isPomodoroTask"
               :count="localPomodoroCount"
               :duration="localPomodoroDuration"
               :short-break="localShortBreak"
@@ -533,6 +544,7 @@ import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { ContentEditableInput } from '@/components/ui/content-editable-input'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -552,6 +564,7 @@ import { PRIORITY_LABELS, POMODORO_DEFAULTS } from '../model/constants'
 import { getPriorityColor } from '../lib/priority'
 import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
 import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
+import { countFromDurationMinutes } from '../lib/duration'
 import { toTimerTask, useTimerStore } from '@/features/task-timer'
 
 const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
@@ -625,7 +638,7 @@ const emit = defineEmits<{
     shortBreak: number
     longBreak: number
     longBreakInterval: number
-  }): void
+  } | null): void
 }>()
 
 // Contenteditable refs
@@ -819,6 +832,22 @@ function emitPomodoroUpdate() {
     longBreak: localLongBreak.value,
     longBreakInterval: localLongBreakInterval.value,
   })
+}
+
+function onPomodoroToggle(enabled: boolean) {
+  if (!props.task) return
+  if (!enabled) {
+    emit('update:pomodoroConfig', props.task.id, null)
+    return
+  }
+  localPomodoroCount.value = props.task.durationMinutes
+    ? countFromDurationMinutes(props.task.durationMinutes)
+    : POMODORO_DEFAULTS.count
+  localPomodoroDuration.value = POMODORO_DEFAULTS.duration
+  localShortBreak.value = POMODORO_DEFAULTS.shortBreak
+  localLongBreak.value = POMODORO_DEFAULTS.longBreak
+  localLongBreakInterval.value = POMODORO_DEFAULTS.longBreakInterval
+  emitPomodoroUpdate()
 }
 
 // Title
