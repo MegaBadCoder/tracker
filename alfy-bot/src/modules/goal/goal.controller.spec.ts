@@ -407,6 +407,37 @@ describe('GoalController', () => {
       expect(result).toBe(updated);
     });
 
+    it('status=completed + outcome=failure пишет оба поля', async () => {
+      const userId = 42;
+      const goalId = 7;
+      const owned = makeGoal({ id: goalId, user_id: userId, status: 'active' });
+      const updated = makeGoal({
+        id: goalId,
+        user_id: userId,
+        status: 'completed',
+        outcome: 'failure',
+      });
+      goalService.findById
+        .mockResolvedValueOnce(owned)
+        .mockResolvedValueOnce(updated);
+      goalService.updateGoalStatus.mockResolvedValue(undefined);
+      goalService.update.mockResolvedValue(updated);
+
+      const dto: UpdateGoalDto = { status: 'completed', outcome: 'failure' };
+      const req = { user: { sub: userId } } as AuthRequestLike;
+
+      const result = await controller.update(req as never, goalId, dto);
+
+      expect(goalService.updateGoalStatus).toHaveBeenCalledWith(
+        goalId,
+        'completed',
+      );
+      expect(goalService.update).toHaveBeenCalledWith(goalId, {
+        outcome: 'failure',
+      });
+      expect(result).toBe(updated);
+    });
+
     it('валидный parent_goal_id → assertValidParent + update', async () => {
       const userId = 42;
       const goalId = 7;

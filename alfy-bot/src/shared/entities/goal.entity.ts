@@ -30,6 +30,10 @@ export class Goal {
   @Column({ default: false })
   is_global: boolean;
 
+  /** Set when status becomes completed: success | failure. Null while active. */
+  @Column({ type: 'text', nullable: true })
+  outcome: 'success' | 'failure' | null;
+
   @Column({ type: 'integer', nullable: true })
   parent_goal_id: number | null;
 

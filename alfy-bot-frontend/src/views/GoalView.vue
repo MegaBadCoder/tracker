@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { QuestionWithScheduleItem } from '../api/goals'
 import type { GoalReportStatus } from '../api/reports'
-import type { Goal, Question } from '../types'
-import { Archive, Check, ChevronRight, MoreVertical, MoveUpRight, Pencil, Plus, RotateCcw, Trash2, Unlink } from 'lucide-vue-next'
+import type { Goal, GoalOutcome, Question } from '../types'
+import { Archive, Check, CheckCircle2, ChevronRight, Flag, MoreVertical, MoveUpRight, Pencil, Plus, RotateCcw, Trash2, Unlink, XCircle } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '@/components/PageContainer.vue'
@@ -86,6 +86,7 @@ let pendingTypeChangeSnapshot: { value: QuestionWithScheduleItem, count: number 
 type GoalAction = 'archive' | 'delete' | 'restore'
 const goalActionPending = ref<GoalAction | null>(null)
 let pendingGoalAction: GoalAction | null = null
+const completeOpen = ref(false)
 
 // Родительская global-цель (если текущая цель привязана к ней).
 const parentGoal = ref<Goal | null>(null)
@@ -447,6 +448,24 @@ function onCancelGoalAction() {
   pendingGoalAction = null
   goalActionPending.value = null
 }
+
+async function completeGoal(outcome: GoalOutcome) {
+  if (!goal.value)
+    return
+  saving.value = true
+  saveError.value = null
+  try {
+    await updateGoal(goal.value.id, { status: 'completed', outcome })
+    completeOpen.value = false
+    await reloadGoal()
+  }
+  catch (e: unknown) {
+    saveError.value = e instanceof Error ? e.message : 'Не удалось завершить цель'
+  }
+  finally {
+    saving.value = false
+  }
+}
 </script>
 
 <template>
@@ -458,7 +477,7 @@ function onCancelGoalAction() {
     <AppHeader :title="goal.goal_name" :show-back="true">
       <template #right>
         <div class="flex items-center gap-2">
-          <GoalStatusBadge :status="goal.status" />
+          <GoalStatusBadge :status="goal.status" :outcome="goal.outcome" />
           <DropdownMenu>
             <DropdownMenuTrigger as-child>
               <Button
@@ -484,6 +503,12 @@ function onCancelGoalAction() {
                 >
                   <Unlink class="w-4 h-4 mr-2" />
                   Открепить
+                </DropdownMenuItem>
+              </template>
+              <template v-if="goal.status === 'active'">
+                <DropdownMenuItem data-testid="goal-action-complete" @click="completeOpen = true">
+                  <Flag class="w-4 h-4 mr-2" />
+                  Завершить
                 </DropdownMenuItem>
               </template>
               <template v-if="goal.status === 'active' || goal.status === 'completed'">
@@ -557,6 +582,17 @@ function onCancelGoalAction() {
         <Check class="size-4 text-green-500" />
         Отчёт на сегодня заполнен
       </div>
+      <Button
+        v-if="goal.status === 'active'"
+        size="lg"
+        variant="outline"
+        class="w-full"
+        data-testid="goal-complete-cta"
+        @click="completeOpen = true"
+      >
+        <Flag class="w-4 h-4 mr-2" />
+        Завершить цель
+      </Button>
 
       <!-- summary (скрываем блок дат у бессрочных целей без дат) -->
       <section v-if="hasDates">
@@ -566,7 +602,7 @@ function onCancelGoalAction() {
           <SummaryCard
             label="Дней до конца"
             :value="goal.status === 'completed' ? '—' : daysLeftVal > 0 ? daysLeftVal : 'Истёк'"
-            :sub="goal.status === 'completed' ? 'Цель завершена' : undefined"
+            :sub="goal.status === 'completed' ? (goal.outcome === 'failure' ? 'Неудача' : 'Достигнута') : undefined"
             :accent="goal.status === 'active' && daysLeftVal > 0"
           />
         </div>
@@ -756,6 +792,43 @@ function onCancelGoalAction() {
           <AlertDialogAction data-testid="confirm-type-change" @click="onConfirmTypeChange">
             Продолжить
           </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog
+      :open="completeOpen"
+      @update:open="(o: boolean) => { if (!o) completeOpen = false }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Завершить цель?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Отметьте, чем закончилась цель. Её можно будет найти во вкладке «Завершённые».
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter class="flex-col sm:flex-row gap-2">
+          <AlertDialogCancel :disabled="saving">
+            Отмена
+          </AlertDialogCancel>
+          <Button
+            variant="outline"
+            class="text-rose-700 dark:text-rose-400"
+            data-testid="complete-failure"
+            :disabled="saving"
+            @click="completeGoal('failure')"
+          >
+            <XCircle class="w-4 h-4 mr-1" />
+            Неудача
+          </Button>
+          <Button
+            data-testid="complete-success"
+            :disabled="saving"
+            @click="completeGoal('success')"
+          >
+            <CheckCircle2 class="w-4 h-4 mr-1" />
+            Успех
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

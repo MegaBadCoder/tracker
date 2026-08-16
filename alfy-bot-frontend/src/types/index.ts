@@ -1,4 +1,5 @@
 export type GoalStatus = 'active' | 'completed' | 'archived' | 'deleted'
+export type GoalOutcome = 'success' | 'failure'
 export type GoalType = 'SIMPLE' | 'SMART' | 'GLOBAL'
 export type QuestionType = 'number' | 'text' | 'rating' | 'emoji_rating' | 'yes_no' | 'time_spent' | 'photo'
 export type FrequencyType = 'daily' | 'weekly_days' | 'interval'
@@ -50,6 +51,7 @@ export interface Goal {
   goal_start: string | null
   goal_end: string | null
   status: GoalStatus
+  outcome?: GoalOutcome | null
   createdAt: string
   is_global: boolean
   parent_goal_id: number | null
