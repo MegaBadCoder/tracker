@@ -163,6 +163,8 @@
             :location="localLocation"
             :tags="localTags"
             :recurrence="localRecurrence"
+            :goals-label="goalsChipLabel"
+            :goals-set="localGoalIds.length > 0"
             :editable="effectiveEditable"
             class="-mx-7 border-y border-border/40"
             @select="activeDrawer = ($event as DrawerField)"
@@ -255,6 +257,12 @@
             @update:model-value="onProjectChange"
           />
 
+          <GoalPicker
+            :model-value="localGoalIds"
+            :disabled="!effectiveEditable"
+            @update:model-value="onGoalsChange"
+          />
+
           <!-- Срок (dueDate) -->
           <DropdownMenu>
             <div class="relative border-b border-border/40">
@@ -278,7 +286,7 @@
                 <X :size="14" />
               </button>
             </div>
-            <DropdownMenuContent class="w-auto p-0" align="start">
+            <DropdownMenuContent class="w-auto p-0">
               <div class="p-3 space-y-3">
                 <Calendar
                   :model-value="dueDateCalendarValue"
@@ -379,7 +387,7 @@
                 <X :size="14" />
               </button>
             </div>
-            <DropdownMenuContent class="w-56" align="start">
+            <DropdownMenuContent>
               <div class="p-3">
                 <Input
                   v-model="localLocation"
@@ -415,7 +423,7 @@
                 </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent class="w-64" align="start">
+            <DropdownMenuContent>
               <TagsEditor
                 :model-value="localTags"
                 :editable="effectiveEditable"
@@ -456,7 +464,7 @@
                 <div class="text-[13px] text-muted-foreground/40">Нет</div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" class="w-48">
+            <DropdownMenuContent>
               <div class="p-3 text-xs text-muted-foreground">Скоро</div>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -477,6 +485,11 @@
           v-if="activeDrawer === 'project'"
           :model-value="localProjectId"
           @update:model-value="onProjectChange"
+        />
+        <GoalPickerContent
+          v-if="activeDrawer === 'goals'"
+          :model-value="localGoalIds"
+          @update:model-value="onGoalsChange"
         />
         <DueDatePickerContent
           v-if="activeDrawer === 'dueDate'"
@@ -589,14 +602,17 @@ import DueDatePickerContent from './DueDatePickerContent.vue'
 import LocationPickerContent from './LocationPickerContent.vue'
 import ProjectPicker from '@/features/projects/ui/ProjectPicker.vue'
 import ProjectPickerContent from '@/features/projects/ui/ProjectPickerContent.vue'
+import GoalPicker from '@/features/goals/ui/GoalPicker.vue'
+import GoalPickerContent from '@/features/goals/ui/GoalPickerContent.vue'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useTaskStore } from '../model/task-store'
 
 // Mobile detection
 const isDesktop = useMediaQuery('(min-width: 640px)')
 const isMobile = computed(() => !isDesktop.value)
 
 // Drawer state
-type DrawerField = 'project' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
+type DrawerField = 'project' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
 const activeDrawer = ref<DrawerField | null>(null)
 const drawerOpen = computed({
   get: () => activeDrawer.value !== null,
@@ -605,6 +621,7 @@ const drawerOpen = computed({
 
 const DRAWER_TITLES: Record<DrawerField, string> = {
   project: 'Проект',
+  goals: 'Цель',
   dueDate: 'Срок',
   deadline: 'Дедлайн',
   priority: 'Приоритет',
@@ -708,6 +725,30 @@ function onProjectChange(value: string | null) {
   activeDrawer.value = null
 }
 
+const localGoalIds = ref<number[]>([])
+const taskStore = useTaskStore()
+
+const goalsChipLabel = computed(() => {
+  const n = localGoalIds.value.length
+  if (n === 0) return 'Цель'
+  if (n === 1) return 'Цель'
+  return `${n} цели`
+})
+
+async function onGoalsChange(value: number[]) {
+  const previous = localGoalIds.value
+  localGoalIds.value = value
+  if (!props.task) return
+  try {
+    const saved = await taskStore.setTaskGoals(props.task.id, value)
+    if (saved) localGoalIds.value = saved
+  }
+  catch (err) {
+    localGoalIds.value = previous
+    console.error('Не удалось обновить цели задачи:', err)
+  }
+}
+
 function onRecurrenceChange(value: RecurrenceRule | null) {
   localRecurrence.value = value
   emitUpdate({ recurrence: value })
@@ -769,6 +810,7 @@ watch(() => props.task, (task) => {
     localLocation.value = task.location || ''
     localTags.value = task.tags ? [...task.tags] : []
     localProjectId.value = task.projectId ?? null
+    localGoalIds.value = task.goalIds ? [...task.goalIds] : []
     localRecurrence.value = task.recurrence ?? null
     localOnMissed.value = task.onMissed ?? 'shift'
     localPomodoroCount.value = task.pomodoroCount ?? POMODORO_DEFAULTS.count

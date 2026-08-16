@@ -1,4 +1,5 @@
 import type { FrequencyType, Goal, GoalStatus, Question, QuestionType, Schedule } from '../types'
+import type { Task } from '@/features/tasks/model/types'
 import { api } from './client'
 
 export interface UpdateScheduleDto {
@@ -116,4 +117,19 @@ export async function updateGoal(
 export async function fetchQuestionAnswerCount(questionId: number): Promise<number> {
   const { data } = await api.get<{ count: number }>(`/questions/${questionId}/answer-count`)
   return data.count
+}
+
+export async function fetchGoalTasks(goalId: number): Promise<Task[]> {
+  const { data } = await api.get<Record<string, unknown>[]>(`/goals/${goalId}/tasks`)
+  return data.map(raw => ({
+    ...raw,
+    dueDate: raw.dueDate ? new Date(raw.dueDate as string) : undefined,
+    deadline: raw.deadline ? new Date(raw.deadline as string) : undefined,
+    goalIds: Array.isArray(raw.goalIds) ? raw.goalIds as number[] : [],
+  }) as Task)
+}
+
+export async function setGoalTasks(goalId: number, taskIds: string[]): Promise<string[]> {
+  const { data } = await api.put<{ taskIds: string[] }>(`/goals/${goalId}/tasks`, { taskIds })
+  return data.taskIds
 }

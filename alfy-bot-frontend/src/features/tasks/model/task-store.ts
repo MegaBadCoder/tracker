@@ -44,6 +44,7 @@ function parseTask(raw: Record<string, unknown>): Task {
     isAutoCreated: (raw.isAutoCreated as boolean) ?? false,
     isOverdue: (raw.isOverdue as boolean) ?? false,
     onMissed: (raw.onMissed as 'shift' | 'freeze') ?? 'shift',
+    goalIds: Array.isArray(raw.goalIds) ? (raw.goalIds as number[]) : [],
   } as Task
 }
 
@@ -63,7 +64,12 @@ export const useTaskStore = defineStore('tasks', () => {
     const index = tasks.value.findIndex(t => t.id === taskId)
     if (index !== -1) {
       const existing = tasks.value[index]!
-      tasks.value[index] = { ...existing, ...updatedTask, checklist: existing.checklist }
+      tasks.value[index] = {
+        ...existing,
+        ...updatedTask,
+        checklist: existing.checklist,
+        goalIds: updatedTask.goalIds ?? existing.goalIds ?? [],
+      }
     }
 
     // Handle recurring: add or refresh next instance in store.
@@ -156,7 +162,7 @@ export const useTaskStore = defineStore('tasks', () => {
         isPomodoroTask, pomodoroCount, pomodoroDuration,
         shortBreak, longBreak, longBreakInterval, pomodoroCompleted,
         recurringCompletedCount, isAutoCreated, recurringParentId,
-        recurrenceAnchorDate,
+        recurrenceAnchorDate, goalIds,
         ...rest
       } = updates as Record<string, unknown>
       const { data } = await api.patch(`/tasks/${taskId}`, serializeTaskDates(rest))
@@ -379,6 +385,20 @@ export const useTaskStore = defineStore('tasks', () => {
     return created
   }
 
+  const setTaskGoals = async (taskId: string, goalIds: number[]) => {
+    if (taskId.includes('__virtual__')) {
+      console.warn('Attempted to link a virtual task instance, ignoring:', taskId)
+      return
+    }
+
+    const { data } = await api.put<{ goalIds: number[] }>(`/tasks/${taskId}/goals`, { goalIds })
+    const index = tasks.value.findIndex(t => t.id === taskId)
+    if (index !== -1) {
+      tasks.value[index] = { ...tasks.value[index]!, goalIds: data.goalIds }
+    }
+    return data.goalIds
+  }
+
   const completedTasks = computed(() => tasks.value.filter(t => t.completed))
   const pendingTasks = computed(() => tasks.value.filter(t => !t.completed))
   const pomodoroTasks = computed(() => tasks.value.filter(t => t.isPomodoroTask))
@@ -404,5 +424,6 @@ export const useTaskStore = defineStore('tasks', () => {
     updateChecklist,
     updatePomodoroConfig,
     materializeOccurrence,
+    setTaskGoals,
   }
 })

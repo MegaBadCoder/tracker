@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { TaskRepositoryPort } from './domain/task-repository.port';
+import { TaskLinkPort } from './domain/task-link.port';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
@@ -55,11 +56,13 @@ function makePomodoroConfig(
 describe('TaskService', () => {
   let service: TaskService;
   let repo: Record<string, jest.Mock>;
+  let linkPort: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
+      findByIds: jest.fn().mockResolvedValue([]),
       create: jest
         .fn()
         .mockImplementation((data) => Promise.resolve(makeTask(data))),
@@ -90,6 +93,19 @@ describe('TaskService', () => {
       }),
     };
 
+    linkPort = {
+      findGoalIdsByTaskIds: jest.fn().mockResolvedValue(new Map()),
+      replaceGoalLinks: jest.fn().mockResolvedValue(undefined),
+      findTaskIdsByGoal: jest.fn().mockResolvedValue([]),
+      replaceTaskLinksForGoal: jest.fn().mockResolvedValue(undefined),
+      filterOwnedGoalIds: jest
+        .fn()
+        .mockImplementation((_userId: number, ids: number[]) =>
+          Promise.resolve([...new Set(ids)]),
+        ),
+      copyGoalLinks: jest.fn().mockResolvedValue(undefined),
+    };
+
     const userSettings = {
       getTimezone: jest.fn().mockResolvedValue('UTC'),
     };
@@ -98,6 +114,7 @@ describe('TaskService', () => {
       providers: [
         TaskService,
         { provide: TaskRepositoryPort, useValue: repo },
+        { provide: TaskLinkPort, useValue: linkPort },
         { provide: UserSettingsPort, useValue: userSettings },
       ],
     }).compile();
@@ -1328,6 +1345,127 @@ describe('TaskService', () => {
       await service.delete(1, 'task-1');
 
       expect(repo.deleteByParentId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('goal links', () => {
+    it('getAll навешивает goalIds без дублей задач', async () => {
+      const a = makeTask({ id: 'a', title: 'A' });
+      const b = makeTask({ id: 'b', title: 'B' });
+      repo.findAllByUser.mockResolvedValue([a, b]);
+      linkPort.findGoalIdsByTaskIds.mockResolvedValue(
+        new Map([
+          ['a', [1, 2, 3]],
+          ['b', []],
+        ]),
+      );
+
+      const result = await service.getAll(1);
+
+      expect(result).toHaveLength(2);
+      expect(result[0]!.goalIds).toEqual([1, 2, 3]);
+      expect(result[1]!.goalIds).toEqual([]);
+      expect(linkPort.findGoalIdsByTaskIds).toHaveBeenCalledWith(1, ['a', 'b']);
+    });
+
+    it('replaceGoalLinks заменяет набор', async () => {
+      repo.findById.mockResolvedValue(makeTask({ id: 'task-1' }));
+
+      const result = await service.replaceGoalLinks(1, 'task-1', [2, 1, 2]);
+
+      expect(linkPort.filterOwnedGoalIds).toHaveBeenCalledWith(1, [2, 1]);
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, 'task-1', [
+        2, 1,
+      ]);
+      expect(result).toEqual({ goalIds: [2, 1] });
+    });
+
+    it('replaceGoalLinks([]) снимает все связи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ id: 'task-1' }));
+
+      const result = await service.replaceGoalLinks(1, 'task-1', []);
+
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, 'task-1', []);
+      expect(result).toEqual({ goalIds: [] });
+    });
+
+    it('чужая цель → 404, replace не вызывается', async () => {
+      repo.findById.mockResolvedValue(makeTask({ id: 'task-1' }));
+      linkPort.filterOwnedGoalIds.mockResolvedValue([1]);
+
+      await expect(
+        service.replaceGoalLinks(1, 'task-1', [1, 99]),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(linkPort.replaceGoalLinks).not.toHaveBeenCalled();
+    });
+
+    it('виртуальный id → 400', async () => {
+      await expect(
+        service.replaceGoalLinks(1, 'task-1__virtual__123', [1]),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(linkPort.replaceGoalLinks).not.toHaveBeenCalled();
+    });
+
+    it('create с goalIds линкует после создания', async () => {
+      const created = await service.create(1, {
+        title: 'С целью',
+        goalIds: [7],
+      });
+
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg).not.toHaveProperty('goalIds');
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, created.id, [
+        7,
+      ]);
+    });
+
+    it('create с чужой целью не создаёт задачу', async () => {
+      linkPort.filterOwnedGoalIds.mockResolvedValue([]);
+
+      await expect(
+        service.create(1, { title: 'Nope', goalIds: [99] }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('complete recurring копирует goal-links на новый инстанс', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+      const task = makeTask({
+        id: 'root-1',
+        recurrence: {
+          frequency: 'daily',
+          interval: 1,
+        },
+        dueDate: new Date('2026-04-05T10:00:00.000Z'),
+        completed: false,
+        recurringParentId: null,
+        recurringCompletedCount: 0,
+      });
+      repo.findById.mockResolvedValue(task);
+      repo.findByParentId.mockResolvedValue([task]);
+
+      await service.update(1, 'root-1', { completed: true });
+
+      expect(linkPort.copyGoalLinks).toHaveBeenCalledWith(
+        1,
+        'root-1',
+        expect.any(String),
+      );
+      jest.useRealTimers();
+    });
+
+    it('listByGoal 404 если цель чужая', async () => {
+      linkPort.filterOwnedGoalIds.mockResolvedValue([]);
+      await expect(service.listByGoal(1, 99)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('replaceTaskLinksForGoal пустой набор снимает связи', async () => {
+      const result = await service.replaceTaskLinksForGoal(1, 5, []);
+      expect(linkPort.replaceTaskLinksForGoal).toHaveBeenCalledWith(1, 5, []);
+      expect(result).toEqual({ taskIds: [] });
     });
   });
 });

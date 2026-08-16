@@ -142,4 +142,10 @@ export class CreateTaskDto {
   @IsOptional()
   @IsNumber()
   longBreakInterval?: number;
+
+  @ApiPropertyOptional({ type: [Number], example: [1, 2] })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  goalIds?: number[];
 }

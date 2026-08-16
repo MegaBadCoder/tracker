@@ -33,6 +33,12 @@
         @update:model-value="emit('toggle', event.taskId)"
       />
       <Repeat v-if="event.isRecurring" :size="10" class="shrink-0" />
+      <Target
+        v-if="event.task.goalIds && event.task.goalIds.length > 0"
+        :size="10"
+        class="shrink-0"
+        data-testid="goal-link-icon"
+      />
       <Flag
         v-if="showPriorityMarks"
         :size="10"
@@ -72,7 +78,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CalendarPlus, Flag, Repeat, Timer } from 'lucide-vue-next'
+import { CalendarPlus, Flag, Repeat, Target, Timer } from 'lucide-vue-next'
 import RoundCheckbox from '@/components/ui/roundCheckbox/RoundCheckbox.vue'
 import type { CalendarEvent } from '../model/types'
 import { PRIORITY_LABELS } from '@/features/tasks/model/constants'

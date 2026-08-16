@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TaskCardEmits, TaskCardProps } from '../model/types'
-import { AlertCircle, Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, GripVertical, MapPin, Repeat, Timer, Trash2 } from 'lucide-vue-next'
+import { AlertCircle, Calendar as CalendarIcon, CheckSquare, Clock, Flag, FolderOpen, GripVertical, MapPin, Repeat, Target, Timer, Trash2 } from 'lucide-vue-next'
 import { computed, ref, toRef } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
@@ -39,6 +39,7 @@ const hasMeta = computed(
     || props.task.location
     || props.task.isPomodoroTask
     || props.task.recurrence
+    || (props.task.goalIds && props.task.goalIds.length > 0)
     || checklistTotal.value > 0,
 )
 </script>
@@ -113,6 +114,15 @@ const hasMeta = computed(
         >
           <FolderOpen :size="11" />
           {{ projectName }}
+        </Badge>
+        <Badge
+          v-if="task.goalIds && task.goalIds.length > 0"
+          variant="outline"
+          class="gap-1 text-[11px] px-2 py-0.5 h-5 border-transparent rounded-full bg-muted text-muted-foreground"
+          data-testid="task-goal-badge"
+        >
+          <Target :size="11" />
+          {{ task.goalIds.length === 1 ? 'Цель' : `${task.goalIds.length} цели` }}
         </Badge>
         <Badge
           v-if="task.isPomodoroTask"

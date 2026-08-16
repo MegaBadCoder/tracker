@@ -54,7 +54,7 @@
             </span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent class="w-auto p-0" align="start">
+        <DropdownMenuContent class="w-auto p-0">
           <div class="p-3 space-y-3">
             <Calendar
               :model-value="dueDateCalendarValue"
@@ -149,7 +149,7 @@
             </span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent class="w-64" align="start">
+        <DropdownMenuContent>
           <TagsEditor
             :model-value="form.tags"
             @update:model-value="form.tags = $event"
@@ -178,7 +178,7 @@
             </span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent class="w-56" align="start">
+        <DropdownMenuContent>
           <div class="p-3">
             <Input
               v-model="form.location"

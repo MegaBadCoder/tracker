@@ -20,6 +20,7 @@ import { OverdueRecurringService } from './overdue-recurring.service';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { SetTaskGoalsDto } from './dto/set-task-goals.dto';
 import { UpdateChecklistDto } from './dto/update-checklist.dto';
 import { UpdatePomodoroConfigDto } from './dto/update-pomodoro-config.dto';
 import { UpsertTimerSessionDto } from './dto/upsert-timer-session.dto';
@@ -120,6 +121,16 @@ export class TaskController {
     @Body() dto: UpdateChecklistDto,
   ) {
     return this.taskService.updateChecklist(req.user.sub, id, dto);
+  }
+
+  @Put(':id/goals')
+  @ApiOperation({ summary: 'Заменить набор целей задачи' })
+  async setGoals(
+    @Request() req: AuthRequest,
+    @Param('id') id: string,
+    @Body() dto: SetTaskGoalsDto,
+  ) {
+    return this.taskService.replaceGoalLinks(req.user.sub, id, dto.goalIds);
   }
 
   @Put(':id/pomodoro-config')

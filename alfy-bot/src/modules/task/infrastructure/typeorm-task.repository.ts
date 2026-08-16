@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { Task, PomodoroConfig } from '../../../shared/entities';
 import {
   TaskRepositoryPort,
@@ -29,6 +29,14 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
   async findById(id: string, userId: number): Promise<Task | null> {
     return this.taskRepo.findOne({
       where: { id, userId },
+      relations: ['pomodoroConfig'],
+    });
+  }
+
+  async findByIds(userId: number, ids: string[]): Promise<Task[]> {
+    if (ids.length === 0) return [];
+    return this.taskRepo.find({
+      where: { userId, id: In(ids) },
       relations: ['pomodoroConfig'],
     });
   }

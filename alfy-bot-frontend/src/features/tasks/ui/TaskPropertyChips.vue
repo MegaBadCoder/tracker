@@ -28,6 +28,7 @@ import {
   FolderOpen,
   Repeat,
   Bell,
+  Target,
 } from 'lucide-vue-next'
 import { formatDueDate, formatDate, DATE_WITH_TIME } from '../lib/formatters'
 import { PRIORITY_LABELS } from '../model/constants'
@@ -44,6 +45,8 @@ const props = defineProps<{
   location: string
   tags: string[]
   recurrence: RecurrenceRule | null
+  goalsLabel: string
+  goalsSet: boolean
   editable: boolean
 }>()
 
@@ -65,6 +68,12 @@ const chips = computed<ChipDef[]>(() => [
     icon: FolderOpen,
     label: props.projectTitle || 'Входящие',
     isSet: !!props.projectTitle,
+  },
+  {
+    key: 'goals',
+    icon: Target,
+    label: props.goalsLabel,
+    isSet: props.goalsSet,
   },
   {
     key: 'dueDate',

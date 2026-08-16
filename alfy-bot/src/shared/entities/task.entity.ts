@@ -116,4 +116,7 @@ export class Task {
     eager: true,
   })
   pomodoroConfig: PomodoroConfig | null;
+
+  /** Not a column — populated by TaskService when returning to clients. */
+  goalIds?: number[];
 }

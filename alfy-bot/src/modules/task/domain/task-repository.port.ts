@@ -10,6 +10,7 @@ export type { ChecklistItem, ChecklistData };
 export abstract class TaskRepositoryPort {
   abstract findAllByUser(userId: number): Promise<Task[]>;
   abstract findById(id: string, userId: number): Promise<Task | null>;
+  abstract findByIds(userId: number, ids: string[]): Promise<Task[]>;
   abstract create(task: Partial<Task>): Promise<Task>;
   abstract save(task: Task): Promise<Task>;
   abstract update(

@@ -64,6 +64,24 @@ describe('CalendarEventBlock', () => {
     expect(wrapper.find('[data-testid="event-side-stripe"]').exists()).toBe(false)
   })
 
+  it('иконка цели если у задачи есть goalIds', () => {
+    const wrapper = mount(CalendarEventBlock, {
+      props: {
+        event: makeEvent({
+          task: makeTask({ goalIds: [1] }),
+        }),
+      },
+    })
+    expect(wrapper.find('[data-testid="goal-link-icon"]').exists()).toBe(true)
+  })
+
+  it('без goalIds нет иконки цели', () => {
+    const wrapper = mount(CalendarEventBlock, {
+      props: { event: makeEvent() },
+    })
+    expect(wrapper.find('[data-testid="goal-link-icon"]').exists()).toBe(false)
+  })
+
   it('выполненная и просроченная с приоритетом — без флага и полоски', () => {
     const done = mount(CalendarEventBlock, {
       props: { event: makeEvent({ priority: 'high', completed: true }) },

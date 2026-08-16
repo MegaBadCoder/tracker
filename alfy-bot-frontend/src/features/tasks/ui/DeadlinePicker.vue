@@ -1,5 +1,5 @@
 <template>
-  <DropdownMenuContent class="w-auto p-0" align="start">
+  <DropdownMenuContent class="w-auto p-0">
     <div class="p-3">
       <DeadlinePickerContent
         :model-value="modelValue"

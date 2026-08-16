@@ -5,16 +5,20 @@ import {
   PomodoroConfig,
   TimerSession,
   User,
+  Link,
+  Goal,
 } from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
 import { UserModule } from '../user/user.module';
 import { NotificationModule } from '../notification/notification.module';
 import { EventsModule } from '../events/events.module';
 import { TaskRepositoryPort } from './domain/task-repository.port';
+import { TaskLinkPort } from './domain/task-link.port';
 import { TimerSessionRepositoryPort } from './domain/timer-session-repository.port';
 import { NotificationPort } from './domain/notification.port';
 import { TelegramUserLookupPort } from './domain/telegram-user-lookup.port';
 import { TypeOrmTaskRepository } from './infrastructure/typeorm-task.repository';
+import { TypeOrmTaskLinkRepository } from './infrastructure/typeorm-task-link.repository';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { TypeOrmUserSettingsAdapter } from './infrastructure/typeorm-user-settings.adapter';
 import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-session.repository';
@@ -29,6 +33,7 @@ import { TaskService } from './task.service';
 import { TimerSessionService } from './timer-session.service';
 import { OverdueRecurringService } from './overdue-recurring.service';
 import { TaskController } from './task.controller';
+import { TaskGoalQueryPort } from './domain/task-goal-query.port';
 
 const notificationProviders = isTelegramEnabled()
   ? [
@@ -39,7 +44,14 @@ const notificationProviders = isTelegramEnabled()
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Task, PomodoroConfig, TimerSession, User]),
+    TypeOrmModule.forFeature([
+      Task,
+      PomodoroConfig,
+      TimerSession,
+      User,
+      Link,
+      Goal,
+    ]),
     AuthModule,
     UserModule,
     NotificationModule,
@@ -48,6 +60,7 @@ const notificationProviders = isTelegramEnabled()
   controllers: [TaskController],
   providers: [
     { provide: TaskRepositoryPort, useClass: TypeOrmTaskRepository },
+    { provide: TaskLinkPort, useClass: TypeOrmTaskLinkRepository },
     {
       provide: TimerSessionRepositoryPort,
       useClass: TypeOrmTimerSessionRepository,
@@ -63,7 +76,8 @@ const notificationProviders = isTelegramEnabled()
     TimerExpiryScheduler,
     OverdueRecurringService,
     OverdueRecurringScheduler,
+    { provide: TaskGoalQueryPort, useExisting: TaskService },
   ],
-  exports: [TaskService, TaskRepositoryPort],
+  exports: [TaskService, TaskRepositoryPort, TaskGoalQueryPort],
 })
 export class TaskModule {}

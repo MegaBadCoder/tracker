@@ -23,6 +23,8 @@ vi.mock('vue-router', () => ({
 vi.mock('@/api/goals', () => ({
   fetchGoalById: vi.fn(),
   fetchGoals: vi.fn(),
+  fetchGoalTasks: vi.fn().mockResolvedValue([]),
+  setGoalTasks: vi.fn(),
   addGoalQuestions: vi.fn(),
   deleteQuestion: vi.fn(),
   fetchQuestionAnswerCount: vi.fn(),
@@ -83,11 +85,15 @@ const stubs = {
   GoalStatusBadge: true,
   PageContainer: { template: '<div><slot /></div>' },
   SummaryCard: true,
+  TaskForm: true,
+  TaskCard: true,
+  TaskDetailDialog: true,
 }
 
 describe('goalView — global goal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
     push.mockReset()
     routeParams.id = '1'
   })
@@ -153,6 +159,7 @@ describe('goalView — global goal', () => {
 describe('goalView — regular goal with parent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
     push.mockReset()
     routeParams.id = '1'
   })
@@ -186,6 +193,28 @@ describe('goalView — regular goal with parent', () => {
     expect(wrapper.text()).toContain('Вопросы цели')
     expect(wrapper.text()).not.toContain('Цели внутри')
   })
+
+  it('рендерит блок Задачи и карточки из fetchGoalTasks', async () => {
+    const goalsApi = await import('@/api/goals')
+    vi.mocked(goalsApi.fetchGoalById).mockResolvedValue(makeRegularGoal())
+    vi.mocked(goalsApi.fetchGoalTasks).mockResolvedValue([
+      { id: 't-1', title: 'Пробежать 5 км', completed: false, goalIds: [1] },
+    ])
+
+    const wrapper = mount(GoalView, {
+      global: {
+        stubs: {
+          ...stubs,
+          TaskCard: { props: ['task'], template: '<div data-testid="linked-task">{{ task.title }}</div>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="goal-tasks"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Задачи')
+    expect(wrapper.text()).toContain('Пробежать 5 км')
+  })
 })
 
 const SERVER_TYPES: QuestionTypeOption[] = [
@@ -209,7 +238,7 @@ function mountGoal() {
   return mount(GoalView, {
     attachTo: document.body,
     global: {
-      stubs: { AppHeader: true },
+      stubs: { AppHeader: true, TaskForm: true, TaskCard: true, TaskDetailDialog: true },
     },
   })
 }

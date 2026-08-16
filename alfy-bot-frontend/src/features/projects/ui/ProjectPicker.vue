@@ -17,7 +17,7 @@
         </div>
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" class="w-56">
+    <DropdownMenuContent>
       <ProjectPickerContent
         :model-value="modelValue"
         :exclude-ids="excludeIds"
