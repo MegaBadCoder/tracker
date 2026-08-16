@@ -158,6 +158,12 @@ describe('task tools', () => {
       const body = (client.patch as ReturnType<typeof vi.fn>).mock.calls[0][1];
       expect(body).not.toHaveProperty('id');
     });
+
+    it('sends projectId: null and clears columnId for Inbox', async () => {
+      client.patch.mockResolvedValueOnce({ id: ID_A, projectId: null, columnId: null });
+      await server.callTool('update_task', { id: ID_A, projectId: null });
+      expect(client.patch).toHaveBeenCalledWith(`/tasks/${ID_A}`, { projectId: null, columnId: null });
+    });
   });
 
   describe('complete_task', () => {

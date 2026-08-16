@@ -116,14 +116,17 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
         durationMinutes: z.number().int().min(1).optional().describe('New duration in minutes'),
         location: z.string().optional().describe('New location'),
         tags: z.array(z.string()).optional().describe('New tags'),
-        projectId: z.string().uuid().optional().describe('Move to project UUID'),
-        columnId: z.string().uuid().optional().describe('Move to board column UUID'),
+        projectId: z.string().uuid().nullable().optional().describe('Move to project UUID, or null for Inbox'),
+        columnId: z.string().uuid().nullable().optional().describe('Move to board column UUID, or null to unset'),
       },
     },
     async ({ id, ...rest }) => {
       const body: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(rest)) {
         if (v !== undefined) body[k] = v;
+      }
+      if (rest.projectId === null && rest.columnId === undefined) {
+        body['columnId'] = null;
       }
       const updated = await client.patch(`/tasks/${id}`, body);
       return toText(updated);

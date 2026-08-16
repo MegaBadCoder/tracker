@@ -4,6 +4,7 @@ import { registerGoalTools } from './tools/goals.js';
 import { registerTaskTools } from './tools/tasks.js';
 import { registerQuestionTools } from './tools/questions.js';
 import { registerProgressTools } from './tools/progress.js';
+import { registerProjectTools } from './tools/projects.js';
 
 /**
  * Factory: creates and returns an McpServer instance with all tools registered.
@@ -19,6 +20,7 @@ export function createServer(client: AlfyRestClient): McpServer {
   registerTaskTools(server, client);
   registerQuestionTools(server, client);
   registerProgressTools(server, client);
+  registerProjectTools(server, client);
 
   return server;
 }
