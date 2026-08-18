@@ -1,5 +1,5 @@
 <template>
-  <DropdownMenuContent class="w-44" align="start">
+  <DropdownMenuContent>
     <PriorityPickerContent
       :model-value="modelValue"
       @update:model-value="$emit('update:modelValue', $event)"

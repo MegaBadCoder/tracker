@@ -56,6 +56,21 @@ describe('TaskCard', () => {
     expect(wrapper.text()).toContain('+1')
   })
 
+  it('рендерит бейдж Цели при одной привязанной цели', () => {
+    const wrapper = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ goalIds: [1], priority: undefined, tags: [], isPomodoroTask: false }) },
+    })
+    expect(wrapper.find('[data-testid="task-goal-badge"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Цель')
+  })
+
+  it('рендерит N цели при нескольких целях', () => {
+    const wrapper = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ goalIds: [1, 2], priority: undefined, tags: [], isPomodoroTask: false }) },
+    })
+    expect(wrapper.text()).toContain('2 цели')
+  })
+
   it('не показывает tags-block при пустом tags', () => {
     const task = apiPayloadToTask({ tags: [] })
     const wrapper = mount(TaskCard, { props: { task } })

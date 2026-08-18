@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
+import { TaskLinkPort } from './domain/task-link.port';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { MaterializeOccurrenceDto } from './dto/materialize-occurrence.dto';
@@ -53,10 +54,12 @@ export class TaskService {
   constructor(
     private readonly taskRepo: TaskRepositoryPort,
     private readonly userSettings: UserSettingsPort,
+    private readonly linkPort: TaskLinkPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
-    return this.taskRepo.findAllByUser(userId);
+    const tasks = await this.taskRepo.findAllByUser(userId);
+    return this.attachGoalIds(userId, tasks);
   }
 
   async create(userId: number, dto: CreateTaskDto): Promise<Task> {
@@ -71,6 +74,7 @@ export class TaskService {
       deadline,
       checklist,
       recurrence,
+      goalIds,
       ...rest
     } = dto;
 
@@ -95,7 +99,15 @@ export class TaskService {
       taskData.pomodoroConfig = config;
     }
 
-    return this.taskRepo.create(taskData);
+    const uniqueGoalIds = goalIds?.length
+      ? await this.assertOwnedGoals(userId, goalIds)
+      : [];
+
+    const created = await this.taskRepo.create(taskData);
+    if (uniqueGoalIds.length) {
+      await this.linkPort.replaceGoalLinks(userId, created.id, uniqueGoalIds);
+    }
+    return this.attachGoalIdsOne(userId, created);
   }
 
   async materializeOccurrence(
@@ -176,7 +188,9 @@ export class TaskService {
       );
     }
 
-    return this.taskRepo.create(instanceData);
+    const created = await this.taskRepo.create(instanceData);
+    await this.linkPort.copyGoalLinks(userId, source.id, created.id);
+    return this.attachGoalIdsOne(userId, created);
   }
 
   async update(
@@ -252,7 +266,7 @@ export class TaskService {
     }
 
     const saved = await this.taskRepo.save(task);
-    return { task: saved };
+    return this.decorateUpdate(userId, { task: saved });
   }
 
   private async retargetSubsequentRecurrence(
@@ -350,6 +364,7 @@ export class TaskService {
             );
           }
           nextInstance = await this.taskRepo.create(instanceData);
+          await this.linkPort.copyGoalLinks(userId, task.id, nextInstance.id);
         }
 
         if (rootTask) {
@@ -365,7 +380,7 @@ export class TaskService {
 
     task.completed = true;
     const saved = await this.taskRepo.save(task);
-    return { task: saved, nextInstance };
+    return this.decorateUpdate(userId, { task: saved, nextInstance });
   }
 
   private async uncompleteRecurringTask(
@@ -407,7 +422,10 @@ export class TaskService {
     }
 
     const saved = await this.taskRepo.save(task);
-    return { task: saved, nextInstance: promotedInstance };
+    return this.decorateUpdate(userId, {
+      task: saved,
+      nextInstance: promotedInstance,
+    });
   }
 
   async updatePomodoroConfig(
@@ -417,7 +435,10 @@ export class TaskService {
   ): Promise<Task> {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
-    return this.taskRepo.updatePomodoroConfig(task, dto);
+    return this.attachGoalIdsOne(
+      userId,
+      await this.taskRepo.updatePomodoroConfig(task, dto),
+    );
   }
 
   async updateChecklist(
@@ -427,7 +448,10 @@ export class TaskService {
   ): Promise<Task> {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
-    return this.taskRepo.updateChecklist(task, { items: dto.items });
+    return this.attachGoalIdsOne(
+      userId,
+      await this.taskRepo.updateChecklist(task, { items: dto.items }),
+    );
   }
 
   async incrementPomodoro(
@@ -460,7 +484,7 @@ export class TaskService {
       return this.update(userId, taskId, { completed: true });
     }
 
-    return { task: refreshed };
+    return this.decorateUpdate(userId, { task: refreshed });
   }
 
   async delete(userId: number, id: string): Promise<DeleteTaskResponse> {
@@ -561,6 +585,101 @@ export class TaskService {
     task.projectId = null;
     task.columnId = null;
     task.order = order;
-    return this.taskRepo.save(task);
+    return this.attachGoalIdsOne(userId, await this.taskRepo.save(task));
+  }
+
+  async replaceGoalLinks(
+    userId: number,
+    taskId: string,
+    goalIds: number[],
+  ): Promise<{ goalIds: number[] }> {
+    this.assertNotVirtual(taskId);
+    const task = await this.taskRepo.findById(taskId, userId);
+    if (!task) throw new NotFoundException(`Task #${taskId} not found`);
+
+    const unique = await this.assertOwnedGoals(userId, goalIds);
+    await this.linkPort.replaceGoalLinks(userId, taskId, unique);
+    return { goalIds: unique };
+  }
+
+  async listByGoal(userId: number, goalId: number): Promise<Task[]> {
+    const owned = await this.linkPort.filterOwnedGoalIds(userId, [goalId]);
+    if (owned.length === 0) {
+      throw new NotFoundException(`Goal #${goalId} not found`);
+    }
+    const taskIds = await this.linkPort.findTaskIdsByGoal(userId, goalId);
+    const tasks = await this.taskRepo.findByIds(userId, taskIds);
+    return this.attachGoalIds(userId, tasks);
+  }
+
+  async replaceTaskLinksForGoal(
+    userId: number,
+    goalId: number,
+    taskIds: string[],
+  ): Promise<{ taskIds: string[] }> {
+    const ownedGoals = await this.linkPort.filterOwnedGoalIds(userId, [goalId]);
+    if (ownedGoals.length === 0) {
+      throw new NotFoundException(`Goal #${goalId} not found`);
+    }
+    const unique = [...new Set(taskIds)];
+    for (const id of unique) this.assertNotVirtual(id);
+
+    if (unique.length > 0) {
+      const tasks = await this.taskRepo.findByIds(userId, unique);
+      if (tasks.length !== unique.length) {
+        throw new NotFoundException('Task not found');
+      }
+    }
+
+    await this.linkPort.replaceTaskLinksForGoal(userId, goalId, unique);
+    return { taskIds: unique };
+  }
+
+  private assertNotVirtual(id: string): void {
+    if (id.includes('__virtual__')) {
+      throw new BadRequestException(
+        'Virtual task instances cannot be modified directly.',
+      );
+    }
+  }
+
+  private async assertOwnedGoals(
+    userId: number,
+    goalIds: number[],
+  ): Promise<number[]> {
+    const unique = [...new Set(goalIds)];
+    const owned = await this.linkPort.filterOwnedGoalIds(userId, unique);
+    if (owned.length !== unique.length) {
+      throw new NotFoundException('Goal not found');
+    }
+    return unique;
+  }
+
+  private async attachGoalIds(userId: number, tasks: Task[]): Promise<Task[]> {
+    if (tasks.length === 0) return tasks;
+    const map = await this.linkPort.findGoalIdsByTaskIds(
+      userId,
+      tasks.map((t) => t.id),
+    );
+    for (const task of tasks) {
+      task.goalIds = map.get(task.id) ?? [];
+    }
+    return tasks;
+  }
+
+  private async attachGoalIdsOne(userId: number, task: Task): Promise<Task> {
+    await this.attachGoalIds(userId, [task]);
+    return task;
+  }
+
+  private async decorateUpdate(
+    userId: number,
+    response: UpdateTaskResponse,
+  ): Promise<UpdateTaskResponse> {
+    const tasks = [response.task, response.nextInstance].filter(
+      (t): t is Task => !!t,
+    );
+    await this.attachGoalIds(userId, tasks);
+    return response;
   }
 }

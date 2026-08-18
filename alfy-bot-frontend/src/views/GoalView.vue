@@ -2,6 +2,7 @@
 import type { QuestionWithScheduleItem } from '../api/goals'
 import type { GoalReportStatus } from '../api/reports'
 import type { Goal, GoalOutcome, Question } from '../types'
+import type { Task } from '@/features/tasks/model/types'
 import { Archive, Check, CheckCircle2, ChevronRight, Flag, MoreVertical, MoveUpRight, Pencil, Plus, RotateCcw, Trash2, Unlink, XCircle } from 'lucide-vue-next'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -17,6 +18,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +43,7 @@ import {
   addGoalQuestions,
   deleteQuestion,
   fetchGoalById,
+  fetchGoalTasks,
   fetchGoals,
   fetchQuestionAnswerCount,
   updateGoal,
@@ -48,6 +56,12 @@ import GoalStatusBadge from '../components/GoalStatusBadge.vue'
 import SummaryCard from '../components/SummaryCard.vue'
 import { daysLeft, formatDate } from '../utils/date'
 import { goalAccent } from '../utils/goalColor'
+import { useConfirm } from '@/composables/useConfirm'
+import { useTaskStore } from '@/features/tasks/model/task-store'
+import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
+import TaskCard from '@/features/tasks/ui/TaskCard.vue'
+import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,6 +80,90 @@ function goToReport() {
 
 const goal = ref<Goal | null>(null)
 const loading = ref(true)
+const linkedTasks = ref<Task[]>([])
+const attachOpen = ref(false)
+const creatingTask = ref(false)
+
+const taskStore = useTaskStore()
+const { confirm } = useConfirm()
+const {
+  selectedTask,
+  isDetailOpen,
+  handleOpenTask,
+  handleUpdateTask,
+  handleUpdateChecklist,
+  handleUpdatePomodoroConfig,
+  handleDeleteFromDialog,
+  handleDetailOpenChange,
+} = useTaskDetailHandlers(taskStore, confirm)
+
+async function reloadTasks() {
+  try {
+    linkedTasks.value = await fetchGoalTasks(id.value)
+    for (const task of linkedTasks.value) {
+      const index = taskStore.tasks.findIndex(t => t.id === task.id)
+      if (index === -1) {
+        taskStore.tasks.push(task)
+      }
+      else {
+        taskStore.tasks[index] = { ...taskStore.tasks[index]!, ...task }
+      }
+    }
+  }
+  catch {
+    linkedTasks.value = []
+  }
+}
+
+const attachCandidates = computed(() =>
+  taskStore.tasks.filter(t =>
+    !(t.goalIds ?? []).includes(id.value) && !t.id.includes('__virtual__'),
+  ),
+)
+
+async function openAttach() {
+  await taskStore.fetchTasks()
+  attachOpen.value = true
+}
+
+async function attachTask(task: Task) {
+  await taskStore.setTaskGoals(task.id, [...(task.goalIds ?? []), id.value])
+  attachOpen.value = false
+  await reloadTasks()
+}
+
+async function unlinkTask(task: Task) {
+  await taskStore.setTaskGoals(
+    task.id,
+    (task.goalIds ?? []).filter(g => g !== id.value),
+  )
+  await reloadTasks()
+}
+
+async function handleAddTask(taskData: Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>) {
+  creatingTask.value = true
+  try {
+    await taskStore.createTask({
+      ...taskData,
+      completed: false,
+      goalIds: [id.value],
+    })
+    await reloadTasks()
+  }
+  finally {
+    creatingTask.value = false
+  }
+}
+
+async function handleToggleLinked(taskId: string) {
+  await taskStore.toggleTask(taskId)
+  await reloadTasks()
+}
+
+async function handleDeleteLinked(taskId: string) {
+  await handleDeleteFromDialog(taskId)
+  await reloadTasks()
+}
 
 const editingQuestion = ref<Question | null>(null)
 const addingQuestion = ref(false)
@@ -136,6 +234,7 @@ onMounted(async () => {
   try {
     await reloadGoal()
     await loadReportStatus()
+    await reloadTasks()
   }
   catch {
     router.replace('/not-found')
@@ -150,8 +249,10 @@ onMounted(async () => {
 watch(id, async () => {
   loading.value = true
   goal.value = null
+  linkedTasks.value = []
   try {
     await reloadGoal()
+    await reloadTasks()
   }
   catch {
     router.replace('/not-found')
@@ -608,6 +709,52 @@ async function completeGoal(outcome: GoalOutcome) {
         </div>
       </section>
 
+      <!-- tasks -->
+      <section data-testid="goal-tasks">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-foreground">
+            Задачи
+          </h2>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="attach-task-cta"
+            @click="openAttach"
+          >
+            <Plus class="size-4" />
+            Привязать
+          </Button>
+        </div>
+        <TaskForm :loading="creatingTask" @submit="handleAddTask" />
+        <div v-if="linkedTasks.length > 0" class="mt-3 space-y-1">
+          <div
+            v-for="task in linkedTasks"
+            :key="task.id"
+            class="flex items-center gap-1"
+          >
+            <TaskCard
+              class="flex-1 min-w-0"
+              :task="task"
+              variant="compact"
+              @open="handleOpenTask"
+              @toggle="handleToggleLinked"
+            />
+            <button
+              type="button"
+              class="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+              :aria-label="`Отвязать задачу: ${task.title}`"
+              :data-testid="`unlink-task-${task.id}`"
+              @click="unlinkTask(task)"
+            >
+              <Unlink class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <p v-else class="mt-3 text-sm text-muted-foreground">
+          Нет привязанных задач. Создайте новую или привяжите существующую.
+        </p>
+      </section>
+
       <!-- children (global goal) -->
       <section v-if="goal.is_global">
         <div class="flex items-center justify-between mb-4">
@@ -895,5 +1042,38 @@ async function completeGoal(outcome: GoalOutcome) {
         </div>
       </SheetContent>
     </Sheet>
+
+    <Dialog :open="attachOpen" @update:open="attachOpen = $event">
+      <DialogContent class="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Привязать задачу</DialogTitle>
+        </DialogHeader>
+        <div class="max-h-[50vh] overflow-y-auto space-y-1">
+          <p v-if="attachCandidates.length === 0" class="text-sm text-muted-foreground">
+            Нет свободных задач
+          </p>
+          <button
+            v-for="task in attachCandidates"
+            :key="task.id"
+            type="button"
+            class="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted"
+            :data-testid="`attach-task-${task.id}`"
+            @click="attachTask(task)"
+          >
+            {{ task.title }}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <TaskDetailDialog
+      :task="selectedTask"
+      :open="isDetailOpen"
+      @update:open="handleDetailOpenChange"
+      @update="handleUpdateTask"
+      @update:checklist="handleUpdateChecklist"
+      @update:pomodoro-config="handleUpdatePomodoroConfig"
+      @delete="handleDeleteLinked"
+    />
   </div>
 </template>

@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   Request,
   UseGuards,
@@ -31,7 +32,9 @@ import { GoalService } from './application/goal.service';
 import { AddQuestionsDto } from './dto/add-questions.dto';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { GoalDto, QuestionDto } from './dto/goal-response.dto';
+import { SetGoalTasksDto } from './dto/set-goal-tasks.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import { TaskGoalQueryPort } from '../task/domain/task-goal-query.port';
 
 interface AuthRequest extends Request {
   user: JwtPayload;
@@ -42,7 +45,10 @@ interface AuthRequest extends Request {
 @UseGuards(JwtOrApiTokenGuard)
 @Controller('goals')
 export class GoalController {
-  constructor(private readonly goalService: GoalService) {}
+  constructor(
+    private readonly goalService: GoalService,
+    private readonly taskGoals: TaskGoalQueryPort,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Список целей пользователя' })
@@ -78,6 +84,35 @@ export class GoalController {
     }
 
     return this.goalService.findAllByUser(userId, scope) as Promise<GoalDto[]>;
+  }
+
+  @Get(':id/tasks')
+  @ApiOperation({ summary: 'Задачи, привязанные к цели' })
+  @ApiOkResponse({ description: 'Список задач цели' })
+  @ApiNotFoundResponse({ description: 'Цель не найдена' })
+  async listTasks(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    await this.assertOwnedGoal(req, id);
+    return this.taskGoals.listByGoal(req.user.sub, id);
+  }
+
+  @Put(':id/tasks')
+  @ApiOperation({ summary: 'Заменить набор задач цели' })
+  @ApiOkResponse({ description: '{ taskIds }' })
+  @ApiNotFoundResponse({ description: 'Цель или задача не найдена' })
+  async setTasks(
+    @Request() req: AuthRequest,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SetGoalTasksDto,
+  ) {
+    await this.assertOwnedGoal(req, id);
+    return this.taskGoals.replaceTaskLinksForGoal(
+      req.user.sub,
+      id,
+      dto.taskIds,
+    );
   }
 
   @Get(':id')

@@ -9,6 +9,7 @@ import { AddQuestionsDto } from './dto/add-questions.dto';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
 import { GoalController } from './goal.controller';
+import { TaskGoalQueryPort } from '../task/domain/task-goal-query.port';
 
 type AuthRequestLike = { user: { sub: number } };
 
@@ -67,7 +68,16 @@ describe('GoalController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [GoalController],
-      providers: [{ provide: GoalService, useValue: goalService }],
+      providers: [
+        { provide: GoalService, useValue: goalService },
+        {
+          provide: TaskGoalQueryPort,
+          useValue: {
+            listByGoal: jest.fn(),
+            replaceTaskLinksForGoal: jest.fn(),
+          },
+        },
+      ],
     })
       .overrideGuard(JwtOrApiTokenGuard)
       .useValue({ canActivate: () => true })

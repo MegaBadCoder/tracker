@@ -85,7 +85,7 @@ function handleLogout() {
         <ChevronDown class="h-4 w-4 text-muted-foreground" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="start" :side-offset="8" class="w-48">
+    <DropdownMenuContent :side-offset="8">
       <DropdownMenuItem
         v-for="link in props.links"
         :key="link.to"

@@ -31,6 +31,7 @@ import {
   Project,
   ProjectColumn,
   ApiToken,
+  Link,
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
@@ -69,6 +70,7 @@ const telegramImports = isTelegramEnabled()
         Project,
         ProjectColumn,
         ApiToken,
+        Link,
       ],
       synchronize: true,
     }),

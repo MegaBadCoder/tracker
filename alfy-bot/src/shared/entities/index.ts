@@ -12,3 +12,4 @@ export { PushSubscription } from './push-subscription.entity';
 export { Project } from './project.entity';
 export { ProjectColumn } from './project-column.entity';
 export { ApiToken } from './api-token.entity';
+export { Link } from './link.entity';

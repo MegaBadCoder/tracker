@@ -1,5 +1,5 @@
 <template>
-  <DropdownMenuContent class="w-56" align="start">
+  <DropdownMenuContent>
     <RecurrencePickerContent
       :model-value="modelValue"
       :on-missed="onMissed"

@@ -120,10 +120,22 @@ export const taskHandlers = [
       longBreakInterval: body.longBreakInterval,
       checklist: body.checklist,
       parentId: body.parentId,
+      goalIds: body.goalIds ?? [],
     }
 
     tasks.unshift(newTask)
     return HttpResponse.json(serializeTask(newTask), { status: 201 })
+  }),
+
+  http.put('/api/tasks/:id/goals', async ({ params, request }) => {
+    const { id } = params
+    const body = await request.json() as { goalIds?: number[] }
+    const index = tasks.findIndex(t => t.id === id)
+    if (index === -1) {
+      return HttpResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+    tasks[index] = { ...tasks[index]!, goalIds: body.goalIds ?? [] }
+    return HttpResponse.json({ goalIds: tasks[index]!.goalIds })
   }),
 
   http.patch('/api/tasks/:id', async ({ params, request }) => {

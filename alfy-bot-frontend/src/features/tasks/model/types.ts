@@ -45,6 +45,7 @@ export interface Task {
   columnId?: string | null
   order?: number
   parentId?: string
+  goalIds?: number[]
   subtasks?: Task[]
   checklistProgress?: {
     total: number

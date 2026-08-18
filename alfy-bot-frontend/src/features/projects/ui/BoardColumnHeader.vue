@@ -35,7 +35,7 @@
           <MoreHorizontal :size="14" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" class="w-40">
+      <DropdownMenuContent align="end">
         <DropdownMenuItem @click="startRename">
           <Pencil :size="14" class="mr-2" />
           Переименовать

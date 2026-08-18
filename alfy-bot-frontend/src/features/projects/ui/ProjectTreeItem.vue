@@ -128,7 +128,7 @@ const isActive = computed(() => route.params.projectId === props.node.id)
             <MoreHorizontal :size="14" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="w-36">
+        <DropdownMenuContent align="end">
           <DropdownMenuItem @click="$emit('edit', node)">
             <Pencil :size="14" class="mr-2" />
             Изменить

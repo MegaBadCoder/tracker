@@ -23,7 +23,7 @@ defineEmits<{
         <MoreHorizontal class="w-5 h-5" />
       </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" class="w-56">
+    <DropdownMenuContent align="end">
       <DropdownMenuItem
         class="flex items-center justify-between cursor-pointer"
         @select.prevent="$emit('update:showCompleted', !showCompleted)"
