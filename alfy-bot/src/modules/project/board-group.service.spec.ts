@@ -320,7 +320,10 @@ describe('BoardGroupService', () => {
   // ── delete ──────────────────────────────────────────────────────
 
   describe('delete', () => {
-    it('удаляет группу (каскад историй/обнуление groupId у задач обеспечен FK)', async () => {
+    // Сам каскад (истории удаляются, задачи выживают с groupId = null)
+    // проверяется на реальных данных в test/board-groups.e2e-spec.ts —
+    // здесь репозиторий замокан, поведение БД тут непроверяемо.
+    it('делегирует удаление репозиторию', async () => {
       projRepo.findById.mockResolvedValue(makeProject());
 
       await service.delete(1, 'proj-1', 'epic-1');

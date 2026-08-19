@@ -183,6 +183,67 @@ describe('Board groups (e2e)', () => {
       expect(body.groupId).toBe(storyId);
     });
 
+    // Разрушающая операция: если PRAGMA foreign_keys окажется выключенным
+    // или onDelete не тем, пользователь потеряет задачи вместе с эпиком.
+    // Юнит-спек это не ловит — там репозиторий замокан.
+    it('удаление эпика уносит истории, но задачи выживают с groupId = null', async () => {
+      const { body: epic } = await request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .send({ title: 'Биллинг' })
+        .expect(201);
+
+      const { body: story } = await request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .send({ title: 'Тарифы', parentId: epic.id })
+        .expect(201);
+
+      const makeTaskIn = async (title: string, groupId: string) => {
+        const { body: task } = await request(app.getHttpServer())
+          .post('/api/tasks')
+          .set('Authorization', auth())
+          .send({ title, projectId })
+          .expect(201);
+        await request(app.getHttpServer())
+          .patch(`/api/projects/${projectId}/tasks/${task.id}/move`)
+          .set('Authorization', auth())
+          .send({ projectId, groupId, order: 0 })
+          .expect(200);
+        return task.id as string;
+      };
+
+      const taskUnderStory = await makeTaskIn('Страница тарифов', story.id);
+      const taskUnderEpic = await makeTaskIn('Аналитика конверсии', epic.id);
+
+      await request(app.getHttpServer())
+        .delete(`/api/projects/${projectId}/groups/${epic.id}`)
+        .set('Authorization', auth())
+        .expect(200);
+
+      const { body: tree } = await request(app.getHttpServer())
+        .get(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .expect(200);
+      const remaining = tree.flatMap((e: { id: string; children: { id: string }[] }) => [
+        e.id,
+        ...e.children.map((c) => c.id),
+      ]);
+      expect(remaining).not.toContain(epic.id);
+      expect(remaining).not.toContain(story.id);
+
+      const { body: tasks } = await request(app.getHttpServer())
+        .get('/api/tasks')
+        .set('Authorization', auth())
+        .expect(200);
+
+      for (const id of [taskUnderStory, taskUnderEpic]) {
+        const survivor = tasks.find((t: { id: string }) => t.id === id);
+        expect(survivor).toBeDefined();
+        expect(survivor.groupId).toBeNull();
+      }
+    });
+
     it('перенос во Входящие обнуляет группу без 500', async () => {
       const { body } = await request(app.getHttpServer())
         .patch(`/api/tasks/${taskId}/move-to-inbox`)
