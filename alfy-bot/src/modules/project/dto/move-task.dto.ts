@@ -12,6 +12,11 @@ export class MoveTaskDto {
   @IsUUID()
   columnId?: string | null;
 
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440002' })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string | null;
+
   @ApiPropertyOptional({ example: 0 })
   @IsOptional()
   @IsNumber()

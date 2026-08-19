@@ -220,11 +220,20 @@ export class TaskService {
     const isUncompletingRecurring =
       dto.completed === false && task.completed && task.recurrence;
 
+    // Moving a task to a different project detaches it from its board group —
+    // the trg_task_group_same_project trigger rejects a groupId that no
+    // longer matches the task's projectId.
+    const isChangingProject =
+      dto.projectId !== undefined && dto.projectId !== task.projectId;
+
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),
     );
     Object.assign(task, defined);
+    if (isChangingProject) {
+      task.groupId = null;
+    }
     if (dueDate !== undefined) {
       const newDue = dueDate ? new Date(dueDate) : null;
       if ((rescheduleScope ?? 'this') === 'subsequent') {
@@ -584,6 +593,9 @@ export class TaskService {
 
     task.projectId = null;
     task.columnId = null;
+    // Группа принадлежит проекту, из которого задача уезжает — оставить
+    // groupId значит нарваться на trg_task_group_same_project и отдать 500.
+    task.groupId = null;
     task.order = order;
     return this.attachGoalIdsOne(userId, await this.taskRepo.save(task));
   }

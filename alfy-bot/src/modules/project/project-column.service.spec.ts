@@ -159,6 +159,15 @@ describe('ProjectColumnService', () => {
         BadRequestException,
       );
     });
+
+    it('позволяет создать колонку в agile-проекте', async () => {
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      colRepo.findAllByProject.mockResolvedValue([]);
+
+      await expect(
+        service.create(1, 'proj-1', { title: 'X' }),
+      ).resolves.toBeDefined();
+    });
   });
 
   // ── update ──────────────────────────────────────────────────────

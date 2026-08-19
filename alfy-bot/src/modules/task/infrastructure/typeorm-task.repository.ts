@@ -120,12 +120,14 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     userId: number,
     projectId: string | null,
     columnId: string | null,
+    groupId: string | null,
     order: number,
   ): Promise<Task | null> {
     const task = await this.findById(taskId, userId);
     if (!task) return null;
     task.projectId = projectId;
     task.columnId = columnId;
+    task.groupId = groupId;
     task.order = order;
     return this.taskRepo.save(task);
   }

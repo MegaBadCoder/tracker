@@ -269,6 +269,46 @@ describe('TaskService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(repo.save).not.toHaveBeenCalled();
     });
+
+    it('смена projectId обнуляет groupId в той же записи', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', groupId: null }),
+      );
+      expect(result.task.groupId).toBeNull();
+    });
+  });
+
+  describe('moveToInbox', () => {
+    // Тот же случай, что и смена projectId в update: задача уезжает из
+    // проекта, а groupId указывает на группу этого проекта. Триггер
+    // trg_task_group_same_project отклонит такую запись, и клиент получит
+    // 500 вместо переноса в Inbox.
+    it('обнуляет groupId вместе с projectId и columnId', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          groupId: 'group-1',
+        }),
+      );
+      await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: null,
+          columnId: null,
+          groupId: null,
+        }),
+      );
+    });
   });
 
   describe('update — reschedule recurring dueDate', () => {

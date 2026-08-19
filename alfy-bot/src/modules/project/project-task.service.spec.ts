@@ -7,8 +7,9 @@ import {
 import { ProjectTaskService } from './project-task.service';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
+import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
-import { Project, ProjectColumn, Task } from '../../shared/entities';
+import { Project, ProjectColumn, BoardGroup, Task } from '../../shared/entities';
 
 function makeProject(overrides: Partial<Project> = {}): Project {
   const p = new Project();
@@ -46,6 +47,27 @@ function makeColumn(overrides: Partial<ProjectColumn> = {}): ProjectColumn {
   return c;
 }
 
+function makeGroup(overrides: Partial<BoardGroup> = {}): BoardGroup {
+  const g = new BoardGroup();
+  Object.assign(g, {
+    id: 'group-1',
+    userId: 1,
+    projectId: 'proj-1',
+    parentId: null,
+    type: 'epic',
+    title: 'Эпик',
+    description: null,
+    status: 'open',
+    completedAt: null,
+    color: null,
+    order: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
+  return g;
+}
+
 function makeTask(overrides: Partial<Task> = {}): Task {
   const t = new Task();
   Object.assign(t, {
@@ -75,6 +97,7 @@ describe('ProjectTaskService — move & reorder', () => {
   let service: ProjectTaskService;
   let projRepo: Record<string, jest.Mock>;
   let colRepo: Record<string, jest.Mock>;
+  let groupRepo: Record<string, jest.Mock>;
   let taskRepo: Record<string, jest.Mock>;
 
   beforeEach(async () => {
@@ -97,6 +120,16 @@ describe('ProjectTaskService — move & reorder', () => {
       reorder: jest.fn(),
     };
 
+    groupRepo = {
+      findAllByProject: jest.fn().mockResolvedValue([]),
+      findById: jest.fn().mockResolvedValue(null),
+      countChildren: jest.fn().mockResolvedValue(0),
+      create: jest.fn(),
+      save: jest.fn(),
+      delete: jest.fn(),
+      reorder: jest.fn(),
+    };
+
     taskRepo = {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
@@ -110,8 +143,11 @@ describe('ProjectTaskService — move & reorder', () => {
       findAllByProject: jest.fn().mockResolvedValue([]),
       updatePosition: jest
         .fn()
-        .mockImplementation((taskId, _userId, projectId, columnId, order) =>
-          Promise.resolve(makeTask({ id: taskId, projectId, columnId, order })),
+        .mockImplementation(
+          (taskId, _userId, projectId, columnId, groupId, order) =>
+            Promise.resolve(
+              makeTask({ id: taskId, projectId, columnId, order, groupId }),
+            ),
         ),
       reorderTasks: jest.fn().mockResolvedValue(undefined),
     };
@@ -121,6 +157,7 @@ describe('ProjectTaskService — move & reorder', () => {
         ProjectTaskService,
         { provide: ProjectRepositoryPort, useValue: projRepo },
         { provide: ProjectColumnRepositoryPort, useValue: colRepo },
+        { provide: BoardGroupRepositoryPort, useValue: groupRepo },
         { provide: TaskRepositoryPort, useValue: taskRepo },
       ],
     }).compile();
@@ -145,6 +182,7 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         null,
+        null,
         0,
       );
     });
@@ -161,6 +199,7 @@ describe('ProjectTaskService — move & reorder', () => {
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
         'task-1',
         1,
+        null,
         null,
         null,
         0,
@@ -183,6 +222,7 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         'col-1',
+        null,
         2,
       );
     });
@@ -205,6 +245,7 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         'col-2',
+        null,
         0,
       );
     });
@@ -222,6 +263,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-1',
+        null,
         null,
         5,
       );
@@ -330,6 +372,42 @@ describe('ProjectTaskService — move & reorder', () => {
           order: -1,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('бросает NotFoundException если groupId не существует в целевом проекте', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      groupRepo.findById.mockResolvedValue(null);
+
+      await expect(
+        service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-1',
+          groupId: 'group-other',
+          order: 0,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('передаёт валидный groupId в updatePosition', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      groupRepo.findById.mockResolvedValue(makeGroup());
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        groupId: 'group-1',
+        order: 0,
+      });
+
+      expect(groupRepo.findById).toHaveBeenCalledWith('group-1', 'proj-1');
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        null,
+        'group-1',
+        0,
+      );
     });
   });
 

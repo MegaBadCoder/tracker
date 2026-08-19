@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
+import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
 import { MoveTaskDto } from './dto/move-task.dto';
 import { ReorderTasksDto } from './dto/reorder-tasks.dto';
@@ -15,6 +16,7 @@ export class ProjectTaskService {
   constructor(
     private readonly projectRepo: ProjectRepositoryPort,
     private readonly columnRepo: ProjectColumnRepositoryPort,
+    private readonly groupRepo: BoardGroupRepositoryPort,
     private readonly taskRepo: TaskRepositoryPort,
   ) {}
 
@@ -47,6 +49,7 @@ export class ProjectTaskService {
     const targetProjectId =
       dto.projectId !== undefined ? dto.projectId : currentProjectId;
     const targetColumnId = dto.columnId !== undefined ? dto.columnId : null;
+    const targetGroupId = dto.groupId !== undefined ? dto.groupId : null;
 
     // Cannot set column without project
     if (targetColumnId && !targetProjectId) {
@@ -90,11 +93,22 @@ export class ProjectTaskService {
         throw new NotFoundException(`Column #${targetColumnId} not found`);
     }
 
+    // Validate group
+    if (targetGroupId && targetProjectId) {
+      const group = await this.groupRepo.findById(
+        targetGroupId,
+        targetProjectId,
+      );
+      if (!group)
+        throw new NotFoundException(`Group #${targetGroupId} not found`);
+    }
+
     return this.taskRepo.updatePosition(
       taskId,
       userId,
       targetProjectId,
       targetColumnId,
+      targetGroupId,
       order,
     );
   }

@@ -6,12 +6,18 @@ import {
 } from '@nestjs/common';
 import { Project } from '../../shared/entities';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
+import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+const AGILE_DEFAULT_COLUMNS = ['К выполнению', 'В работе', 'Готово'];
+
 @Injectable()
 export class ProjectService {
-  constructor(private readonly projectRepo: ProjectRepositoryPort) {}
+  constructor(
+    private readonly projectRepo: ProjectRepositoryPort,
+    private readonly columnRepo: ProjectColumnRepositoryPort,
+  ) {}
 
   async getAll(userId: number): Promise<Project[]> {
     return this.projectRepo.findAllByUser(userId);
@@ -34,7 +40,7 @@ export class ProjectService {
         throw new ForbiddenException('Parent project belongs to another user');
     }
 
-    return this.projectRepo.create({
+    const created = await this.projectRepo.create({
       userId,
       title: dto.title,
       description: dto.description,
@@ -43,6 +49,12 @@ export class ProjectService {
       icon: dto.icon,
       color: dto.color,
     });
+
+    if (created.viewMode === 'agile') {
+      await this.seedAgileColumns(created.id);
+    }
+
+    return created;
   }
 
   async update(
@@ -66,8 +78,28 @@ export class ProjectService {
         throw new ForbiddenException('Parent project belongs to another user');
     }
 
+    const isSwitchingToAgile =
+      dto.viewMode === 'agile' && project.viewMode !== 'agile';
+
     Object.assign(project, dto);
-    return this.projectRepo.save(project);
+    const saved = await this.projectRepo.save(project);
+
+    if (isSwitchingToAgile) {
+      const existingColumns = await this.columnRepo.findAllByProject(
+        saved.id,
+      );
+      if (existingColumns.length === 0) {
+        await this.seedAgileColumns(saved.id);
+      }
+    }
+
+    return saved;
+  }
+
+  private async seedAgileColumns(projectId: string): Promise<void> {
+    for (const [order, title] of AGILE_DEFAULT_COLUMNS.entries()) {
+      await this.columnRepo.create({ projectId, title, order });
+    }
   }
 
   async delete(userId: number, id: string): Promise<void> {
