@@ -49,7 +49,20 @@ export class ProjectTaskService {
     const targetProjectId =
       dto.projectId !== undefined ? dto.projectId : currentProjectId;
     const targetColumnId = dto.columnId !== undefined ? dto.columnId : null;
-    const targetGroupId = dto.groupId !== undefined ? dto.groupId : null;
+    // Асимметрия с columnId намеренная. Обычная board-доска шлёт move без
+    // groupId, и трактовка "не пришло значит обнулить" стирала бы эпик у
+    // задачи после одного перетаскивания в режиме board — то есть настройка
+    // отображения выполняла бы необратимое доменное действие. Отсутствие
+    // поля значит "не трогать", явный null значит "убрать из группы".
+    // Исключение — переезд в другой проект: группа принадлежит старому
+    // проекту, тащить её за собой нельзя.
+    const keepsProject = targetProjectId === task.projectId;
+    const targetGroupId =
+      dto.groupId !== undefined
+        ? dto.groupId
+        : keepsProject
+          ? task.groupId
+          : null;
 
     // Cannot set column without project
     if (targetColumnId && !targetProjectId) {

@@ -84,6 +84,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     checklist: null,
     projectId: null,
     columnId: null,
+    groupId: null,
     order: 0,
     pomodoroConfig: null,
     createdAt: new Date(),
@@ -386,6 +387,79 @@ describe('ProjectTaskService — move & reorder', () => {
           order: 0,
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    // Обычная board-доска (use-board-dnd) groupId не присылает вообще.
+    // Если трактовать отсутствие как «обнулить», то переключение проекта из
+    // agile в board и одно перетаскивание молча выкинут задачу из эпика —
+    // необратимое доменное действие, завязанное на настройку отображения.
+    it('сохраняет существующий groupId, если он не пришёл в запросе', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
+      colRepo.findById.mockResolvedValue(makeColumn());
+      groupRepo.findById.mockResolvedValue(makeGroup());
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-1',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        'group-1',
+        0,
+      );
+    });
+
+    // Группа принадлежит старому проекту — тащить её за собой нельзя, иначе
+    // сработает триггер trg_task_group_same_project.
+    it('обнуляет groupId при переезде в другой проект, даже если он не пришёл', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ id: 'proj-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-2',
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('обнуляет groupId, когда null пришёл явно', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask({ groupId: 'group-1' }));
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      colRepo.findById.mockResolvedValue(makeColumn());
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-1',
+        groupId: null,
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        null,
+        0,
+      );
     });
 
     it('передаёт валидный groupId в updatePosition', async () => {
