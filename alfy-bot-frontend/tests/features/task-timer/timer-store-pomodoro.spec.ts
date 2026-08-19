@@ -32,6 +32,16 @@ describe('timer store — запись помодоро', () => {
     vi.mocked(api.delete).mockResolvedValue({ data: {} })
   })
 
+  it('startTask сразу запускает таймер', () => {
+    const timer = useTimerStore()
+
+    timer.startTask(POMODORO_TASK)
+
+    expect(timer.isActive).toBe(true)
+    expect(timer.phase).toBe(1)
+    expect(timer.timeBlock).toBeGreaterThan(0)
+  })
+
   it('завершение рабочей фазы делегирует инкремент в task-store', async () => {
     const timer = useTimerStore()
     const tasks = useTaskStore()
