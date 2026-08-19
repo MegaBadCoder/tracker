@@ -19,6 +19,7 @@ defineEmits<{
   toggleTask: [id: string]
   openTask: [task: Task]
   toggleDone: []
+  taskChange: [event: any, columnId: string | null, groupId: string | null, tasks: Task[]]
 }>()
 
 const collapsed = ref(false)
@@ -70,6 +71,7 @@ const epicTasksByColumn = computed(() => groupTasksByColumn(props.epicTasks))
         :lanes="lanes"
         @toggle-task="$emit('toggleTask', $event)"
         @open-task="$emit('openTask', $event)"
+        @task-change="(...args) => $emit('taskChange', ...args)"
       />
 
       <div v-if="epicTasks.length > 0" class="col-span-full grid [grid-template-columns:subgrid] border-t border-border/60">
@@ -77,8 +79,11 @@ const epicTasksByColumn = computed(() => groupTasksByColumn(props.epicTasks))
           v-for="lane in lanes"
           :key="lane?.id ?? 'uncategorized'"
           :tasks="epicTasksByColumn.get(lane ? lane.id : null) ?? []"
+          :column-id="lane ? lane.id : null"
+          :group-id="epic.id"
           @toggle-task="$emit('toggleTask', $event)"
           @open-task="$emit('openTask', $event)"
+          @task-change="(...args) => $emit('taskChange', ...args)"
         />
       </div>
     </template>

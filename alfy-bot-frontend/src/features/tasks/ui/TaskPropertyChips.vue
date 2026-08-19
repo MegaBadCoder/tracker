@@ -47,6 +47,7 @@ const props = defineProps<{
   recurrence: RecurrenceRule | null
   goalsLabel: string
   goalsSet: boolean
+  hideGoals?: boolean
   editable: boolean
 }>()
 
@@ -69,12 +70,14 @@ const chips = computed<ChipDef[]>(() => [
     label: props.projectTitle || 'Входящие',
     isSet: !!props.projectTitle,
   },
-  {
-    key: 'goals',
-    icon: Target,
-    label: props.goalsLabel,
-    isSet: props.goalsSet,
-  },
+  ...(props.hideGoals
+    ? []
+    : [{
+        key: 'goals',
+        icon: Target,
+        label: props.goalsLabel,
+        isSet: props.goalsSet,
+      }]),
   {
     key: 'dueDate',
     icon: CalendarIcon,

@@ -165,6 +165,7 @@
             :recurrence="localRecurrence"
             :goals-label="goalsChipLabel"
             :goals-set="localGoalIds.length > 0"
+            :hide-goals="isAgileProject"
             :editable="effectiveEditable"
             class="-mx-7 border-y border-border/40"
             @select="activeDrawer = ($event as DrawerField)"
@@ -258,6 +259,7 @@
           />
 
           <GoalPicker
+            v-if="!isAgileProject"
             :model-value="localGoalIds"
             :disabled="!effectiveEditable"
             @update:model-value="onGoalsChange"
@@ -487,7 +489,7 @@
           @update:model-value="onProjectChange"
         />
         <GoalPickerContent
-          v-if="activeDrawer === 'goals'"
+          v-if="activeDrawer === 'goals' && !isAgileProject"
           :model-value="localGoalIds"
           @update:model-value="onGoalsChange"
         />
@@ -717,6 +719,15 @@ const projectTitle = computed(() =>
   localProjectId.value
     ? projectStore.projectMap.get(localProjectId.value)?.title ?? null
     : null,
+)
+
+// Agile-projects group tasks by epic/story instead of goals — the goals
+// block is hidden while the task's project is in agile mode. This is a
+// display-only toggle: existing goalIds are never touched here.
+const isAgileProject = computed(() =>
+  localProjectId.value
+    ? projectStore.projectMap.get(localProjectId.value)?.viewMode === 'agile'
+    : false,
 )
 
 function onProjectChange(value: string | null) {

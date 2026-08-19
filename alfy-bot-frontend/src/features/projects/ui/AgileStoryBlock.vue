@@ -14,6 +14,7 @@ const props = defineProps<{
 defineEmits<{
   toggleTask: [id: string]
   openTask: [task: Task]
+  taskChange: [event: any, columnId: string | null, groupId: string | null, tasks: Task[]]
 }>()
 
 const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
@@ -29,8 +30,11 @@ const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
       v-for="lane in lanes"
       :key="lane?.id ?? 'uncategorized'"
       :tasks="tasksByColumn.get(lane ? lane.id : null) ?? []"
+      :column-id="lane ? lane.id : null"
+      :group-id="story.id"
       @toggle-task="$emit('toggleTask', $event)"
       @open-task="$emit('openTask', $event)"
+      @task-change="(...args) => $emit('taskChange', ...args)"
     />
   </div>
 </template>

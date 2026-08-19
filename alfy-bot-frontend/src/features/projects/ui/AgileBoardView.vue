@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { computed, watch } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { buildAgileRows, groupTasksByColumn } from '../lib/agile-layout'
+import { useAgileDnd } from '../lib/use-agile-dnd'
 import { useColumnStore } from '../model/column-store'
 import { useGroupStore } from '../model/group-store'
 import AgileCell from './AgileCell.vue'
@@ -30,6 +31,7 @@ const columnStore = useColumnStore()
 const groupStore = useGroupStore()
 const taskStore = useTaskStore()
 const { tasks } = storeToRefs(taskStore)
+const { onTaskChange } = useAgileDnd(taskStore)
 
 const sortedColumns = computed(() =>
   [...columnStore.columns].sort((a, b) => a.order - b.order),
@@ -64,6 +66,10 @@ function laneTaskCount(lane: ProjectColumn | null): number {
 
 async function handleToggleEpicDone(epic: BoardGroup) {
   await groupStore.toggleEpicDone(props.projectId, epic)
+}
+
+function handleTaskChange(event: any, columnId: string | null, groupId: string | null, cellTasks: Task[]) {
+  onTaskChange(event, columnId, groupId, props.projectId, cellTasks)
 }
 
 watch(() => props.projectId, (id) => {
@@ -109,6 +115,7 @@ watch(() => props.projectId, (id) => {
           @toggle-task="$emit('toggleTask', $event)"
           @open-task="$emit('openTask', $event)"
           @toggle-done="handleToggleEpicDone(row.epic)"
+          @task-change="handleTaskChange"
         />
         <div v-else class="col-span-full grid [grid-template-columns:subgrid] border-t-2 border-border">
           <div class="col-span-full px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -118,8 +125,11 @@ watch(() => props.projectId, (id) => {
             v-for="lane in lanes"
             :key="lane?.id ?? 'uncategorized'"
             :tasks="groupTasksByColumn(row.tasks).get(lane ? lane.id : null) ?? []"
+            :column-id="lane ? lane.id : null"
+            :group-id="null"
             @toggle-task="$emit('toggleTask', $event)"
             @open-task="$emit('openTask', $event)"
+            @task-change="handleTaskChange"
           />
         </div>
       </template>

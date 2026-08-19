@@ -286,14 +286,15 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  const moveTask = async (taskId: string, projectId: string | null, payload: { columnId?: string | null; order?: number }) => {
+  const moveTask = async (taskId: string, projectId: string | null, payload: { columnId?: string | null; groupId?: string | null; order?: number }) => {
     const task = tasks.value.find(t => t.id === taskId)
     if (!task) return
 
-    const previous = { projectId: task.projectId, columnId: task.columnId, order: task.order }
+    const previous = { projectId: task.projectId, columnId: task.columnId, groupId: task.groupId, order: task.order }
 
     task.projectId = projectId
     if (payload.columnId !== undefined) task.columnId = payload.columnId
+    if (payload.groupId !== undefined) task.groupId = payload.groupId
     if (payload.order !== undefined) task.order = payload.order
 
     try {
@@ -307,6 +308,7 @@ export const useTaskStore = defineStore('tasks', () => {
     } catch (err) {
       task.projectId = previous.projectId
       task.columnId = previous.columnId
+      task.groupId = previous.groupId
       task.order = previous.order
       throw err
     }
