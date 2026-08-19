@@ -2,12 +2,13 @@
 import type { BoardGroupNode, ProjectColumn } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { computed } from 'vue'
+import { groupTasksByColumn } from '../lib/agile-layout'
 import AgileCell from './AgileCell.vue'
 
 const props = defineProps<{
   story: BoardGroupNode
   tasks: Task[]
-  columns: ProjectColumn[]
+  lanes: Array<ProjectColumn | null>
 }>()
 
 defineEmits<{
@@ -15,17 +16,7 @@ defineEmits<{
   openTask: [task: Task]
 }>()
 
-const tasksByColumn = computed(() => {
-  const map = new Map<string, Task[]>()
-  for (const task of props.tasks) {
-    if (task.columnId) {
-      const arr = map.get(task.columnId) ?? []
-      arr.push(task)
-      map.set(task.columnId, arr)
-    }
-  }
-  return map
-})
+const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
 </script>
 
 <template>
@@ -35,9 +26,9 @@ const tasksByColumn = computed(() => {
       <span class="text-[11px] text-muted-foreground/60">{{ tasks.length }}</span>
     </div>
     <AgileCell
-      v-for="column in columns"
-      :key="column.id"
-      :tasks="tasksByColumn.get(column.id) ?? []"
+      v-for="lane in lanes"
+      :key="lane?.id ?? 'uncategorized'"
+      :tasks="tasksByColumn.get(lane ? lane.id : null) ?? []"
       @toggle-task="$emit('toggleTask', $event)"
       @open-task="$emit('openTask', $event)"
     />

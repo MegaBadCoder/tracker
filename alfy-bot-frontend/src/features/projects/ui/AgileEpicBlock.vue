@@ -4,6 +4,7 @@ import type { BoardGroupNode, ProjectColumn } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { ChevronDown, ChevronRight } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
+import { groupTasksByColumn } from '../lib/agile-layout'
 import AgileCell from './AgileCell.vue'
 import AgileStoryBlock from './AgileStoryBlock.vue'
 
@@ -11,7 +12,7 @@ const props = defineProps<{
   epic: BoardGroupNode
   stories: AgileStoryRow[]
   epicTasks: Task[]
-  columns: ProjectColumn[]
+  lanes: Array<ProjectColumn | null>
 }>()
 
 defineEmits<{
@@ -30,17 +31,7 @@ const allEpicTasks = computed(() => [
 const totalCount = computed(() => allEpicTasks.value.length)
 const doneCount = computed(() => allEpicTasks.value.filter(t => t.completed).length)
 
-const epicTasksByColumn = computed(() => {
-  const map = new Map<string, Task[]>()
-  for (const task of props.epicTasks) {
-    if (task.columnId) {
-      const arr = map.get(task.columnId) ?? []
-      arr.push(task)
-      map.set(task.columnId, arr)
-    }
-  }
-  return map
-})
+const epicTasksByColumn = computed(() => groupTasksByColumn(props.epicTasks))
 </script>
 
 <template>
@@ -76,16 +67,16 @@ const epicTasksByColumn = computed(() => {
         :key="storyRow.story.id"
         :story="storyRow.story"
         :tasks="storyRow.tasks"
-        :columns="columns"
+        :lanes="lanes"
         @toggle-task="$emit('toggleTask', $event)"
         @open-task="$emit('openTask', $event)"
       />
 
       <div v-if="epicTasks.length > 0" class="col-span-full grid [grid-template-columns:subgrid] border-t border-border/60">
         <AgileCell
-          v-for="column in columns"
-          :key="column.id"
-          :tasks="epicTasksByColumn.get(column.id) ?? []"
+          v-for="lane in lanes"
+          :key="lane?.id ?? 'uncategorized'"
+          :tasks="epicTasksByColumn.get(lane ? lane.id : null) ?? []"
           @toggle-task="$emit('toggleTask', $event)"
           @open-task="$emit('openTask', $event)"
         />

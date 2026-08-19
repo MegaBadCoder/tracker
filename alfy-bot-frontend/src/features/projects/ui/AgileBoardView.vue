@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { BoardGroup } from '../model/types'
+import type { BoardGroup, ProjectColumn } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { storeToRefs } from 'pinia'
 import { computed, watch } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
-import { buildAgileRows } from '../lib/agile-layout'
+import { buildAgileRows, groupTasksByColumn } from '../lib/agile-layout'
 import { useColumnStore } from '../model/column-store'
 import { useGroupStore } from '../model/group-store'
 import AgileCell from './AgileCell.vue'
@@ -43,22 +43,23 @@ const projectTasks = computed(() =>
   ),
 )
 
+const hasUncategorizedTasks = computed(() =>
+  projectTasks.value.some(t => !t.columnId),
+)
+
+// Leading "no column" lane (per BoardView's null-column precedent), followed
+// by the project's real columns in order. Only present when there are tasks
+// with columnId === null — otherwise the lane is not rendered at all.
+const lanes = computed<Array<ProjectColumn | null>>(() =>
+  hasUncategorizedTasks.value ? [null, ...sortedColumns.value] : sortedColumns.value,
+)
+
 const rows = computed(() => buildAgileRows(groupStore.groups, projectTasks.value))
 
-function columnTaskCount(columnId: string): number {
-  return projectTasks.value.filter(t => t.columnId === columnId).length
-}
+const projectTasksByColumn = computed(() => groupTasksByColumn(projectTasks.value))
 
-function ungroupedTasksByColumn(tasksInRow: Task[]) {
-  const map = new Map<string, Task[]>()
-  for (const task of tasksInRow) {
-    if (task.columnId) {
-      const arr = map.get(task.columnId) ?? []
-      arr.push(task)
-      map.set(task.columnId, arr)
-    }
-  }
-  return map
+function laneTaskCount(lane: ProjectColumn | null): number {
+  return projectTasksByColumn.value.get(lane ? lane.id : null)?.length ?? 0
 }
 
 async function handleToggleEpicDone(epic: BoardGroup) {
@@ -78,20 +79,23 @@ watch(() => props.projectId, (id) => {
     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
   </div>
   <div v-else class="overflow-x-auto pb-4 h-full">
-    <div class="grid" :style="{ gridTemplateColumns: `repeat(${sortedColumns.length}, ${COLUMN_WIDTH_PX}px)` }">
+    <div class="grid" :style="{ gridTemplateColumns: `repeat(${lanes.length}, ${COLUMN_WIDTH_PX}px)` }">
       <div class="contents">
         <div
-          v-for="column in sortedColumns"
-          :key="column.id"
+          v-for="lane in lanes"
+          :key="lane?.id ?? 'uncategorized'"
           class="sticky top-0 z-10 bg-background border-b border-border px-3 py-2 flex items-center gap-2"
         >
-          <div
-            v-if="column.color"
-            class="w-2 h-2 rounded-full shrink-0"
-            :style="{ backgroundColor: column.color }"
-          />
-          <span class="text-sm font-medium truncate">{{ column.title }}</span>
-          <span class="text-xs text-muted-foreground shrink-0">{{ columnTaskCount(column.id) }}</span>
+          <template v-if="lane">
+            <div
+              v-if="lane.color"
+              class="w-2 h-2 rounded-full shrink-0"
+              :style="{ backgroundColor: lane.color }"
+            />
+            <span class="text-sm font-medium truncate">{{ lane.title }}</span>
+          </template>
+          <span v-else class="text-sm font-medium truncate">Без колонки</span>
+          <span class="text-xs text-muted-foreground shrink-0">{{ laneTaskCount(lane) }}</span>
         </div>
       </div>
 
@@ -101,7 +105,7 @@ watch(() => props.projectId, (id) => {
           :epic="row.epic"
           :stories="row.stories"
           :epic-tasks="row.epicTasks"
-          :columns="sortedColumns"
+          :lanes="lanes"
           @toggle-task="$emit('toggleTask', $event)"
           @open-task="$emit('openTask', $event)"
           @toggle-done="handleToggleEpicDone(row.epic)"
@@ -111,9 +115,9 @@ watch(() => props.projectId, (id) => {
             Без эпика
           </div>
           <AgileCell
-            v-for="column in sortedColumns"
-            :key="column.id"
-            :tasks="ungroupedTasksByColumn(row.tasks).get(column.id) ?? []"
+            v-for="lane in lanes"
+            :key="lane?.id ?? 'uncategorized'"
+            :tasks="groupTasksByColumn(row.tasks).get(lane ? lane.id : null) ?? []"
             @toggle-task="$emit('toggleTask', $event)"
             @open-task="$emit('openTask', $event)"
           />

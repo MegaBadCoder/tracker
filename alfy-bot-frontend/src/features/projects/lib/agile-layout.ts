@@ -49,3 +49,18 @@ export function buildAgileRows(groups: BoardGroupNode[], tasks: Task[]): AgileRo
 
   return rows
 }
+
+/**
+ * Groups tasks by their columnId, preserving `null` (no column assigned)
+ * as an explicit map key so those tasks are never dropped.
+ */
+export function groupTasksByColumn(tasks: Task[]): Map<string | null, Task[]> {
+  const map = new Map<string | null, Task[]>()
+  for (const task of tasks) {
+    const key = task.columnId ?? null
+    const arr = map.get(key) ?? []
+    arr.push(task)
+    map.set(key, arr)
+  }
+  return map
+}
