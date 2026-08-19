@@ -12,6 +12,7 @@ import { User } from './user.entity';
 import { PomodoroConfig } from './pomodoro-config.entity';
 import { Project } from './project.entity';
 import { ProjectColumn } from './project-column.entity';
+import { BoardGroup } from './board-group.entity';
 import type { ChecklistData } from '../types/checklist.types';
 import type { RecurrenceRule } from '../types/recurrence.types';
 
@@ -58,6 +59,9 @@ export class Task {
 
   @Column({ type: 'text', nullable: true })
   columnId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  groupId: string | null;
 
   @Column({ type: 'integer', default: 0 })
   order: number;
@@ -106,6 +110,13 @@ export class Task {
   })
   @JoinColumn({ name: 'columnId' })
   column: ProjectColumn | null;
+
+  @ManyToOne(() => BoardGroup, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'groupId' })
+  group: BoardGroup | null;
 
   @ManyToOne(() => Task, { nullable: true })
   @JoinColumn({ name: 'recurringParentId' })

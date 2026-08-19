@@ -2,6 +2,7 @@ import { DataSource, Repository } from 'typeorm';
 import {
   ApiToken,
   AuthMethod,
+  BoardGroup,
   Goal,
   Project,
   ProjectColumn,
@@ -19,6 +20,7 @@ import { TypeOrmReportAnswerRepository } from './typeorm-report-answer.repositor
 const ALL_ENTITIES = [
   ApiToken,
   AuthMethod,
+  BoardGroup,
   Goal,
   Project,
   ProjectColumn,

@@ -15,6 +15,7 @@ import {
   ReportAnswer,
   Project,
   ProjectColumn,
+  BoardGroup,
 } from '../../src/shared/entities';
 
 export interface TestContext {
@@ -42,6 +43,7 @@ export async function createTestApp(): Promise<TestContext> {
       ReportAnswer,
       Project,
       ProjectColumn,
+      BoardGroup,
     ],
     synchronize: true,
   });

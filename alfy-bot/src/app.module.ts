@@ -30,6 +30,7 @@ import {
   PushSubscription,
   Project,
   ProjectColumn,
+  BoardGroup,
   ApiToken,
   Link,
 } from './shared/entities';
@@ -69,6 +70,7 @@ const telegramImports = isTelegramEnabled()
         PushSubscription,
         Project,
         ProjectColumn,
+        BoardGroup,
         ApiToken,
         Link,
       ],
