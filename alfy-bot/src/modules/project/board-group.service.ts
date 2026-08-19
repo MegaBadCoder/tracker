@@ -79,6 +79,7 @@ export class BoardGroupService {
     const nextOrder = siblings.length;
 
     return this.groupRepo.create({
+      userId,
       projectId,
       parentId,
       type,
