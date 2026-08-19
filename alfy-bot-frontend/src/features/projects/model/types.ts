@@ -1,4 +1,4 @@
-export type ViewMode = 'list' | 'board'
+export type ViewMode = 'list' | 'board' | 'agile'
 
 export interface Project {
   id: string
@@ -17,6 +17,38 @@ export interface ProjectColumn {
   title: string
   order: number
   color: string | null
+}
+
+export type GroupType = 'epic' | 'story'
+
+export type GroupStatus = 'open' | 'done'
+
+export interface BoardGroup {
+  id: string
+  projectId: string
+  parentId: string | null
+  type: GroupType
+  title: string
+  description: string | null
+  status: GroupStatus
+  completedAt: string | null
+  color: string | null
+  order: number
+}
+
+export interface BoardGroupNode extends BoardGroup {
+  children: BoardGroupNode[]
+}
+
+export interface CreateGroupPayload {
+  title: string
+  parentId?: string | null
+  description?: string | null
+  color?: string | null
+}
+
+export type UpdateGroupPayload = Partial<CreateGroupPayload> & {
+  status?: GroupStatus
 }
 
 export interface ProjectTreeNode extends Project {

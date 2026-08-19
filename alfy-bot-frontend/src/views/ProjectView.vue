@@ -8,6 +8,7 @@ import PageContainer from '@/components/PageContainer.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import AgileBoardView from '@/features/projects/ui/AgileBoardView.vue'
 import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
@@ -29,6 +30,7 @@ const projectId = computed(() => route.params.projectId as string)
 const projectStore = useProjectStore()
 const project = computed(() => projectStore.projectMap.get(projectId.value))
 const isBoardMode = computed(() => project.value?.viewMode === 'board')
+const isAgileMode = computed(() => project.value?.viewMode === 'agile')
 
 const showCompleted = useShowCompleted(projectId)
 const hideOverdue = useHideOverdue(projectId)
@@ -73,7 +75,8 @@ const filteredTasks = computed(() => {
     .sort((a, b) => {
       const w = (t: Task) => (t.isOverdue ? 2 : 0) + (t.completed ? 1 : 0)
       const wd = w(a) - w(b)
-      if (wd !== 0) return wd
+      if (wd !== 0)
+        return wd
       return (a.order ?? 0) - (b.order ?? 0)
     })
 })
@@ -95,7 +98,7 @@ const { insertionIndex } = useReorderList({
 })
 
 async function handleViewModeChange(mode: string) {
-  await projectStore.updateProject(projectId.value, { viewMode: mode as 'list' | 'board' })
+  await projectStore.updateProject(projectId.value, { viewMode: mode as 'list' | 'board' | 'agile' })
 }
 
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
@@ -154,8 +157,8 @@ watch(projectId, (id) => {
 </script>
 
 <template>
-  <div :class="['flex flex-col', isBoardMode && 'h-[100dvh]']">
-    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" :fluid="isBoardMode">
+  <div class="flex flex-col" :class="[(isBoardMode || isAgileMode) && 'h-[100dvh]']">
+    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" :fluid="isBoardMode || isAgileMode">
       <template #right>
         <ViewModeToggle
           v-if="project"
@@ -187,6 +190,36 @@ watch(projectId, (id) => {
 
       <main v-else class="flex-1 min-h-0 px-4 pb-4">
         <BoardView
+          :project-id="projectId"
+          :show-completed="showCompleted"
+          :hide-overdue="hideOverdue"
+          @toggle-task="handleToggleTask"
+          @open-task="handleOpenTask"
+        />
+      </main>
+    </template>
+
+    <!-- Agile view — full page -->
+    <template v-else-if="isAgileMode">
+      <div class="px-4 py-3">
+        <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+      </div>
+
+      <div v-if="loading" class="text-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+        <p class="mt-2 text-muted-foreground">
+          Загрузка задач...
+        </p>
+      </div>
+
+      <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4">
+        <p class="text-destructive">
+          {{ error }}
+        </p>
+      </div>
+
+      <main v-else class="flex-1 min-h-0 px-4 pb-4">
+        <AgileBoardView
           :project-id="projectId"
           :show-completed="showCompleted"
           :hide-overdue="hideOverdue"

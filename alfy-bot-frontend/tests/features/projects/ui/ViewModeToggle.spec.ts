@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 
-describe('ViewModeToggle', () => {
-  it('рендерит две кнопки', () => {
+describe('viewModeToggle', () => {
+  it('рендерит три кнопки', () => {
     const wrapper = mount(ViewModeToggle, {
       props: { modelValue: 'list' },
     })
-    expect(wrapper.findAll('button')).toHaveLength(2)
+    expect(wrapper.findAll('button')).toHaveLength(3)
   })
 
   it('подсвечивает активный режим', () => {

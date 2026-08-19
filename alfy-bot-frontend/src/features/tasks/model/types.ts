@@ -43,6 +43,7 @@ export interface Task {
   onMissed?: 'shift' | 'freeze'
   projectId?: string | null
   columnId?: string | null
+  groupId?: string | null
   order?: number
   parentId?: string
   goalIds?: number[]
