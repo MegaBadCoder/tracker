@@ -12,7 +12,7 @@ const props = defineProps<{
   epic: BoardGroupNode
   stories: AgileStoryRow[]
   epicTasks: Task[]
-  lanes: Array<ProjectColumn | null>
+  lanes: ProjectColumn[]
 }>()
 
 defineEmits<{
@@ -77,9 +77,9 @@ const epicTasksByColumn = computed(() => groupTasksByColumn(props.epicTasks))
       <div v-if="epicTasks.length > 0" class="col-span-full grid [grid-template-columns:subgrid] border-t border-border/60">
         <AgileCell
           v-for="lane in lanes"
-          :key="lane?.id ?? 'uncategorized'"
-          :tasks="epicTasksByColumn.get(lane ? lane.id : null) ?? []"
-          :column-id="lane ? lane.id : null"
+          :key="lane.id"
+          :tasks="epicTasksByColumn.get(lane.id) ?? []"
+          :column-id="lane.id"
           :group-id="epic.id"
           @toggle-task="$emit('toggleTask', $event)"
           @open-task="$emit('openTask', $event)"

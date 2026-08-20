@@ -8,7 +8,7 @@ import AgileCell from './AgileCell.vue'
 const props = defineProps<{
   story: BoardGroupNode
   tasks: Task[]
-  lanes: Array<ProjectColumn | null>
+  lanes: ProjectColumn[]
 }>()
 
 defineEmits<{
@@ -28,9 +28,9 @@ const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
     </div>
     <AgileCell
       v-for="lane in lanes"
-      :key="lane?.id ?? 'uncategorized'"
-      :tasks="tasksByColumn.get(lane ? lane.id : null) ?? []"
-      :column-id="lane ? lane.id : null"
+      :key="lane.id"
+      :tasks="tasksByColumn.get(lane.id) ?? []"
+      :column-id="lane.id"
       :group-id="story.id"
       @toggle-task="$emit('toggleTask', $event)"
       @open-task="$emit('openTask', $event)"

@@ -45,23 +45,16 @@ const projectTasks = computed(() =>
   ),
 )
 
-const hasUncategorizedTasks = computed(() =>
-  projectTasks.value.some(t => !t.columnId),
-)
-
-// Leading "no column" lane (per BoardView's null-column precedent), followed
-// by the project's real columns in order. Only present when there are tasks
-// with columnId === null — otherwise the lane is not rendered at all.
-const lanes = computed<Array<ProjectColumn | null>>(() =>
-  hasUncategorizedTasks.value ? [null, ...sortedColumns.value] : sortedColumns.value,
-)
+// Board lanes are exactly the project's columns. Tasks with columnId === null
+// are backlog — they live in AgileBacklogPanel, not on the board.
+const lanes = computed<ProjectColumn[]>(() => sortedColumns.value)
 
 const rows = computed(() => buildAgileRows(groupStore.groups, projectTasks.value))
 
 const projectTasksByColumn = computed(() => groupTasksByColumn(projectTasks.value))
 
-function laneTaskCount(lane: ProjectColumn | null): number {
-  return projectTasksByColumn.value.get(lane ? lane.id : null)?.length ?? 0
+function laneTaskCount(lane: ProjectColumn): number {
+  return projectTasksByColumn.value.get(lane.id)?.length ?? 0
 }
 
 async function handleToggleEpicDone(epic: BoardGroup) {
@@ -89,18 +82,15 @@ watch(() => props.projectId, (id) => {
       <div class="contents">
         <div
           v-for="lane in lanes"
-          :key="lane?.id ?? 'uncategorized'"
+          :key="lane.id"
           class="sticky top-0 z-10 bg-background border-b border-border px-3 py-2 flex items-center gap-2"
         >
-          <template v-if="lane">
-            <div
-              v-if="lane.color"
-              class="w-2 h-2 rounded-full shrink-0"
-              :style="{ backgroundColor: lane.color }"
-            />
-            <span class="text-sm font-medium truncate">{{ lane.title }}</span>
-          </template>
-          <span v-else class="text-sm font-medium truncate">Без колонки</span>
+          <div
+            v-if="lane.color"
+            class="w-2 h-2 rounded-full shrink-0"
+            :style="{ backgroundColor: lane.color }"
+          />
+          <span class="text-sm font-medium truncate">{{ lane.title }}</span>
           <span class="text-xs text-muted-foreground shrink-0">{{ laneTaskCount(lane) }}</span>
         </div>
       </div>
@@ -123,9 +113,9 @@ watch(() => props.projectId, (id) => {
           </div>
           <AgileCell
             v-for="lane in lanes"
-            :key="lane?.id ?? 'uncategorized'"
-            :tasks="groupTasksByColumn(row.tasks).get(lane ? lane.id : null) ?? []"
-            :column-id="lane ? lane.id : null"
+            :key="lane.id"
+            :tasks="groupTasksByColumn(row.tasks).get(lane.id) ?? []"
+            :column-id="lane.id"
             :group-id="null"
             @toggle-task="$emit('toggleTask', $event)"
             @open-task="$emit('openTask', $event)"

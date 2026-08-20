@@ -8,6 +8,7 @@ import PageContainer from '@/components/PageContainer.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import AgileBacklogPanel from '@/features/projects/ui/AgileBacklogPanel.vue'
 import AgileBoardView from '@/features/projects/ui/AgileBoardView.vue'
 import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
@@ -218,8 +219,17 @@ watch(projectId, (id) => {
         </p>
       </div>
 
-      <main v-else class="flex-1 min-h-0 px-4 pb-4">
-        <AgileBoardView
+      <main v-else class="flex-1 min-h-0 px-4 pb-4 flex gap-3">
+        <div class="flex-1 min-w-0">
+          <AgileBoardView
+            :project-id="projectId"
+            :show-completed="showCompleted"
+            :hide-overdue="hideOverdue"
+            @toggle-task="handleToggleTask"
+            @open-task="handleOpenTask"
+          />
+        </div>
+        <AgileBacklogPanel
           :project-id="projectId"
           :show-completed="showCompleted"
           :hide-overdue="hideOverdue"

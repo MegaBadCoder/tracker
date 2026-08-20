@@ -102,7 +102,7 @@ describe('agileBoardView', () => {
     })
   }
 
-  it('показывает задачу истории/эпика с columnId === null в дорожке «Без колонки»', async () => {
+  it('не показывает на доске задачу истории/эпика с columnId === null — это бэклог', async () => {
     const story = makeEpic({ id: 'story-1', type: 'story', parentId: 'epic-1' })
     const epic = makeEpic({ id: 'epic-1', children: [story] })
     const wrapper = setup(
@@ -113,19 +113,23 @@ describe('agileBoardView', () => {
     await vi.dynamicImportSettled()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('Задача без колонки')
-    expect(wrapper.text()).toContain('Без колонки')
+    expect(wrapper.text()).not.toContain('Задача без колонки')
   })
 
-  it('не рендерит дорожку «Без колонки», когда все задачи привязаны к колонке', async () => {
+  it('рендерит ровно столько дорожек, сколько колонок у проекта', async () => {
     const wrapper = setup(
-      [makeColumn()],
+      [makeColumn({ id: 'col-1', title: 'В работе' }), makeColumn({ id: 'col-2', title: 'Готово', order: 1 })],
       [],
-      [makeTask({ id: 't1', title: 'Задача с колонкой', columnId: 'col-1' })],
+      [
+        makeTask({ id: 't1', title: 'Задача с колонкой', columnId: 'col-1' }),
+        makeTask({ id: 't2', title: 'Задача без колонки', columnId: null }),
+      ],
     )
     await vi.dynamicImportSettled()
     await wrapper.vm.$nextTick()
 
+    const headers = wrapper.findAll('.sticky.top-0')
+    expect(headers).toHaveLength(2)
     expect(wrapper.text()).not.toContain('Без колонки')
   })
 
