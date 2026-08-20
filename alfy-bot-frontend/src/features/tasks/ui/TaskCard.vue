@@ -16,12 +16,25 @@ const emit = defineEmits<TaskCardEmits>()
 const cardEl = ref<HTMLElement | null>(null)
 const handleEl = ref<HTMLElement | null>(null)
 
+const ownsGesture = computed(() => props.dndSource !== false)
+
 useDragSource({
   task: toRef(props, 'task'),
   cardEl,
   handleEl,
   onTap: () => emit('open', props.task),
+  enabled: ownsGesture.value,
 })
+
+// Когда жестом владеет vuedraggable, открывать задачу некому — onTap
+// кастомного движка не сработает, поэтому нужен обычный клик.
+function onCardClick(event: MouseEvent) {
+  if (ownsGesture.value)
+    return
+  if ((event.target as HTMLElement).closest('[data-no-drag]'))
+    return
+  emit('open', props.task)
+}
 
 const isCompact = computed(() => props.variant === 'compact')
 
@@ -49,6 +62,7 @@ const hasMeta = computed(
     ref="cardEl"
     role="listitem"
     :data-task-id="task.id"
+    @click="onCardClick"
     :class="[
       'group flex items-center gap-2 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
       isCompact ? 'pl-1 pr-3 py-2 min-h-[36px]' : 'pl-1 pr-4 py-3 min-h-[44px]',

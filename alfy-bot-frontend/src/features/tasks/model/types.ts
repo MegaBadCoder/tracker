@@ -59,6 +59,12 @@ export interface TaskCardProps {
   task: Task
   projectName?: string
   variant?: 'default' | 'compact'
+  /**
+   * false — карточка лежит внутри vuedraggable-списка и жест принадлежит ему.
+   * Кастомный PointerEvents-движок при старте делает setPointerCapture и
+   * забирает события себе, из-за чего Sortable перетаскивания не видит.
+   */
+  dndSource?: boolean
 }
 
 export interface TaskCardEmits {

@@ -92,7 +92,11 @@ describe('agileBoardView', () => {
       props: { projectId: 'proj-1' },
       global: {
         stubs: {
-          TaskCard: { template: '<div class="task-card">{{ task.title }}</div>', props: ['task', 'variant'] },
+          TaskCard: {
+            name: 'TaskCard',
+            template: '<div class="task-card">{{ task.title }}</div>',
+            props: ['task', 'variant', 'dndSource'],
+          },
         },
       },
     })
@@ -158,5 +162,27 @@ describe('agileBoardView', () => {
 
     const scrollContainers = wrapper.findAll('.overflow-x-auto')
     expect(scrollContainers).toHaveLength(1)
+  })
+
+  // Карточка умеет быть источником собственного PointerEvents-движка. Внутри
+  // ячейки жестом владеет vuedraggable, и если движок оставить включённым, он
+  // при старте делает setPointerCapture, забирает события себе — и Sortable
+  // перетаскивания просто не видит. Снаружи это выглядит как «задачи не
+  // переносятся между колонками», а тесты и типы при этом зелёные.
+  it('карточки в ячейках не включают кастомный DnD-движок', async () => {
+    const story = makeEpic({ id: 'story-1', type: 'story', parentId: 'epic-1' })
+    const epic = makeEpic({ id: 'epic-1', children: [story] })
+    const wrapper = setup(
+      [makeColumn()],
+      [epic],
+      [makeTask({ id: 't1', groupId: 'story-1', columnId: 'col-1' })],
+    )
+    await vi.dynamicImportSettled()
+    await wrapper.vm.$nextTick()
+
+    const cards = wrapper.findAllComponents({ name: 'TaskCard' })
+    expect(cards.length).toBeGreaterThan(0)
+    for (const card of cards)
+      expect(card.props('dndSource')).toBe(false)
   })
 })
