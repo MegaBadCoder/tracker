@@ -303,15 +303,9 @@ export const useTaskStore = defineStore('tasks', () => {
         if (payload.order !== undefined) body.order = payload.order
         await api.patch(`/tasks/${taskId}/move-to-inbox`, body)
       } else {
-        if (import.meta.env.DEV)
-          console.log('[agile-dnd] 5. PATCH move', { url: `/projects/${projectId}/tasks/${taskId}/move`, payload })
-        const { data } = await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
-        if (import.meta.env.DEV)
-          console.log('[agile-dnd] 6. ответ сервера', { columnId: data?.columnId, groupId: data?.groupId, order: data?.order })
+        await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
       }
     } catch (err) {
-      if (import.meta.env.DEV)
-        console.error('[agile-dnd] 6. ЗАПРОС УПАЛ, откатываю', err)
       task.projectId = previous.projectId
       task.columnId = previous.columnId
       task.groupId = previous.groupId

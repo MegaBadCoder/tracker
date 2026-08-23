@@ -1,5 +1,4 @@
 import type { useTaskStore } from '@/features/tasks/model/task-store'
-import { alog } from './agile-debug'
 
 interface MoveEvent {
   added?: { element: { id: string }; newIndex: number }
@@ -25,17 +24,13 @@ export function useAgileDnd(taskStore: ReturnType<typeof useTaskStore>) {
       }
       if (groupId !== undefined)
         payload.groupId = groupId
-      alog('4. added → отправляю moveTask', { taskId, columnId, groupId, order: event.added.newIndex })
       taskStore.moveTask(taskId, projectId, payload)
       if (orderedIds.length > 1) {
         taskStore.reorderTasks(projectId, orderedIds, columnId ?? undefined)
       }
     } else if (event.moved) {
       const orderedIds = cellTasks.map(t => t.id)
-      alog('4. moved (внутри той же ячейки) → только reorder', { columnId, groupId })
       taskStore.reorderTasks(projectId, orderedIds, columnId ?? undefined)
-    } else {
-      alog('4. change без added/moved — ничего не отправляю', { keys: Object.keys(event) })
     }
   }
 

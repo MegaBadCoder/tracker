@@ -2,7 +2,6 @@
 import type { Task } from '@/features/tasks/model/types'
 import draggable from 'vuedraggable'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
-import { alog } from '../lib/agile-debug'
 
 const props = defineProps<{
   tasks: Task[]
@@ -16,29 +15,8 @@ const emit = defineEmits<{
   taskChange: [event: any, columnId: string | null, groupId: string | null, tasks: Task[]]
 }>()
 
-function cellId() {
-  return { columnId: props.columnId, groupId: props.groupId }
-}
-
 function handleChange(event: any) {
-  alog('3. cell change', { cell: cellId(), kinds: Object.keys(event) })
   emit('taskChange', event, props.columnId, props.groupId, props.tasks)
-}
-
-function handleStart(event: any) {
-  alog('1. sortable start (перетаскивание началось)', {
-    fromCell: cellId(),
-    index: event?.oldIndex,
-  })
-}
-
-function handleEnd(event: any) {
-  alog('2. sortable end (отпустили)', {
-    fromCell: cellId(),
-    oldIndex: event?.oldIndex,
-    newIndex: event?.newIndex,
-    sameList: event?.from === event?.to,
-  })
 }
 </script>
 
@@ -55,8 +33,6 @@ function handleEnd(event: any) {
       ghost-class="opacity-30"
       class="flex-1 space-y-1 min-h-[20px]"
       @change="handleChange"
-      @start="handleStart"
-      @end="handleEnd"
     >
       <template #item="{ element }">
         <TaskCard

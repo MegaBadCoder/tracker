@@ -8,7 +8,6 @@ import draggable from 'vuedraggable'
 import { Badge } from '@/components/ui/badge'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
-import { alog } from '../lib/agile-debug'
 import { useAgileDnd } from '../lib/use-agile-dnd'
 import { useGroupStore } from '../model/group-store'
 
@@ -66,7 +65,6 @@ function groupLabel(task: Task): string | null {
 }
 
 function handleChange(event: any) {
-  alog('3. backlog panel change', { kinds: Object.keys(event) })
   // groupId is intentionally undefined (not null): dropping a task into the
   // backlog must not touch its epic/story assignment.
   onTaskChange(event, null, undefined, props.projectId, backlogTasks.value)
