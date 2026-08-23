@@ -21,9 +21,16 @@ const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
 </script>
 
 <template>
-  <div class="col-span-full grid [grid-template-columns:subgrid] border-t border-border/60">
-    <div class="col-span-full flex items-center gap-2 px-3 py-1.5 bg-muted/20">
-      <span class="text-xs font-medium text-muted-foreground truncate">{{ story.title }}</span>
+  <!-- Вложенность читается слоями, а не вдвинутым прямоугольником: отступ или
+       margin на этом блоке сдвинул бы его subgrid-колонки относительно эпика
+       и разломал сквозное выравнивание. Поэтому поверхность светлее эпика,
+       рейл тоньше, подпись с отступом. -->
+  <div
+    class="col-span-full grid [grid-template-columns:subgrid] bg-muted/[0.12]"
+    style="box-shadow: inset 2px 0 0 0 color-mix(in oklab, var(--border) 90%, transparent)"
+  >
+    <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5 bg-muted/25">
+      <span class="text-xs font-medium text-foreground/80 truncate">{{ story.title }}</span>
       <span class="text-[11px] text-muted-foreground/60">{{ tasks.length }}</span>
     </div>
     <AgileCell
