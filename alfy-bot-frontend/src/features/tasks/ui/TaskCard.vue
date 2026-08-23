@@ -99,7 +99,11 @@ const hasMeta = computed(
       <div class="flex items-center gap-2">
         <span
           :class="[
-            'text-sm truncate',
+            'truncate',
+            // На доске карточка — самый частый элемент, и на 14px она спорила
+            // с заголовками колонок и эпиков того же кегля. 13px оставляет
+            // лестницу: история 12 → задача 13 → эпик и колонка 14.
+            isCompact ? 'text-[13px]' : 'text-sm',
             task.isOverdue
               ? 'text-red-600 dark:text-red-400 font-medium'
               : task.completed
