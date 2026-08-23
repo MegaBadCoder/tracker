@@ -26,11 +26,13 @@ const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
        и разломал сквозное выравнивание. Поэтому поверхность светлее эпика,
        рейл тоньше, подпись с отступом. -->
   <div
-    class="col-span-full grid [grid-template-columns:subgrid] bg-muted/[0.12]"
+    class="col-span-full grid [grid-template-columns:subgrid] bg-muted/30"
     style="box-shadow: inset 2px 0 0 0 color-mix(in oklab, var(--border) 90%, transparent)"
   >
     <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5 bg-muted/25">
-      <span class="text-xs font-medium text-foreground/80 truncate">{{ story.title }}</span>
+      <!-- Один кегль с названием задачи, поэтому разводим яркостью:
+           содержимое светлое, подпись-разделитель приглушённая. -->
+      <span class="text-xs font-medium text-muted-foreground truncate">{{ story.title }}</span>
       <span class="text-[11px] text-muted-foreground/60">{{ tasks.length }}</span>
     </div>
     <AgileCell

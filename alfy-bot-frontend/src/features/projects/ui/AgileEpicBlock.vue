@@ -44,7 +44,7 @@ const epicFrame = computed(() => ({
 
 <template>
   <div
-    class="col-span-full grid [grid-template-columns:subgrid] mt-3 bg-muted/[0.06]"
+    class="col-span-full grid [grid-template-columns:subgrid] mt-3 bg-muted/15"
     :style="epicFrame"
   >
     <div class="col-span-full flex items-center gap-2 pl-4 pr-3 py-2 bg-muted/50">
@@ -90,7 +90,7 @@ const epicFrame = computed(() => ({
            Пунктирный рейл и приглушённый курсив отличают этот ряд от истории. -->
       <div
         v-if="epicTasks.length > 0"
-        class="col-span-full grid [grid-template-columns:subgrid] bg-muted/[0.12]"
+        class="col-span-full grid [grid-template-columns:subgrid] bg-muted/30"
         style="box-shadow: inset 2px 0 0 0 color-mix(in oklab, var(--muted-foreground) 40%, transparent)"
       >
         <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5">

@@ -64,10 +64,16 @@ const hasMeta = computed(
     :data-task-id="task.id"
     @click="onCardClick"
     :class="[
-      'group flex items-center gap-2 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
-      isCompact ? 'pl-1 pr-3 py-2 min-h-[36px]' : 'pl-1 pr-4 py-3 min-h-[44px]',
+      // transition-all анимировал бы и раскладку; перечисляем ровно то, что меняется
+      'group flex items-center gap-2 cursor-pointer transition-[background-color,border-color,box-shadow] duration-200',
+      // На доске карточке нужна собственная поверхность: без неё она была
+      // прозрачной и сливалась с подложкой истории. --card в тёмной теме уже
+      // на ступень светлее фона (0.205 против 0.145) — используем эту ступень.
+      isCompact
+        ? 'pl-1 pr-2.5 py-1.5 min-h-[36px] rounded-md border border-border bg-card shadow-sm hover:bg-muted/50'
+        : 'pl-1 pr-4 py-3 min-h-[44px] hover:bg-muted/60 hover:shadow-sm',
       task.isOverdue
-        ? 'border-l-4 border-red-500 bg-red-500/10 dark:bg-red-500/20'
+        ? 'border-l-4 border-l-red-500 bg-red-500/10 dark:bg-red-500/15'
         : task.completed && 'opacity-50',
     ]"
   >
@@ -101,9 +107,10 @@ const hasMeta = computed(
           :class="[
             'truncate',
             // На доске карточка — самый частый элемент, и на 14px она спорила
-            // с заголовками колонок и эпиков того же кегля. 13px оставляет
-            // лестницу: история 12 → задача 13 → эпик и колонка 14.
-            isCompact ? 'text-[13px]' : 'text-sm',
+            // с заголовками колонок и эпиков того же кегля. Ниже 12px уводить
+            // нельзя — начинает страдать читаемость, поэтому на 12px задача
+            // отделяется от подписи истории уже не кеглем, а цветом и весом.
+            isCompact ? 'text-xs' : 'text-sm',
             task.isOverdue
               ? 'text-red-600 dark:text-red-400 font-medium'
               : task.completed
