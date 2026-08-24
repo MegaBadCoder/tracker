@@ -192,30 +192,19 @@ describe('ProjectService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('создание agile-проекта засевает три колонки по умолчанию', async () => {
+    it('создание проекта с type=agile сохраняет type', async () => {
       const result = await service.create(1, {
         title: 'Спринт',
-        viewMode: 'agile',
+        type: 'agile',
       });
 
-      expect(columnRepo.create).toHaveBeenCalledTimes(3);
-      expect(columnRepo.create.mock.calls.map((call) => call[0])).toEqual([
-        expect.objectContaining({
-          projectId: result.id,
-          title: 'К выполнению',
-          order: 0,
-        }),
-        expect.objectContaining({
-          projectId: result.id,
-          title: 'В работе',
-          order: 1,
-        }),
-        expect.objectContaining({
-          projectId: result.id,
-          title: 'Готово',
-          order: 2,
-        }),
-      ]);
+      expect(result.type).toBe('agile');
+    });
+
+    it('type по умолчанию — simple', async () => {
+      const result = await service.create(1, { title: 'Обычный' });
+
+      expect(result.type).toBe('simple');
     });
 
     it('создание list-проекта не засевает колонки', async () => {
@@ -370,48 +359,21 @@ describe('ProjectService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('переключение на agile засевает три колонки, если у проекта их ещё нет', async () => {
+    it('обновление viewMode на board не засевает колонки', async () => {
       repo.findById.mockResolvedValue(makeProject({ viewMode: 'list' }));
-      columnRepo.findAllByProject.mockResolvedValue([]);
 
-      await service.update(1, 'proj-1', { viewMode: 'agile' });
-
-      expect(columnRepo.create).toHaveBeenCalledTimes(3);
-      expect(columnRepo.create.mock.calls.map((call) => call[0])).toEqual([
-        expect.objectContaining({
-          projectId: 'proj-1',
-          title: 'К выполнению',
-          order: 0,
-        }),
-        expect.objectContaining({
-          projectId: 'proj-1',
-          title: 'В работе',
-          order: 1,
-        }),
-        expect.objectContaining({
-          projectId: 'proj-1',
-          title: 'Готово',
-          order: 2,
-        }),
-      ]);
-    });
-
-    it('переключение на agile не засевает колонки, если они уже есть', async () => {
-      repo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
-      columnRepo.findAllByProject.mockResolvedValue([
-        { id: 'col-1', projectId: 'proj-1', title: 'To Do', order: 0 },
-      ]);
-
-      await service.update(1, 'proj-1', { viewMode: 'agile' });
+      await service.update(1, 'proj-1', { viewMode: 'board' });
 
       expect(columnRepo.create).not.toHaveBeenCalled();
     });
 
-    it('обновление без изменения viewMode на agile не засевает колонки', async () => {
-      repo.findById.mockResolvedValue(makeProject({ viewMode: 'list' }));
+    it('обновление не меняет type проекта (type в UpdateProjectDto нет)', async () => {
+      const project = makeProject({ type: 'simple' });
+      repo.findById.mockResolvedValue(project);
 
-      await service.update(1, 'proj-1', { title: 'Новый' });
+      const saved = await service.update(1, 'proj-1', { title: 'Новый' });
 
+      expect(saved.type).toBe('simple');
       expect(columnRepo.create).not.toHaveBeenCalled();
     });
   });

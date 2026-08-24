@@ -16,10 +16,15 @@ export class CreateProjectDto {
   @IsUUID()
   parentId?: string;
 
-  @ApiPropertyOptional({ example: 'list', enum: ['list', 'board', 'agile'] })
+  @ApiPropertyOptional({ example: 'list', enum: ['list', 'board'] })
   @IsOptional()
-  @IsIn(['list', 'board', 'agile'])
-  viewMode?: 'list' | 'board' | 'agile';
+  @IsIn(['list', 'board'])
+  viewMode?: 'list' | 'board';
+
+  @ApiPropertyOptional({ example: 'simple', enum: ['simple', 'agile'] })
+  @IsOptional()
+  @IsIn(['simple', 'agile'])
+  type?: 'simple' | 'agile';
 
   @ApiPropertyOptional({ example: 'star' })
   @IsOptional()

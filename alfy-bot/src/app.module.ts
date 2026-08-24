@@ -36,6 +36,7 @@ import {
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
 import { BoardGroupConstraintsMigrationService } from './shared/database/board-group-constraints.service';
+import { ProjectTypeMigrationService } from './shared/database/project-type-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
 import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
 import { RecurringSeriesRepairService } from './shared/database/recurring-series-repair.service';
@@ -97,6 +98,7 @@ const telegramImports = isTelegramEnabled()
     AuthMethodMigrationService,
     RecurringSeriesRepairService,
     BoardGroupConstraintsMigrationService,
+    ProjectTypeMigrationService,
   ],
 })
 export class AppModule {}

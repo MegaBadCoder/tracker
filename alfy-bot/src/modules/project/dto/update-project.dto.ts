@@ -16,10 +16,10 @@ export class UpdateProjectDto {
   @IsOptional()
   parentId?: string | null;
 
-  @ApiPropertyOptional({ example: 'list', enum: ['list', 'board', 'agile'] })
+  @ApiPropertyOptional({ example: 'list', enum: ['list', 'board'] })
   @IsOptional()
-  @IsIn(['list', 'board', 'agile'])
-  viewMode?: 'list' | 'board' | 'agile';
+  @IsIn(['list', 'board'])
+  viewMode?: 'list' | 'board';
 
   @ApiPropertyOptional({ description: 'Set to null to remove icon' })
   @IsOptional()

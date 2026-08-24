@@ -9,7 +9,12 @@ import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
 import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
-import { Project, ProjectColumn, BoardGroup, Task } from '../../shared/entities';
+import {
+  Project,
+  ProjectColumn,
+  BoardGroup,
+  Task,
+} from '../../shared/entities';
 
 function makeProject(overrides: Partial<Project> = {}): Project {
   const p = new Project();
@@ -377,7 +382,7 @@ describe('ProjectTaskService — move & reorder', () => {
 
     it('бросает NotFoundException если groupId не существует в целевом проекте', async () => {
       taskRepo.findById.mockResolvedValue(makeTask());
-      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
       groupRepo.findById.mockResolvedValue(null);
 
       await expect(
@@ -442,7 +447,7 @@ describe('ProjectTaskService — move & reorder', () => {
 
     it('обнуляет groupId, когда null пришёл явно', async () => {
       taskRepo.findById.mockResolvedValue(makeTask({ groupId: 'group-1' }));
-      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
       colRepo.findById.mockResolvedValue(makeColumn());
 
       await service.moveTask(1, 'proj-1', 'task-1', {
@@ -464,7 +469,7 @@ describe('ProjectTaskService — move & reorder', () => {
 
     it('передаёт валидный groupId в updatePosition', async () => {
       taskRepo.findById.mockResolvedValue(makeTask());
-      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
       groupRepo.findById.mockResolvedValue(makeGroup());
 
       await service.moveTask(1, 'proj-1', 'task-1', {

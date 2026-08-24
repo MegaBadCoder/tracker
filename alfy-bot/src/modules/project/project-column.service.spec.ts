@@ -160,8 +160,8 @@ describe('ProjectColumnService', () => {
       );
     });
 
-    it('позволяет создать колонку в agile-проекте', async () => {
-      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'agile' }));
+    it('позволяет создать колонку в board-проекте', async () => {
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
       colRepo.findAllByProject.mockResolvedValue([]);
 
       await expect(

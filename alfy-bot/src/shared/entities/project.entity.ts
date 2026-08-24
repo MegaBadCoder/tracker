@@ -29,7 +29,10 @@ export class Project {
   description: string | null;
 
   @Column({ type: 'text', default: 'list' })
-  viewMode: 'list' | 'board' | 'agile';
+  viewMode: 'list' | 'board';
+
+  @Column({ type: 'text', default: 'simple' })
+  type: 'simple' | 'agile';
 
   @Column({ type: 'text', nullable: true })
   icon: string | null;

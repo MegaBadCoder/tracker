@@ -24,26 +24,27 @@ describe('Board groups (e2e)', () => {
   const auth = () => `Bearer ${token}`;
 
   describe('agile-проект', () => {
-    it('создаётся и засевает три колонки в нужном порядке', async () => {
+    it('создаётся с type=agile, viewMode остаётся board', async () => {
       const { body: project } = await request(app.getHttpServer())
         .post('/api/projects')
         .set('Authorization', auth())
-        .send({ title: 'Agile e2e', viewMode: 'agile' })
+        .send({ title: 'Agile e2e', viewMode: 'board', type: 'agile' })
         .expect(201);
 
-      expect(project.viewMode).toBe('agile');
+      expect(project.type).toBe('agile');
+      expect(project.viewMode).toBe('board');
       projectId = project.id;
+    });
 
-      const { body: columns } = await request(app.getHttpServer())
-        .get(`/api/projects/${projectId}/columns`)
+    it('PATCH молча отбрасывает type — тип проекта не меняется существующим эндпоинтом', async () => {
+      const { body: updated } = await request(app.getHttpServer())
+        .patch(`/api/projects/${projectId}`)
         .set('Authorization', auth())
+        .send({ title: 'Agile e2e (renamed)', type: 'simple' })
         .expect(200);
 
-      expect(columns.map((c: { title: string }) => c.title)).toEqual([
-        'К выполнению',
-        'В работе',
-        'Готово',
-      ]);
+      expect(updated.title).toBe('Agile e2e (renamed)');
+      expect(updated.type).toBe('agile');
     });
 
     it('list-проект колонок не засевает', async () => {
@@ -145,10 +146,17 @@ describe('Board groups (e2e)', () => {
     let storyId: string;
 
     beforeAll(async () => {
-      const { body: columns } = await request(app.getHttpServer())
-        .get(`/api/projects/${projectId}/columns`)
-        .set('Authorization', auth());
-      columnId = columns[1].id;
+      await request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/columns`)
+        .set('Authorization', auth())
+        .send({ title: 'К выполнению' })
+        .expect(201);
+      const { body: secondColumn } = await request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/columns`)
+        .set('Authorization', auth())
+        .send({ title: 'В работе' })
+        .expect(201);
+      columnId = secondColumn.id;
 
       const { body: tree } = await request(app.getHttpServer())
         .get(`/api/projects/${projectId}/groups`)
@@ -225,10 +233,12 @@ describe('Board groups (e2e)', () => {
         .get(`/api/projects/${projectId}/groups`)
         .set('Authorization', auth())
         .expect(200);
-      const remaining = tree.flatMap((e: { id: string; children: { id: string }[] }) => [
-        e.id,
-        ...e.children.map((c) => c.id),
-      ]);
+      const remaining = tree.flatMap(
+        (e: { id: string; children: { id: string }[] }) => [
+          e.id,
+          ...e.children.map((c) => c.id),
+        ],
+      );
       expect(remaining).not.toContain(epic.id);
       expect(remaining).not.toContain(story.id);
 
