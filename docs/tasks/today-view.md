@@ -255,6 +255,13 @@ Phase 1 блокирует 2, 4 и 5 (все зовут `today.ts`). Phase 3 б�
 ## Conclusion
 <empty — filled by up:ureview>
 
+### Deviations from plan
+
+- Фазы реализованы inline, без диспатча `up:implementer` — в сессии стоит запрет на вызов сабагентов без явной просьбы пользователя.
+- Добавлены `formatTaskCount` в `features/tasks/lib/formatters.ts` и спека к нему — план требовал подзаголовок «N задач», но склонения в проекте не было, а «1 задач» в шапке выглядит поломкой.
+- В TodayView форма быстрого добавления показывается и в пустом состоянии (план подразумевал, что пустое состояние заменяет содержимое) — иначе с пустого «Сегодня» нельзя ничего добавить.
+- На кнопку «Перенести» добавлен `data-testid="reschedule-overdue"` как якорь для спеки.
+
 ### Hands-off decisions
 <empty — populated only when Mode is hands-off>
 
