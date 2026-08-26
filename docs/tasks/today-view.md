@@ -1,6 +1,6 @@
 # Экран «Сегодня» в сайдбаре (просроченные + сегодняшние задачи)
 
-**Status:** executing
+**Status:** reviewing
 **Branch:** feat/today-view
 **Worktree:** /Users/v/projects/Alfy/.worktrees/feat-today-view
 **Mode:** interactive
@@ -250,7 +250,32 @@ Phase 1 блокирует 2, 4 и 5 (все зовут `today.ts`). Phase 3 б�
   `CurrentTaskWidget`.
 
 ## Verify
-<empty — filled by up:uverify>
+
+**Result:** passed
+
+Positive:
+- `splitTodayBuckets` раскладывает вчерашнюю в overdue, сегодняшнюю в today; обе группы отсортированы по `dueDate`
+- `shiftToSameTimeToday` сохраняет время суток и не мутирует исходную дату
+- Экран рендерит обе группы, задачи из проектов идут с ярлыком проекта
+- Счётчик в сайдбаре показывает сумму групп
+- Быстрое добавление стартует с датой «сегодня»
+- 470 тестов в 72 файлах, `vue-tsc --noEmit` без ошибок
+
+Negative:
+- Замороженные (`isOverdue`), выполненные, завтрашние и бездатные не попадают ни в группы, ни в счётчик
+- Группа «Просрочено» не рендерится пустой; счётчик не рендерит ноль
+- `TaskForm` без `defaultDueDate` отдаёт `dueDate: undefined` — Входящие не задеты
+
+Invariants:
+- `TasksView.vue` и `TaskListOptionsMenu.vue` отсутствуют в дифе против `origin/main`
+- `today.ts` не импортирует Vue/Pinia, не читает часы, не использует UTC-методы
+- `tasks-nav.ts` импортируется без активной Pinia (регрессия — `tests/router/tasks-nav.spec.ts`)
+- `TodayView` не подключает `useReorderList`/`useTaskDnd`; пустых `catch` нет
+- Массовый перенос всегда шлёт `rescheduleScope: 'this'`
+
+Smoke: изолированный бэкенд (копия БД, порт 3022) + vite 5174, реальный браузер. Экран: счётчик 5, «Просрочено 3» с тремя живыми задачами, «26 авг. · Сегодня · Среда 2», три замороженные скрыты, консоль чистая. «Перенести» → три `PATCH /api/tasks/:id` с 200, все три уехали на сегодня с сохранённым временем (`Придумать...` осталась в 08:00–09:00 в календаре), группа «Просрочено» исчезла, счётчик остался 5.
+
+Notes: смоук нашёл косметический дефект — CSS `capitalize` поднимал каждое слово («26 Авг.»), исправлено поднятием только дня недели в `todayLabel`. Копия БД и оба процесса после проверки убраны.
 
 ## Conclusion
 <empty — filled by up:ureview>
