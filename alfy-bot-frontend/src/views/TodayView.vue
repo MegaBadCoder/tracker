@@ -6,12 +6,13 @@ import { storeToRefs } from 'pinia'
 import { computed, inject, onMounted, ref } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
 import PageContainer from '@/components/PageContainer.vue'
+import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/composables/useConfirm'
 import { useNow } from '@/composables/useNow'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { toTimerTask, useTimerStore } from '@/features/task-timer'
 import { formatDate, formatTaskCount } from '@/features/tasks/lib/formatters'
-import { splitTodayBuckets } from '@/features/tasks/lib/today'
+import { shiftToSameTimeToday, splitTodayBuckets } from '@/features/tasks/lib/today'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
@@ -22,7 +23,7 @@ const openSidebar = inject<() => void>('openSidebar')
 
 const taskStore = useTaskStore()
 const { tasks, loading, error } = storeToRefs(taskStore)
-const { fetchTasks, createTask, toggleTask, deleteTask } = taskStore
+const { fetchTasks, createTask, updateTask, toggleTask, deleteTask } = taskStore
 
 const projectStore = useProjectStore()
 const timerStore = useTimerStore()
@@ -37,6 +38,9 @@ const totalCount = computed(() => buckets.value.overdue.length + buckets.value.t
 
 const overdueCollapsed = ref(false)
 const todayCollapsed = ref(false)
+
+const isRescheduling = ref(false)
+const rescheduleError = ref<string | null>(null)
 
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
@@ -64,6 +68,41 @@ const {
   handleUpdatePomodoroConfig,
   handleDeleteFromDialog,
 } = useTaskDetailHandlers(taskStore, confirm)
+
+/**
+ * Переносит всю группу «Просрочено» на сегодня.
+ *
+ * `rescheduleScope: 'this'` — двигаем только конкретное вхождение: для серии
+ * это иначе означало бы диалог «сместить все последующие?» на каждую задачу.
+ * Неудачи не глотаем: allSettled, и сколько задач не доехало — видно на экране.
+ */
+async function handleRescheduleOverdue() {
+  const targets = buckets.value.overdue
+  if (targets.length === 0)
+    return
+
+  isRescheduling.value = true
+  rescheduleError.value = null
+  try {
+    const results = await Promise.allSettled(
+      targets.map(task => updateTask(
+        task.id,
+        {
+          dueDate: shiftToSameTimeToday(new Date(task.dueDate!), now.value),
+          rescheduleScope: 'this',
+        },
+        false,
+      )),
+    )
+
+    const failed = results.filter(r => r.status === 'rejected').length
+    if (failed > 0)
+      rescheduleError.value = `Не удалось перенести: ${formatTaskCount(failed)}`
+  }
+  finally {
+    isRescheduling.value = false
+  }
+}
 
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
   isCreatingTask.value = true
@@ -152,7 +191,7 @@ onMounted(() => {
       <div v-else class="space-y-6">
         <!-- Просрочено: секции нет вовсе, когда нечего показывать -->
         <section v-if="buckets.overdue.length > 0">
-          <div class="flex items-center gap-2 px-4 py-1.5 text-xs font-medium uppercase tracking-wide">
+          <div class="flex items-center justify-between gap-2 px-4 py-1.5 text-xs font-medium uppercase tracking-wide">
             <button
               class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               :aria-expanded="!overdueCollapsed"
@@ -166,7 +205,20 @@ onMounted(() => {
               <span>Просрочено</span>
               <span class="text-muted-foreground/60">{{ buckets.overdue.length }}</span>
             </button>
+            <Button
+              variant="link"
+              size="sm"
+              data-testid="reschedule-overdue"
+              class="h-auto p-0 text-xs font-medium uppercase tracking-wide"
+              :disabled="isRescheduling"
+              @click="handleRescheduleOverdue"
+            >
+              {{ isRescheduling ? 'Переносим...' : 'Перенести' }}
+            </Button>
           </div>
+          <p v-if="rescheduleError" class="px-4 pb-1.5 text-xs text-destructive">
+            {{ rescheduleError }}
+          </p>
           <div v-if="!overdueCollapsed" role="list" class="divide-y divide-border">
             <TaskCard
               v-for="task in buckets.overdue"
