@@ -49,9 +49,13 @@ const isCreatingTask = ref(false)
 // на вчерашней дате в открытой вкладке.
 const todayStart = computed(() => startOfDay(now.value))
 
-const todayLabel = computed(
-  () => `${formatDate(now.value, 'd MMM')} · Сегодня · ${formatDate(now.value, 'EEEE')}`,
-)
+// CSS-капитализация здесь не годится: `capitalize` поднимает каждое слово и
+// превращает «26 авг.» в «26 Авг.». Поднимаем только день недели — date-fns ru
+// отдаёт его строчным.
+const todayLabel = computed(() => {
+  const weekday = formatDate(now.value, 'EEEE')
+  return `${formatDate(now.value, 'd MMM')} · Сегодня · ${weekday[0]!.toUpperCase()}${weekday.slice(1)}`
+})
 
 function getProjectName(task: Task) {
   if (!task.projectId)
@@ -245,7 +249,7 @@ onMounted(() => {
                 class="transition-transform duration-150"
                 :class="!todayCollapsed && 'rotate-90'"
               />
-              <span class="capitalize">{{ todayLabel }}</span>
+              <span>{{ todayLabel }}</span>
               <span class="text-muted-foreground/60">{{ buckets.today.length }}</span>
             </button>
           </div>
