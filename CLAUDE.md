@@ -91,6 +91,8 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 
 **Эндпоинты, возвращающие `UpdateTaskResponse`.** `PATCH /tasks/:id` и `PATCH /tasks/:id/pomodoro` отдают не задачу, а обёртку `{ task, nextInstance?, deletedInstanceId? }` — из-за повторяющихся задач, где завершение порождает следующий инстанс. Потребители должны читать `body.task`, а не `body`. На фронте разбор один — `applyUpdateResponse` в `features/tasks/model/task-store.ts`.
 
+**`Task.isOverdue` — это «заморожена», а не «просрочена по дате».** Флаг ставит ночная джоба только повторяющимся задачам с `onMissed: 'freeze'`: инстанс помечается `isOverdue=true`, теряет `recurrence` и становится **иммутабельным** — `task.service.ts` кидает `BadRequestException` на любой PATCH, доступно только удаление. Обычная разовая задача со вчерашним `dueDate` имеет `isOverdue=false` и спокойно редактируется. Поэтому «просроченные» в UI-смысле — это `!completed && dueDate < начало сегодня`, и вычислять их через `isOverdue` нельзя. Единственный источник этого предиката на фронте — `features/tasks/lib/today.ts` (`splitTodayBuckets`), см. `docs/tasks/overdue-recurring-tasks.md`.
+
 # Frontend architecture (FSD-like)
 
 `alfy-bot-frontend/src/` устроен как feature-sliced:
@@ -109,7 +111,9 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 
 Авторизация: при старте `main.ts` пробует `authorize()` если есть `Telegram.WebApp.initData` или dev-флаг `VITE_DEV_TELEGRAM_ID`. Router guard в `router/index.ts` редиректит на `/login` любой не-public маршрут при отсутствии токена. Public-маршруты помечены `meta: { public: true }`.
 
-**Секционный блок сайдбара — один компонент на секцию.** `sectionExtraRegistry` в `components/AppLayout.vue` отображает `meta.sectionNav` в **ровно один** компонент (`tasks` → `TasksSidebarSection.vue`). Чтобы добавить в сайдбар ещё один блок, композиция делается внутри секционного компонента, а не расширением реестра до массива. `AppSidebar.vue` рендерит слот `section-extra` **дважды** — в десктопном `<aside>` и в мобильной панели внутри `<Teleport>`; оба живут в DOM одновременно, поэтому секционный компонент монтируется два раза, и всё, что он заводит (интервалы, подписки), существует в двух экземплярах.
+**Секционный блок сайдбара — один компонент на секцию.** `sectionExtraRegistry` в `components/AppLayout.vue` отображает `meta.sectionNav` в **ровно один** компонент (`tasks` → `TasksSidebarSection.vue`). Чтобы добавить в сайдбар ещё один блок, композиция делается внутри секционного компонента, а не расширением реестра до массива. `AppSidebar.vue` рендерит **и `SidebarNav`, и слот `section-extra` дважды** — в десктопном `<aside>` и в мобильной панели внутри `<Teleport>`; оба живут в DOM одновременно, поэтому эти компоненты монтируются по два раза, и всё, что они заводят (интервалы, подписки), существует в двух экземплярах.
+
+**Счётчик пункта сайдбара — тунк, а не число.** `NavLink.count` имеет тип `(now: Date) => number`, потому что массивы ссылок (`router/*-nav.ts`) собираются на уровне модуля, до подъёма Pinia: вызов `useTaskStore()` там упадёт. Стор трогаем только внутри тунка, который `SidebarNav` разворачивает уже в setup-контексте. `now` идёт аргументом, иначе счётчик застрянет на вчерашнем дне после полуночи. Регрессия — `tests/router/tasks-nav.spec.ts`.
 
 **`VITE_API_URL` задаётся вместе с префиксом `/api`.** `api/client.ts` подставляет переменную в `baseURL` как есть, а вызовы идут как `api.get('/tasks')` — значит для локального бэка нужно `http://localhost:3002/api`, иначе все запросы получают 404.
 
