@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Task } from '@/features/tasks/model/types'
+import { startOfDay } from 'date-fns'
 import { ChevronRight } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { computed, inject, onMounted, ref } from 'vue'
@@ -15,12 +16,13 @@ import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-hand
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 
 const openSidebar = inject<() => void>('openSidebar')
 
 const taskStore = useTaskStore()
 const { tasks, loading, error } = storeToRefs(taskStore)
-const { fetchTasks, toggleTask, deleteTask } = taskStore
+const { fetchTasks, createTask, toggleTask, deleteTask } = taskStore
 
 const projectStore = useProjectStore()
 const timerStore = useTimerStore()
@@ -35,6 +37,13 @@ const totalCount = computed(() => buckets.value.overdue.length + buckets.value.t
 
 const overdueCollapsed = ref(false)
 const todayCollapsed = ref(false)
+
+const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
+const isCreatingTask = ref(false)
+
+// Полночь у пользователя, пересчитывается вместе с `now` — форма не застревает
+// на вчерашней дате в открытой вкладке.
+const todayStart = computed(() => startOfDay(now.value))
 
 const todayLabel = computed(
   () => `${formatDate(now.value, 'd MMM')} · Сегодня · ${formatDate(now.value, 'EEEE')}`,
@@ -55,6 +64,20 @@ const {
   handleUpdatePomodoroConfig,
   handleDeleteFromDialog,
 } = useTaskDetailHandlers(taskStore, confirm)
+
+async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
+  isCreatingTask.value = true
+  try {
+    await createTask(taskData)
+    taskFormRef.value?.resetForm()
+  }
+  catch (err) {
+    console.error('Ошибка добавления задачи:', err)
+  }
+  finally {
+    isCreatingTask.value = false
+  }
+}
 
 async function handleToggleTask(taskId: string) {
   try {
@@ -121,65 +144,32 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-else-if="totalCount === 0" class="p-6 text-center text-muted-foreground">
-      На сегодня задач нет.
-    </div>
+    <template v-else>
+      <div v-if="totalCount === 0" class="px-4 py-6 text-center text-muted-foreground">
+        На сегодня задач нет.
+      </div>
 
-    <div v-else class="space-y-6">
-      <!-- Просрочено: секции нет вовсе, когда нечего показывать -->
-      <section v-if="buckets.overdue.length > 0">
-        <div class="flex items-center gap-2 px-4 py-1.5 text-xs font-medium uppercase tracking-wide">
-          <button
-            class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            :aria-expanded="!overdueCollapsed"
-            @click="overdueCollapsed = !overdueCollapsed"
-          >
-            <ChevronRight
-              :size="14"
-              class="transition-transform duration-150"
-              :class="!overdueCollapsed && 'rotate-90'"
-            />
-            <span>Просрочено</span>
-            <span class="text-muted-foreground/60">{{ buckets.overdue.length }}</span>
-          </button>
-        </div>
-        <div v-if="!overdueCollapsed" role="list" class="divide-y divide-border">
-          <TaskCard
-            v-for="task in buckets.overdue"
-            :key="task.id"
-            :task="task"
-            :project-name="getProjectName(task)"
-            @toggle="handleToggleTask"
-            @show-timer="handleShowTimer"
-            @delete="handleDeleteTask"
-            @open="handleOpenTask"
-          />
-        </div>
-      </section>
-
-      <section>
-        <div class="flex items-center gap-2 px-4 py-1.5 text-xs font-medium uppercase tracking-wide">
-          <button
-            class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            :aria-expanded="!todayCollapsed"
-            @click="todayCollapsed = !todayCollapsed"
-          >
-            <ChevronRight
-              :size="14"
-              class="transition-transform duration-150"
-              :class="!todayCollapsed && 'rotate-90'"
-            />
-            <span class="capitalize">{{ todayLabel }}</span>
-            <span class="text-muted-foreground/60">{{ buckets.today.length }}</span>
-          </button>
-        </div>
-        <div v-if="!todayCollapsed">
-          <div v-if="buckets.today.length === 0" class="px-4 py-3 text-sm text-muted-foreground/60">
-            На сегодня ничего не запланировано.
+      <div v-else class="space-y-6">
+        <!-- Просрочено: секции нет вовсе, когда нечего показывать -->
+        <section v-if="buckets.overdue.length > 0">
+          <div class="flex items-center gap-2 px-4 py-1.5 text-xs font-medium uppercase tracking-wide">
+            <button
+              class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              :aria-expanded="!overdueCollapsed"
+              @click="overdueCollapsed = !overdueCollapsed"
+            >
+              <ChevronRight
+                :size="14"
+                class="transition-transform duration-150"
+                :class="!overdueCollapsed && 'rotate-90'"
+              />
+              <span>Просрочено</span>
+              <span class="text-muted-foreground/60">{{ buckets.overdue.length }}</span>
+            </button>
           </div>
-          <div v-else role="list" class="divide-y divide-border">
+          <div v-if="!overdueCollapsed" role="list" class="divide-y divide-border">
             <TaskCard
-              v-for="task in buckets.today"
+              v-for="task in buckets.overdue"
               :key="task.id"
               :task="task"
               :project-name="getProjectName(task)"
@@ -189,9 +179,54 @@ onMounted(() => {
               @open="handleOpenTask"
             />
           </div>
-        </div>
-      </section>
-    </div>
+        </section>
+
+        <section>
+          <div class="flex items-center gap-2 px-4 py-1.5 text-xs font-medium uppercase tracking-wide">
+            <button
+              class="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              :aria-expanded="!todayCollapsed"
+              @click="todayCollapsed = !todayCollapsed"
+            >
+              <ChevronRight
+                :size="14"
+                class="transition-transform duration-150"
+                :class="!todayCollapsed && 'rotate-90'"
+              />
+              <span class="capitalize">{{ todayLabel }}</span>
+              <span class="text-muted-foreground/60">{{ buckets.today.length }}</span>
+            </button>
+          </div>
+          <div v-if="!todayCollapsed">
+            <div v-if="buckets.today.length === 0" class="px-4 py-3 text-sm text-muted-foreground/60">
+              На сегодня ничего не запланировано.
+            </div>
+            <div v-else role="list" class="divide-y divide-border">
+              <TaskCard
+                v-for="task in buckets.today"
+                :key="task.id"
+                :task="task"
+                :project-name="getProjectName(task)"
+                @toggle="handleToggleTask"
+                @show-timer="handleShowTimer"
+                @delete="handleDeleteTask"
+                @open="handleOpenTask"
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Новая задача попадает прямо в «Сегодня»: дата предзаполнена -->
+      <div class="mt-6">
+        <TaskForm
+          ref="taskFormRef"
+          :loading="isCreatingTask"
+          :default-due-date="todayStart"
+          @submit="handleAddTask as any"
+        />
+      </div>
+    </template>
   </PageContainer>
 
   <TaskDetailDialog
