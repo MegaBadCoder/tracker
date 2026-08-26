@@ -2,11 +2,25 @@
 import type { NavLink } from '@/types/navigation'
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { useNow } from '@/composables/useNow'
 import { useDropTarget } from '@/features/tasks/lib/dnd/use-drop-target'
 
 defineProps<{ links: NavLink[] }>()
 
 const route = useRoute()
+const now = useNow()
+
+/**
+ * Число для бейджа, или null — когда пункт счётчика не заводит либо считать
+ * нечего. Тунк зовётся здесь, в setup-контексте: на уровне модуля, где
+ * собираются ссылки, Pinia ещё не поднята.
+ */
+function linkCount(link: NavLink): number | null {
+  if (!link.count)
+    return null
+  const value = link.count(now.value)
+  return value > 0 ? value : null
+}
 
 function isLinkActive(to: string): boolean {
   const [path, queryStr] = to.split('?')
@@ -53,6 +67,12 @@ const { isHovered: isInboxHovered } = useDropTarget({
         class="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
       >
         {{ link.badge }}
+      </span>
+      <span
+        v-if="linkCount(link) !== null"
+        class="text-xs text-sidebar-foreground/50 tabular-nums"
+      >
+        {{ linkCount(link) }}
       </span>
     </RouterLink>
   </nav>
