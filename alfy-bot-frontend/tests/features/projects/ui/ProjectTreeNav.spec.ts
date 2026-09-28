@@ -28,8 +28,8 @@ describe('ProjectTreeNav', () => {
   it('рендерит корневые проекты', async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: [
-        { id: 'p1', parentId: null, title: 'Проект 1', description: null, viewMode: 'list', icon: null, color: null, order: 0 },
-        { id: 'p2', parentId: null, title: 'Проект 2', description: null, viewMode: 'list', icon: null, color: null, order: 1 },
+        { id: 'p1', parentId: null, title: 'Проект 1', description: null, viewMode: 'list', type: 'simple', icon: null, color: null, order: 0 },
+        { id: 'p2', parentId: null, title: 'Проект 2', description: null, viewMode: 'list', type: 'simple', icon: null, color: null, order: 1 },
       ],
     })
 
@@ -47,8 +47,8 @@ describe('ProjectTreeNav', () => {
   it('рендерит вложенные проекты с отступом', async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: [
-        { id: 'root', parentId: null, title: 'Корень', description: null, viewMode: 'list', icon: null, color: null, order: 0 },
-        { id: 'child', parentId: 'root', title: 'Дочерний', description: null, viewMode: 'list', icon: null, color: null, order: 0 },
+        { id: 'root', parentId: null, title: 'Корень', description: null, viewMode: 'list', type: 'simple', icon: null, color: null, order: 0 },
+        { id: 'child', parentId: 'root', title: 'Дочерний', description: null, viewMode: 'list', type: 'simple', icon: null, color: null, order: 0 },
       ],
     })
 

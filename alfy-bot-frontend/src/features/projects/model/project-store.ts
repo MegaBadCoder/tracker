@@ -37,6 +37,7 @@ export const useProjectStore = defineStore('projects', () => {
       title: payload.title,
       description: payload.description ?? null,
       viewMode: payload.viewMode ?? 'list',
+      type: payload.type ?? 'simple',
       icon: payload.icon ?? null,
       color: payload.color ?? null,
       order: projects.value.length,

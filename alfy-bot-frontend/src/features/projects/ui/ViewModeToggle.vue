@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ViewMode } from '../model/types'
-import { Columns3, LayoutList, Rows3 } from 'lucide-vue-next'
+import { Columns3, LayoutList } from 'lucide-vue-next'
 
 defineProps<{
   modelValue: ViewMode
@@ -32,16 +32,6 @@ defineEmits<{
       @click="modelValue !== 'board' && $emit('update:modelValue', 'board')"
     >
       <Columns3 :size="16" />
-    </button>
-    <button
-      class="p-1.5 rounded transition-colors cursor-pointer" :class="[
-        modelValue === 'agile' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
-      ]"
-      :aria-pressed="modelValue === 'agile'"
-      aria-label="Agile-доска"
-      @click="modelValue !== 'agile' && $emit('update:modelValue', 'agile')"
-    >
-      <Rows3 :size="16" />
     </button>
   </div>
 </template>

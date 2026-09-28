@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 
 describe('viewModeToggle', () => {
-  it('рендерит три кнопки', () => {
+  it('рендерит две кнопки', () => {
     const wrapper = mount(ViewModeToggle, {
       props: { modelValue: 'list' },
     })
-    expect(wrapper.findAll('button')).toHaveLength(3)
+    expect(wrapper.findAll('button')).toHaveLength(2)
   })
 
   it('подсвечивает активный режим', () => {

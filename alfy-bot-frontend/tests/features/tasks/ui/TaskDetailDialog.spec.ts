@@ -28,6 +28,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     title: 'Проект',
     description: null,
     viewMode: 'board',
+    type: 'simple',
     icon: null,
     color: null,
     order: 0,
@@ -82,9 +83,9 @@ describe('taskDetailDialog — блок целей и agile-проекты', () 
     expect(wrapper.findComponent(GoalPicker).exists()).toBe(true)
   })
 
-  it('скрывает GoalPicker, когда проект задачи в режиме agile', async () => {
+  it('скрывает GoalPicker, когда проект задачи имеет тип agile', async () => {
     const projectStore = useProjectStore()
-    projectStore.projects = [makeProject({ id: 'proj-agile', viewMode: 'agile' })]
+    projectStore.projects = [makeProject({ id: 'proj-agile', type: 'agile', viewMode: 'list' })]
 
     const wrapper = mount(TaskDetailDialog, {
       props: {
@@ -114,7 +115,7 @@ describe('taskDetailDialog — блок целей и agile-проекты', () 
   it('возвращает GoalPicker при переключении проекта обратно в board', async () => {
     const projectStore = useProjectStore()
     projectStore.projects = [
-      makeProject({ id: 'proj-agile', viewMode: 'agile' }),
+      makeProject({ id: 'proj-agile', type: 'agile', viewMode: 'list' }),
       makeProject({ id: 'proj-board', viewMode: 'board' }),
     ]
 

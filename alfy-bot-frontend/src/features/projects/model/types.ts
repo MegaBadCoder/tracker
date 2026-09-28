@@ -1,4 +1,6 @@
-export type ViewMode = 'list' | 'board' | 'agile'
+export type ViewMode = 'list' | 'board'
+
+export type ProjectType = 'simple' | 'agile'
 
 export interface Project {
   id: string
@@ -6,6 +8,7 @@ export interface Project {
   title: string
   description: string | null
   viewMode: ViewMode
+  type: ProjectType
   icon: string | null
   color: string | null
   order: number
@@ -60,6 +63,7 @@ export interface CreateProjectPayload {
   parentId?: string | null
   description?: string | null
   viewMode?: ViewMode
+  type?: ProjectType
   icon?: string | null
   color?: string | null
 }

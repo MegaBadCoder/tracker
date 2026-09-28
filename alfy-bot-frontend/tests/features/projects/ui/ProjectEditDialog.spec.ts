@@ -34,6 +34,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     title: 'Проект',
     description: null,
     viewMode: 'list',
+    type: 'simple',
     icon: null,
     color: null,
     order: 0,

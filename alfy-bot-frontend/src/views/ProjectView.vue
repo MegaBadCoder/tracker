@@ -31,7 +31,7 @@ const projectId = computed(() => route.params.projectId as string)
 const projectStore = useProjectStore()
 const project = computed(() => projectStore.projectMap.get(projectId.value))
 const isBoardMode = computed(() => project.value?.viewMode === 'board')
-const isAgileMode = computed(() => project.value?.viewMode === 'agile')
+const isAgileProject = computed(() => project.value?.type === 'agile')
 
 const showCompleted = useShowCompleted(projectId)
 const hideOverdue = useHideOverdue(projectId)
@@ -99,7 +99,7 @@ const { insertionIndex } = useReorderList({
 })
 
 async function handleViewModeChange(mode: string) {
-  await projectStore.updateProject(projectId.value, { viewMode: mode as 'list' | 'board' | 'agile' })
+  await projectStore.updateProject(projectId.value, { viewMode: mode as 'list' | 'board' })
 }
 
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
@@ -158,11 +158,11 @@ watch(projectId, (id) => {
 </script>
 
 <template>
-  <div class="flex flex-col" :class="[(isBoardMode || isAgileMode) && 'h-[100dvh]']">
-    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" :fluid="isBoardMode || isAgileMode">
+  <div class="flex flex-col" :class="[(isBoardMode || isAgileProject) && 'h-[100dvh]']">
+    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" :fluid="isBoardMode || isAgileProject">
       <template #right>
         <ViewModeToggle
-          v-if="project"
+          v-if="project && !isAgileProject"
           :model-value="project.viewMode"
           @update:model-value="handleViewModeChange"
         />
@@ -170,38 +170,8 @@ watch(projectId, (id) => {
       </template>
     </AppHeader>
 
-    <!-- Board view — full page -->
-    <template v-if="isBoardMode">
-      <div class="px-4 py-3">
-        <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
-      </div>
-
-      <div v-if="loading" class="text-center py-8">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-        <p class="mt-2 text-muted-foreground">
-          Загрузка задач...
-        </p>
-      </div>
-
-      <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4">
-        <p class="text-destructive">
-          {{ error }}
-        </p>
-      </div>
-
-      <main v-else class="flex-1 min-h-0 px-4 pb-4">
-        <BoardView
-          :project-id="projectId"
-          :show-completed="showCompleted"
-          :hide-overdue="hideOverdue"
-          @toggle-task="handleToggleTask"
-          @open-task="handleOpenTask"
-        />
-      </main>
-    </template>
-
     <!-- Agile view — full page -->
-    <template v-else-if="isAgileMode">
+    <template v-if="isAgileProject">
       <div class="px-4 py-3">
         <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
       </div>
@@ -230,6 +200,36 @@ watch(projectId, (id) => {
           />
         </div>
         <AgileBacklogPanel
+          :project-id="projectId"
+          :show-completed="showCompleted"
+          :hide-overdue="hideOverdue"
+          @toggle-task="handleToggleTask"
+          @open-task="handleOpenTask"
+        />
+      </main>
+    </template>
+
+    <!-- Board view — full page -->
+    <template v-else-if="isBoardMode">
+      <div class="px-4 py-3">
+        <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+      </div>
+
+      <div v-if="loading" class="text-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+        <p class="mt-2 text-muted-foreground">
+          Загрузка задач...
+        </p>
+      </div>
+
+      <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4">
+        <p class="text-destructive">
+          {{ error }}
+        </p>
+      </div>
+
+      <main v-else class="flex-1 min-h-0 px-4 pb-4">
+        <BoardView
           :project-id="projectId"
           :show-completed="showCompleted"
           :hide-overdue="hideOverdue"

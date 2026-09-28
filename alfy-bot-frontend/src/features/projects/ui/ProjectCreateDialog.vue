@@ -36,6 +36,23 @@
           />
         </div>
 
+        <div class="space-y-2">
+          <label class="text-sm font-medium">Тип проекта</label>
+          <Tabs :model-value="type" @update:model-value="type = $event as ProjectType">
+            <TabsList class="w-full">
+              <TabsTrigger value="simple" class="flex-1">
+                Обычный
+              </TabsTrigger>
+              <TabsTrigger value="agile" class="flex-1">
+                Agile
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <p class="text-xs text-muted-foreground">
+            Тип нельзя изменить после создания проекта.
+          </p>
+        </div>
+
         <div class="flex justify-end gap-2 pt-2">
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
@@ -54,10 +71,12 @@ import { ref, watch } from 'vue'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useProjectStore } from '../model/project-store'
 import ProjectPicker from './ProjectPicker.vue'
 import IconPicker from './IconPicker.vue'
 import ColorPicker from './ColorPicker.vue'
+import type { ProjectType } from '../model/types'
 
 const props = defineProps<{
   open: boolean
@@ -73,6 +92,7 @@ const description = ref('')
 const icon = ref<string | null>(null)
 const color = ref<string | null>(null)
 const localParentId = ref<string | null>(null)
+const type = ref<ProjectType>('simple')
 
 const store = useProjectStore()
 
@@ -83,6 +103,7 @@ watch(() => props.open, (val) => {
     icon.value = null
     color.value = null
     localParentId.value = props.parentId ?? null
+    type.value = 'simple'
   }
 })
 
@@ -96,6 +117,7 @@ async function handleSubmit() {
       parentId: localParentId.value,
       icon: icon.value,
       color: color.value,
+      type: type.value,
     })
     emit('update:open', false)
   } catch (err) {

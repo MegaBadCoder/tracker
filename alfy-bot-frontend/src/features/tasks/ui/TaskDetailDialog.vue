@@ -726,7 +726,7 @@ const projectTitle = computed(() =>
 // display-only toggle: existing goalIds are never touched here.
 const isAgileProject = computed(() =>
   localProjectId.value
-    ? projectStore.projectMap.get(localProjectId.value)?.viewMode === 'agile'
+    ? projectStore.projectMap.get(localProjectId.value)?.type === 'agile'
     : false,
 )
 
