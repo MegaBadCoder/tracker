@@ -1,6 +1,6 @@
 # Agile как тип проекта, а не режим отображения
 
-**Status:** executing
+**Status:** done
 **Branch:** feat/agile-board
 **Worktree:** .worktrees/feat-agile-board
 **Mode:** interactive
@@ -201,7 +201,23 @@ Notes:
 - Drop в сайдбаре руками не проверен: встроенный браузер не даёт кастомному DnD-движку промежуточных `pointermove`, контрольный разрешённый перенос тоже не срабатывает. Сейчас agile-карточки отдают жест vuedraggable (`dnd-source=false`), так что до сайдбара agile-задачу в UI не дотащить; запрет фазы 5 держат `drop-rules.spec.ts`, `use-task-dnd.spec.ts`, `ProjectTreeItem.spec.ts`.
 
 ## Conclusion
-<empty — filled by up:ureview>
+
+Outcome: agile стал неизменяемым типом проекта (`Project.type`), и сервер не выпускает задачи из agile-проекта никуда, кроме другого agile-проекта; HEAD `216b369`.
+
+Invariants:
+- Тип задаётся при создании и не меняется — `type` нет в `UpdateProjectDto`, `PATCH {type}` в smoke вернул прежний `simple`.
+- `viewMode` только `'list' | 'board'` и не участвует в правилах — сужен в сущности и фронтовом типе, grep `viewMode === 'agile'` по `src` пуст.
+- Задача не покидает agile-проект иначе как в agile — unit и e2e на все три серверных пути, smoke через живой API: 400 в каждом.
+- Задача попадает в agile из обычного проекта и из Входящих — smoke 200.
+- Колонки в agile разрешены всегда — спек `project-column.service` и smoke (agile + list → 201).
+- «Это agile» читается из `type` — grep плюс `ProjectView.spec.ts` (agile с `viewMode: 'board'` рисует agile-доску).
+- Мигрированные проекты: `type = 'agile'`, `viewMode` не тронут — спек миграции на реальном SQLite, проект «Alfy 2.0» в dev-базе.
+- Запрет на сервере во всех путях — включая sidebar-форму `moveTask`, где в URL проект назначения.
+
+Review findings:
+- Important: английский доккомментарий-история в `project-type-migration.service.ts` переписан по-русски как контракт (`216b369`).
+
+Verified by: drop в сайдбаре руками не проверен — встроенный браузер не управляет кастомным DnD-движком (см. Verify → Notes). Стоит один раз проверить вручную: задача из Входящих бросается на agile-проект и переезжает.
 
 ### Deviations from plan
 
