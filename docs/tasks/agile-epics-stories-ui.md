@@ -1,6 +1,6 @@
 # Эпики и истории: управление в интерфейсе
 
-**Status:** design
+**Status:** executing
 **Branch:** feat/agile-board
 **Worktree:** .worktrees/feat-agile-board
 **Mode:** interactive
