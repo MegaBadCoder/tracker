@@ -103,6 +103,7 @@ const isActive = computed(() => route.params.projectId === props.node.id)
         :to="`/tasks/project/${node.id}`"
         data-drop-kind="project"
         :data-project-id="node.id"
+        :data-project-type="node.type"
         class="flex items-center gap-3 px-3 py-2 pr-8 rounded-md text-sm font-medium transition-colors"
         :style="{ paddingLeft: `${12 + depth * 16}px` }"
         :class="[
