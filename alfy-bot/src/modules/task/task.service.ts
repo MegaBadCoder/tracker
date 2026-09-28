@@ -25,6 +25,7 @@ import {
 } from './domain/recurrence.utils';
 import { hasCrossedPomodoroTarget } from './domain/pomodoro.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
+import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
@@ -55,6 +56,7 @@ export class TaskService {
     private readonly taskRepo: TaskRepositoryPort,
     private readonly userSettings: UserSettingsPort,
     private readonly linkPort: TaskLinkPort,
+    private readonly projectTypeQuery: ProjectTypeQueryPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
@@ -220,6 +222,22 @@ export class TaskService {
     // longer matches the task's projectId.
     const isChangingProject =
       dto.projectId !== undefined && dto.projectId !== task.projectId;
+
+    if (isChangingProject && task.projectId) {
+      const sourceProjectType = await this.projectTypeQuery.getType(
+        task.projectId,
+      );
+      if (sourceProjectType === 'agile') {
+        const targetProjectType = dto.projectId
+          ? await this.projectTypeQuery.getType(dto.projectId)
+          : null;
+        if (targetProjectType !== 'agile') {
+          throw new BadRequestException(
+            'Cannot move a task out of an agile project',
+          );
+        }
+      }
+    }
 
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
@@ -571,6 +589,15 @@ export class TaskService {
   ): Promise<Task> {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
+
+    if (task.projectId) {
+      const projectType = await this.projectTypeQuery.getType(task.projectId);
+      if (projectType === 'agile') {
+        throw new BadRequestException(
+          'Cannot move a task from an agile project to the inbox',
+        );
+      }
+    }
 
     let order: number;
     if (dto.order !== undefined) {

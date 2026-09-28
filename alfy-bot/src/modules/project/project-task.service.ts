@@ -70,20 +70,20 @@ export class ProjectTaskService {
     }
 
     // Validate target project if moving to a different project
+    let targetProject = currentProject;
     if (targetProjectId && targetProjectId !== currentProjectId) {
-      const targetProject = await this.projectRepo.findById(
-        targetProjectId,
-        userId,
-      );
-      if (!targetProject)
+      const found = await this.projectRepo.findById(targetProjectId, userId);
+      if (!found)
         throw new NotFoundException(
           `Target project #${targetProjectId} not found`,
         );
-      if (targetProject.userId !== userId)
+      if (found.userId !== userId)
         throw new ForbiddenException('Target project belongs to another user');
+      targetProject = found;
+    }
 
+    if (targetColumnId && targetProjectId) {
       if (
-        targetColumnId &&
         targetProject.type === 'simple' &&
         targetProject.viewMode === 'list'
       ) {
@@ -91,13 +91,26 @@ export class ProjectTaskService {
           'Cannot assign column in a list-mode project',
         );
       }
-    } else if (targetProjectId && targetColumnId) {
+    }
+
+    // Drop в сайдбаре кладёт в URL проект назначения,
+    // поэтому источник переноса — task.projectId.
+    if (!keepsProject && task.projectId) {
+      const originProject =
+        task.projectId === currentProjectId
+          ? currentProject
+          : task.projectId === targetProjectId
+            ? targetProject
+            : await this.projectRepo.findById(task.projectId, userId);
+
       if (
-        currentProject.type === 'simple' &&
-        currentProject.viewMode === 'list'
+        originProject?.type === 'agile' &&
+        (!targetProjectId || targetProject.type !== 'agile')
       ) {
         throw new BadRequestException(
-          'Cannot assign column in a list-mode project',
+          targetProjectId
+            ? 'Cannot move a task out of an agile project'
+            : 'Cannot move a task from an agile project to the inbox',
         );
       }
     }

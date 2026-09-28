@@ -529,6 +529,115 @@ describe('ProjectTaskService — move & reorder', () => {
         0,
       );
     });
+
+    // Запрет действует независимо от того, что стоит в URL: перетаскивание
+    // задачи из сайдбара шлёт целевой проект как :projectId в URL и совсем
+    // не передаёт dto.projectId — «текущим» с точки зрения этого эндпоинта
+    // становится проект назначения, а не тот, где задача реально лежит.
+    describe('запрет переноса из agile-проекта', () => {
+      it('бросает BadRequestException при переносе из agile в обычный проект', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'proj-1'
+              ? makeProject({ id: 'proj-1', type: 'agile' })
+              : makeProject({ id, type: 'simple' }),
+          ),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: 'proj-2',
+            order: 0,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(taskRepo.updatePosition).not.toHaveBeenCalled();
+      });
+
+      it('бросает BadRequestException при переносе из agile-проекта во Входящие', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockResolvedValue(
+          makeProject({ id: 'proj-1', type: 'agile' }),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: null,
+            order: 0,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(taskRepo.updatePosition).not.toHaveBeenCalled();
+      });
+
+      it('разрешает перенос из agile-проекта в другой agile-проект', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(makeProject({ id, type: 'agile' })),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: 'proj-2',
+            order: 0,
+          }),
+        ).resolves.toBeDefined();
+      });
+
+      it('разрешает перенос из обычного проекта в agile-проект', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'proj-1'
+              ? makeProject({ id: 'proj-1', type: 'simple' })
+              : makeProject({ id, type: 'agile' }),
+          ),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: 'proj-2',
+            order: 0,
+          }),
+        ).resolves.toBeDefined();
+      });
+
+      it('блокирует перенос из agile, даже когда :projectId в URL — это целевой проект (drop в сайдбаре)', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-agile' }),
+        );
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'proj-agile'
+              ? makeProject({ id: 'proj-agile', type: 'agile' })
+              : makeProject({ id, type: 'simple' }),
+          ),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-target', 'task-1', {
+            columnId: null,
+            order: 5,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(taskRepo.updatePosition).not.toHaveBeenCalled();
+      });
+
+      it('разрешает такой же drop в сайдбаре, если целевой проект тоже agile', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-agile' }),
+        );
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(makeProject({ id, type: 'agile' })),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-target', 'task-1', {
+            columnId: null,
+            order: 5,
+          }),
+        ).resolves.toBeDefined();
+      });
+    });
   });
 
   // ── reorderTasks ────────────────────────────────────────────────

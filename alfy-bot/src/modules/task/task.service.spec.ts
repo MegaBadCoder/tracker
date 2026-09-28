@@ -4,6 +4,7 @@ import { TaskService } from './task.service';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { TaskLinkPort } from './domain/task-link.port';
 import { UserSettingsPort } from './domain/user-settings.port';
+import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -57,6 +58,7 @@ describe('TaskService', () => {
   let service: TaskService;
   let repo: Record<string, jest.Mock>;
   let linkPort: Record<string, jest.Mock>;
+  let projectTypeQuery: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -110,12 +112,17 @@ describe('TaskService', () => {
       getTimezone: jest.fn().mockResolvedValue('UTC'),
     };
 
+    projectTypeQuery = {
+      getType: jest.fn().mockResolvedValue('simple'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
         { provide: TaskRepositoryPort, useValue: repo },
         { provide: TaskLinkPort, useValue: linkPort },
         { provide: UserSettingsPort, useValue: userSettings },
+        { provide: ProjectTypeQueryPort, useValue: projectTypeQuery },
       ],
     }).compile();
 
@@ -284,6 +291,64 @@ describe('TaskService', () => {
       );
       expect(result.task.groupId).toBeNull();
     });
+
+    it('бросает BadRequestException при переносе задачи из agile-проекта в обычный', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockImplementation((id: string) =>
+        Promise.resolve(id === 'proj-agile' ? 'agile' : 'simple'),
+      );
+
+      await expect(
+        service.update(1, 'task-1', { projectId: 'proj-simple' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при переносе задачи из agile-проекта в null (Входящие)', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      await expect(
+        service.update(1, 'task-1', { projectId: null }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('разрешает перенос задачи из agile-проекта в другой agile-проект', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile-1' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-agile-2',
+      });
+
+      expect(result.task.projectId).toBe('proj-agile-2');
+    });
+
+    it('разрешает перенос задачи из обычного проекта в agile-проект', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-simple' }));
+      projectTypeQuery.getType.mockImplementation((id: string) =>
+        Promise.resolve(id === 'proj-agile' ? 'agile' : 'simple'),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-agile',
+      });
+
+      expect(result.task.projectId).toBe('proj-agile');
+    });
+
+    it('не проверяет тип проекта, если projectId не меняется', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      const result = await service.update(1, 'task-1', {
+        title: 'Новое название',
+      });
+
+      expect(projectTypeQuery.getType).not.toHaveBeenCalled();
+      expect(result.task.title).toBe('Новое название');
+    });
   });
 
   describe('moveToInbox', () => {
@@ -308,6 +373,25 @@ describe('TaskService', () => {
           groupId: null,
         }),
       );
+    });
+
+    it('бросает BadRequestException при переносе задачи из agile-проекта', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      await expect(
+        service.moveToInbox(1, 'task-1', { order: 0 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('разрешает перенос во Входящие из обычного проекта', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-simple' }));
+      projectTypeQuery.getType.mockResolvedValue('simple');
+
+      const result = await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(result.projectId).toBeNull();
     });
   });
 

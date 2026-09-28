@@ -7,6 +7,7 @@ import {
   User,
   Link,
   Goal,
+  Project,
 } from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
 import { UserModule } from '../user/user.module';
@@ -21,6 +22,8 @@ import { TypeOrmTaskRepository } from './infrastructure/typeorm-task.repository'
 import { TypeOrmTaskLinkRepository } from './infrastructure/typeorm-task-link.repository';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { TypeOrmUserSettingsAdapter } from './infrastructure/typeorm-user-settings.adapter';
+import { ProjectTypeQueryPort } from './domain/project-type.port';
+import { TypeOrmProjectTypeAdapter } from './infrastructure/typeorm-project-type.adapter';
 import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-session.repository';
 import { TelegramNotificationAdapter } from './infrastructure/telegram-notification.adapter';
 import { TelegramUserLookupAdapter } from './infrastructure/telegram-user-lookup.adapter';
@@ -51,6 +54,7 @@ const notificationProviders = isTelegramEnabled()
       User,
       Link,
       Goal,
+      Project,
     ]),
     AuthModule,
     UserModule,
@@ -66,6 +70,7 @@ const notificationProviders = isTelegramEnabled()
       useClass: TypeOrmTimerSessionRepository,
     },
     { provide: UserSettingsPort, useClass: TypeOrmUserSettingsAdapter },
+    { provide: ProjectTypeQueryPort, useClass: TypeOrmProjectTypeAdapter },
     ...notificationProviders,
     {
       provide: TelegramUserLookupPort,

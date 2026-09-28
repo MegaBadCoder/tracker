@@ -266,15 +266,43 @@ describe('Board groups (e2e)', () => {
       }
     });
 
-    it('перенос во Входящие обнуляет группу без 500', async () => {
-      const { body } = await request(app.getHttpServer())
+    it('перенос agile-задачи во Входящие отклоняется с 400', async () => {
+      await request(app.getHttpServer())
         .patch(`/api/tasks/${taskId}/move-to-inbox`)
         .set('Authorization', auth())
         .send({})
-        .expect(200);
+        .expect(400);
+    });
 
-      expect(body.projectId).toBeNull();
-      expect(body.groupId).toBeNull();
+    it('PATCH /api/tasks/:id со сменой projectId из agile в обычный проект отклоняется с 400', async () => {
+      const { body: simpleProject } = await request(app.getHttpServer())
+        .post('/api/projects')
+        .set('Authorization', auth())
+        .send({ title: 'Simple e2e (update)' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}`)
+        .set('Authorization', auth())
+        .send({ projectId: simpleProject.id })
+        .expect(400);
+    });
+
+    // Drop в сайдбаре шлёт целевой проект как :projectId в URL и не
+    // передаёт dto.projectId вовсе — источник задачи (agile) при этом не
+    // совпадает с URL, и именно этот путь легче всего пропустить.
+    it('move на другой проект через URL целевого проекта (drop в сайдбаре) отклоняется с 400', async () => {
+      const { body: simpleProject } = await request(app.getHttpServer())
+        .post('/api/projects')
+        .set('Authorization', auth())
+        .send({ title: 'Simple e2e (sidebar drop)' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/projects/${simpleProject.id}/tasks/${taskId}/move`)
+        .set('Authorization', auth())
+        .send({ columnId: null, order: 0 })
+        .expect(400);
     });
   });
 });
