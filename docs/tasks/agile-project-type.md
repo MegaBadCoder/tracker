@@ -171,7 +171,34 @@ TDD (тесты первыми) — фазы 1-3:
 - **Совместимость.** Сужение `viewMode` закрывается фазой 1 (DTO) и миграцией; сломанные гварды — фазой 2. `alfy-mcp` уже объявляет `'list' | 'board'`, сужение его не задевает; создание agile-проекта через MCP останется недоступным — отложено вместе с работами по доступам.
 
 ## Verify
-<empty — filled by up:uverify>
+
+**Result:** passed
+
+Positive:
+- `POST /projects {type:'agile'}` → 201, `type: agile`, колонки «К выполнению / В работе / Готово»
+- `POST /projects` без `type` → `simple`, колонок нет
+- колонка в agile-проекте с `viewMode: 'list'` → 201
+- перенос agile → agile (`PATCH /tasks/:id` и sidebar-форма `/projects/:dest/tasks/:id/move`), simple → agile, Входящие → agile → 200
+- существующий «Alfy 2.0» после миграции: `type: agile`, `viewMode: agile` сохранён
+- UI: диалог «Новый проект» с выбором Обычный / Agile; созданный через UI agile-проект открывает agile-доску без переключателя видов; у обычного проекта переключатель из двух кнопок
+
+Negative:
+- `PATCH /tasks/:id` agile → simple и agile → `null` → 400 «Cannot move a task out of an agile project»
+- `PATCH /tasks/:id/move-to-inbox` из agile → 400
+- sidebar-форма `/projects/<simple>/tasks/<agile-task>/move` → 400
+- колонка в simple + list → 400
+- `PATCH /projects/:id {type:'agile'}` → 200, `type` остался `simple`
+
+Invariants:
+- `viewMode === 'agile'` нигде в `src` бэка и фронта не читается
+- `type` отсутствует в `UpdateProjectDto`; `viewMode` — `'list' | 'board'` в сущности и во фронтовом типе
+- серверный запрет стоит во всех путях: `update`, `moveToInbox`, `moveTask` (включая sidebar-форму)
+
+Smoke: бэк на :3102 + фронт на :5173, чеклист выше прогнан через живой API и браузер; тестовые проекты удалены. Наборы: бэк 470 unit + 47 e2e, фронт 475, `vue-tsc` и `tsc` чистые.
+
+Notes:
+- `tsc` по бэку нашёл ошибку в спеке фазы 3: `projectId: null` не влезал в тип DTO, хотя `@IsOptional()` пропускает `null` по HTTP. Тип расширен до `string | null` (`73fb457`).
+- Drop в сайдбаре руками не проверен: встроенный браузер не даёт кастомному DnD-движку промежуточных `pointermove`, контрольный разрешённый перенос тоже не срабатывает. Сейчас agile-карточки отдают жест vuedraggable (`dnd-source=false`), так что до сайдбара agile-задачу в UI не дотащить; запрет фазы 5 держат `drop-rules.spec.ts`, `use-task-dnd.spec.ts`, `ProjectTreeItem.spec.ts`.
 
 ## Conclusion
 <empty — filled by up:ureview>
