@@ -164,7 +164,9 @@ describe('TypeOrmGoalRepository (in-memory sqlite)', () => {
 
     // regular goal (child2) has no children_count set
     const regulars = await repo.findAllByUser(USER_A, 'regular');
-    expect(regulars.find((g) => g.id === child2.id)?.children_count).toBeUndefined();
+    expect(
+      regulars.find((g) => g.id === child2.id)?.children_count,
+    ).toBeUndefined();
   });
 
   it('findAllByUser sets children_count = 0 for childless global goal', async () => {

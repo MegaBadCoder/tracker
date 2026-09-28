@@ -944,9 +944,7 @@ describe('TaskService', () => {
         completed: true,
         recurringCompletedCount: 1,
       });
-      repo.findById
-        .mockResolvedValueOnce(task)
-        .mockResolvedValueOnce(root);
+      repo.findById.mockResolvedValueOnce(task).mockResolvedValueOnce(root);
       repo.findByParentId.mockResolvedValue([task]);
 
       await service.update(1, 'inst-1', { completed: true });
@@ -1403,8 +1401,8 @@ describe('TaskService', () => {
       const result = await service.getAll(1);
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.goalIds).toEqual([1, 2, 3]);
-      expect(result[1]!.goalIds).toEqual([]);
+      expect(result[0].goalIds).toEqual([1, 2, 3]);
+      expect(result[1].goalIds).toEqual([]);
       expect(linkPort.findGoalIdsByTaskIds).toHaveBeenCalledWith(1, ['a', 'b']);
     });
 
@@ -1414,9 +1412,11 @@ describe('TaskService', () => {
       const result = await service.replaceGoalLinks(1, 'task-1', [2, 1, 2]);
 
       expect(linkPort.filterOwnedGoalIds).toHaveBeenCalledWith(1, [2, 1]);
-      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, 'task-1', [
-        2, 1,
-      ]);
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(
+        1,
+        'task-1',
+        [2, 1],
+      );
       expect(result).toEqual({ goalIds: [2, 1] });
     });
 
@@ -1454,9 +1454,11 @@ describe('TaskService', () => {
 
       const arg = repo.create.mock.calls[0][0] as Partial<Task>;
       expect(arg).not.toHaveProperty('goalIds');
-      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, created.id, [
-        7,
-      ]);
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(
+        1,
+        created.id,
+        [7],
+      );
     });
 
     it('create с чужой целью не создаёт задачу', async () => {

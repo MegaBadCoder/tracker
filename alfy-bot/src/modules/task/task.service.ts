@@ -158,12 +158,7 @@ export class TaskService {
     const completedCount = rootTask?.recurringCompletedCount ?? 0;
 
     if (
-      !isOccurrenceOnSeries(
-        originZoned,
-        rule,
-        occurrenceZoned,
-        completedCount,
-      )
+      !isOccurrenceOnSeries(originZoned, rule, occurrenceZoned, completedCount)
     ) {
       throw new BadRequestException(
         'occurrenceDate is not on the series schedule.',
@@ -351,8 +346,7 @@ export class TaskService {
       );
       const nextDate = nextZoned ? shiftBackToUtc(nextZoned, timezone) : null;
       const occupying =
-        nextZoned &&
-        this.findOccupyingMember(siblings, nextZoned, timezone);
+        nextZoned && this.findOccupyingMember(siblings, nextZoned, timezone);
 
       if (occupying) {
         nextInstance = occupying;
@@ -544,8 +538,7 @@ export class TaskService {
       await this.taskRepo.clearParentId(parentId);
     }
 
-    const alreadyDeleted =
-      Boolean(task.recurringParentId) && !task.completed;
+    const alreadyDeleted = Boolean(task.recurringParentId) && !task.completed;
     if (!alreadyDeleted) {
       const deleted = await this.taskRepo.delete(task.id, userId);
       if (!deleted) throw new NotFoundException(`Task #${task.id} not found`);
