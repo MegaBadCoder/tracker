@@ -82,14 +82,20 @@ export class ProjectTaskService {
       if (targetProject.userId !== userId)
         throw new ForbiddenException('Target project belongs to another user');
 
-      if (targetColumnId && targetProject.viewMode === 'list') {
+      if (
+        targetColumnId &&
+        targetProject.type === 'simple' &&
+        targetProject.viewMode === 'list'
+      ) {
         throw new BadRequestException(
           'Cannot assign column in a list-mode project',
         );
       }
     } else if (targetProjectId && targetColumnId) {
-      // Same project — validate viewMode
-      if (currentProject.viewMode === 'list') {
+      if (
+        currentProject.type === 'simple' &&
+        currentProject.viewMode === 'list'
+      ) {
         throw new BadRequestException(
           'Cannot assign column in a list-mode project',
         );

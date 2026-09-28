@@ -34,6 +34,18 @@ describe('Board groups (e2e)', () => {
       expect(project.type).toBe('agile');
       expect(project.viewMode).toBe('board');
       projectId = project.id;
+
+      const { body: columns } = await request(app.getHttpServer())
+        .get(`/api/projects/${projectId}/columns`)
+        .set('Authorization', auth())
+        .expect(200);
+
+      expect(columns).toHaveLength(3);
+      expect(columns.map((c: { title: string }) => c.title)).toEqual([
+        'К выполнению',
+        'В работе',
+        'Готово',
+      ]);
     });
 
     it('PATCH молча отбрасывает type — тип проекта не меняется существующим эндпоинтом', async () => {

@@ -10,6 +10,8 @@ import { ProjectColumnRepositoryPort } from './domain/project-column-repository.
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+const AGILE_DEFAULT_COLUMNS = ['К выполнению', 'В работе', 'Готово'];
+
 @Injectable()
 export class ProjectService {
   constructor(
@@ -49,7 +51,17 @@ export class ProjectService {
       color: dto.color,
     });
 
+    if (created.type === 'agile') {
+      await this.seedAgileColumns(created.id);
+    }
+
     return created;
+  }
+
+  private async seedAgileColumns(projectId: string): Promise<void> {
+    for (const [order, title] of AGILE_DEFAULT_COLUMNS.entries()) {
+      await this.columnRepo.create({ projectId, title, order });
+    }
   }
 
   async update(

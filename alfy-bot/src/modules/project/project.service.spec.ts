@@ -217,6 +217,30 @@ describe('ProjectService', () => {
       expect(columnRepo.create).not.toHaveBeenCalled();
     });
 
+    it('создание agile-проекта засевает три колонки', async () => {
+      const result = await service.create(1, {
+        title: 'Спринт',
+        type: 'agile',
+      });
+
+      expect(columnRepo.create).toHaveBeenCalledTimes(3);
+      expect(columnRepo.create).toHaveBeenNthCalledWith(1, {
+        projectId: result.id,
+        title: 'К выполнению',
+        order: 0,
+      });
+      expect(columnRepo.create).toHaveBeenNthCalledWith(2, {
+        projectId: result.id,
+        title: 'В работе',
+        order: 1,
+      });
+      expect(columnRepo.create).toHaveBeenNthCalledWith(3, {
+        projectId: result.id,
+        title: 'Готово',
+        order: 2,
+      });
+    });
+
     it('бросает ForbiddenException если parentId указывает на проект другого пользователя', async () => {
       repo.findById.mockResolvedValue(makeProject({ userId: 999 }));
 

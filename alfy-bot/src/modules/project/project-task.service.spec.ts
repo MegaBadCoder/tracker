@@ -25,6 +25,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     title: 'Проект',
     description: null,
     viewMode: 'board' as const,
+    type: 'simple' as const,
     icon: null,
     color: null,
     order: 0,
@@ -366,6 +367,46 @@ describe('ProjectTaskService — move & reorder', () => {
           order: 0,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('позволяет назначить columnId в agile-проекте текущего с viewMode=list', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', viewMode: 'list' }),
+      );
+      colRepo.findById.mockResolvedValue(makeColumn());
+
+      await expect(
+        service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          order: 0,
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('позволяет назначить columnId при переезде в agile-проект с viewMode=list', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'proj-1'
+            ? makeProject()
+            : makeProject({
+                id: 'proj-2',
+                type: 'agile',
+                viewMode: 'list',
+              }),
+        ),
+      );
+      colRepo.findById.mockResolvedValue(makeColumn({ projectId: 'proj-2' }));
+
+      await expect(
+        service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-2',
+          columnId: 'col-1',
+          order: 0,
+        }),
+      ).resolves.toBeDefined();
     });
 
     it('бросает BadRequestException если order отрицательный', async () => {
