@@ -2,16 +2,12 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 /**
- * `Project.type` was introduced to separate "what kind of project this is"
- * (a domain property, set at creation) from `viewMode` (a display setting).
- * Existing projects created before this split have their agile-ness encoded
- * only in `viewMode = 'agile'` (a value the narrowed `viewMode` union no
- * longer accepts going forward). This service copies that signal into the
- * new `type` column on every bootstrap, idempotently.
+ * При каждом старте приложения проставляет `type = 'agile'` проектам
+ * с устаревшим `viewMode = 'agile'`. Идемпотентна: повторный запуск строки
+ * не меняет.
  *
- * `viewMode` is intentionally left untouched — it's the only surviving
- * record of which projects were agile before this migration, in case the
- * code needs to be rolled back.
+ * `viewMode` не переписывается: при откате кода это единственный признак,
+ * по которому agile-проект можно опознать.
  */
 @Injectable()
 export class ProjectTypeMigrationService implements OnApplicationBootstrap {
