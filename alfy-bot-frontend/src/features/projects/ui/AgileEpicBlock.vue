@@ -116,7 +116,7 @@ function handleCreateStory(title: string) {
       </button>
       <span class="text-xs text-muted-foreground shrink-0">{{ totalCount }}</span>
       <span class="text-xs text-muted-foreground shrink-0">{{ doneCount }} из {{ totalCount }} готово</span>
-      <div class="ml-auto flex items-center gap-0.5 shrink-0">
+      <div class="flex items-center gap-0.5 shrink-0">
         <Button
           variant="ghost"
           size="icon-sm"

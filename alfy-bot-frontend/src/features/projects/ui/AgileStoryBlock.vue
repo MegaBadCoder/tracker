@@ -72,7 +72,7 @@ function handleCreateTask(title: string) {
         {{ story.title }}
       </button>
       <span class="text-[11px] text-muted-foreground/60 shrink-0">{{ tasks.length }}</span>
-      <div class="ml-auto flex items-center gap-0.5 shrink-0">
+      <div class="flex items-center gap-0.5 shrink-0">
         <Button
           variant="ghost"
           size="icon-sm"

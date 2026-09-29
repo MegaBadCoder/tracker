@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { BoardGroup } from '../model/types'
-import { Ellipsis, Palette, Pencil, Plus, SquareArrowOutUpRight, Trash2 } from 'lucide-vue-next'
-import { computed } from 'vue'
+import { CircleCheck, Ellipsis, Palette, Pencil, Plus, RotateCcw, SquareArrowOutUpRight, Trash2 } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -23,7 +23,7 @@ const props = defineProps<{
   group: BoardGroup
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   open: []
   rename: []
   setColor: [color: string | null]
@@ -35,6 +35,23 @@ defineEmits<{
 const isEpic = computed(() => props.group.type === 'epic')
 const triggerLabel = computed(() => (isEpic.value ? 'Действия с эпиком' : 'Действия с историей'))
 const toggleDoneLabel = computed(() => (props.group.status === 'done' ? 'Открыть' : 'Закрыть'))
+
+const keepFocusOnClose = ref(false)
+
+function startInlineEdit(action: 'rename' | 'addStory') {
+  keepFocusOnClose.value = true
+  if (action === 'rename')
+    emit('rename')
+  else
+    emit('addStory')
+}
+
+function onCloseAutoFocus(event: Event) {
+  if (!keepFocusOnClose.value)
+    return
+  keepFocusOnClose.value = false
+  event.preventDefault()
+}
 </script>
 
 <template>
@@ -44,12 +61,12 @@ const toggleDoneLabel = computed(() => (props.group.status === 'done' ? 'Отк�
         <Ellipsis :size="16" />
       </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
+    <DropdownMenuContent align="end" @close-auto-focus="onCloseAutoFocus">
       <DropdownMenuItem @click="$emit('open')">
         <SquareArrowOutUpRight :size="14" class="mr-2" />
         Открыть карточку
       </DropdownMenuItem>
-      <DropdownMenuItem @click="$emit('rename')">
+      <DropdownMenuItem @click="startInlineEdit('rename')">
         <Pencil :size="14" class="mr-2" />
         Переименовать
       </DropdownMenuItem>
@@ -72,11 +89,13 @@ const toggleDoneLabel = computed(() => (props.group.status === 'done' ? 'Отк�
           </DropdownMenuItem>
         </DropdownMenuSubContent>
       </DropdownMenuSub>
-      <DropdownMenuItem v-if="isEpic" @click="$emit('addStory')">
+      <DropdownMenuItem v-if="isEpic" @click="startInlineEdit('addStory')">
         <Plus :size="14" class="mr-2" />
         Добавить историю
       </DropdownMenuItem>
       <DropdownMenuItem @click="$emit('toggleDone')">
+        <RotateCcw v-if="group.status === 'done'" :size="14" class="mr-2" />
+        <CircleCheck v-else :size="14" class="mr-2" />
         {{ toggleDoneLabel }}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
