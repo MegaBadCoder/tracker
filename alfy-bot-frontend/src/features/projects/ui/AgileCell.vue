@@ -5,14 +5,14 @@ import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 
 const props = defineProps<{
   tasks: Task[]
-  columnId: string | null
+  columnId: string
   groupId: string | null
 }>()
 
 const emit = defineEmits<{
   toggleTask: [id: string]
   openTask: [task: Task]
-  taskChange: [event: any, columnId: string | null, groupId: string | null, tasks: Task[]]
+  taskChange: [event: any, columnId: string, groupId: string | null, tasks: Task[]]
 }>()
 
 function handleChange(event: any) {

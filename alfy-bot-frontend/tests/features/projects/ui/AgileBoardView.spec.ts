@@ -1,4 +1,4 @@
-import type { BoardGroupNode, ProjectColumn } from '@/features/projects/model/types'
+import type { BoardGroupNode, ProjectColumn, Sprint } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -8,6 +8,7 @@ import { api } from '@/api/client'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import * as columnsApi from '@/features/projects/api/columns-api'
 import * as groupsApi from '@/features/projects/api/groups-api'
+import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { useGroupDetail } from '@/features/projects/model/use-group-detail'
 import AgileBoardView from '@/features/projects/ui/AgileBoardView.vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -66,12 +67,31 @@ function makeEpic(overrides: Partial<BoardGroupNode> = {}): BoardGroupNode {
   }
 }
 
+function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
+  return {
+    id: 'sprint-1',
+    userId: 1,
+    projectId: 'proj-1',
+    name: 'Спринт 1',
+    goal: null,
+    startDate: '2026-09-28',
+    endDate: '2026-10-11',
+    status: 'active',
+    completedAt: null,
+    order: 0,
+    createdAt: '2026-09-28T00:00:00.000Z',
+    updatedAt: '2026-09-28T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
     id: 'task-1',
     title: 'Задача',
     completed: false,
     projectId: 'proj-1',
+    sprintId: 'sprint-1',
     columnId: null,
     groupId: null,
     order: 0,
@@ -91,6 +111,7 @@ describe('agileBoardView', () => {
 
     const taskStore = useTaskStore()
     taskStore.tasks = tasks
+    useSprintStore().lists['proj-1'] = [makeSprint()]
 
     return mount(AgileBoardView, {
       props: { projectId: 'proj-1' },
@@ -106,7 +127,7 @@ describe('agileBoardView', () => {
     })
   }
 
-  it('не показывает на доске задачу истории/эпика с columnId === null — это бэклог', async () => {
+  it('не показывает на доске задачу истории/эпика с columnId === null — у ячейки доски всегда есть колонка', async () => {
     const story = makeEpic({ id: 'story-1', type: 'story', parentId: 'epic-1' })
     const epic = makeEpic({ id: 'epic-1', children: [story] })
     const wrapper = setup(
@@ -118,6 +139,39 @@ describe('agileBoardView', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).not.toContain('Задача без колонки')
+  })
+
+  it('показывает только задачи активного спринта, а задачи другого спринта и бэклога — нет', async () => {
+    const wrapper = setup(
+      [makeColumn({ id: 'col-1' })],
+      [],
+      [
+        makeTask({ id: 't1', title: 'Из активного', columnId: 'col-1', sprintId: 'sprint-1' }),
+        makeTask({ id: 't2', title: 'Из другого спринта', columnId: 'col-1', sprintId: 'sprint-2' }),
+        makeTask({ id: 't3', title: 'Из бэклога', columnId: 'col-1', sprintId: null }),
+        makeTask({ id: 't4', title: 'Без поля спринта', columnId: 'col-1', sprintId: undefined }),
+      ],
+    )
+    await vi.dynamicImportSettled()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Из активного')
+    expect(wrapper.text()).not.toContain('Из другого спринта')
+    expect(wrapper.text()).not.toContain('Из бэклога')
+    expect(wrapper.text()).not.toContain('Без поля спринта')
+  })
+
+  it('без активного спринта не показывает ни одной задачи', async () => {
+    const wrapper = setup(
+      [makeColumn({ id: 'col-1' })],
+      [],
+      [makeTask({ id: 't1', title: 'Задача', columnId: 'col-1', sprintId: 'sprint-1' })],
+    )
+    useSprintStore().lists['proj-1'] = [makeSprint({ status: 'closed' })]
+    await vi.dynamicImportSettled()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('Задача')
   })
 
   it('рендерит ровно столько дорожек, сколько колонок у проекта', async () => {
@@ -214,6 +268,7 @@ describe('agileBoardView — управление на доске', () => {
 
     const taskStore = useTaskStore()
     taskStore.tasks = tasks
+    useSprintStore().lists['proj-1'] = [makeSprint()]
 
     return mount(AgileBoardView, {
       props: { projectId: 'proj-1' },
@@ -227,6 +282,7 @@ describe('agileBoardView — управление на доске', () => {
 
     const taskStore = useTaskStore()
     taskStore.tasks = tasks
+    useSprintStore().lists['proj-1'] = [makeSprint()]
 
     const Harness = defineComponent({
       components: { AgileBoardView, ConfirmDialog },
@@ -287,6 +343,7 @@ describe('agileBoardView — управление на доске', () => {
       projectId: 'proj-1',
       columnId: 'col-1',
       groupId: 'epic-1',
+      sprintId: 'sprint-1',
     }))
   })
 

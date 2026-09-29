@@ -11,6 +11,7 @@ import { useAgileDnd } from '../lib/use-agile-dnd'
 import { useGroupDeletion } from '../lib/use-group-deletion'
 import { useColumnStore } from '../model/column-store'
 import { useGroupStore } from '../model/group-store'
+import { useSprintStore } from '../model/sprint-store'
 import { useGroupDetail } from '../model/use-group-detail'
 import AgileCell from './AgileCell.vue'
 import AgileEpicBlock from './AgileEpicBlock.vue'
@@ -34,6 +35,7 @@ const COLUMN_WIDTH_PX = 260
 
 const columnStore = useColumnStore()
 const groupStore = useGroupStore()
+const sprintStore = useSprintStore()
 const taskStore = useTaskStore()
 const { tasks } = storeToRefs(taskStore)
 const { onTaskChange } = useAgileDnd(taskStore)
@@ -46,19 +48,22 @@ const sortedColumns = computed(() =>
   [...columnStore.columns].sort((a, b) => a.order - b.order),
 )
 
-const allProjectTasks = computed(() =>
-  tasks.value.filter(t => t.projectId === props.projectId),
-)
+const activeSprint = computed(() => sprintStore.activeSprintOf(props.projectId))
+
+const sprintBoardTasks = computed(() => {
+  const sprintId = activeSprint.value?.id
+  if (!sprintId)
+    return []
+  return tasks.value.filter(t => t.projectId === props.projectId && t.sprintId === sprintId)
+})
 
 const projectTasks = computed(() =>
-  allProjectTasks.value.filter(t =>
+  sprintBoardTasks.value.filter(t =>
     (props.showCompleted || !t.completed)
     && (!props.hideOverdue || !t.isOverdue),
   ),
 )
 
-// Board lanes are exactly the project's columns. Tasks with columnId === null
-// are backlog — they live in AgileBacklogPanel, not on the board.
 const lanes = computed<ProjectColumn[]>(() => sortedColumns.value)
 
 const rows = computed(() => buildAgileRows(groupStore.groupsOf(props.projectId), projectTasks.value))
@@ -105,11 +110,16 @@ async function handleCreateEpic(title: string) {
 }
 
 async function handleCreateTask(groupId: string, title: string) {
+  const sprint = activeSprint.value
+  if (!sprint)
+    throw new Error('Нет активного спринта для новой задачи')
+
   await taskStore.createTask({
     title,
     completed: false,
     projectId: props.projectId,
     columnId: lanes.value[0]?.id ?? null,
+    sprintId: sprint.id,
     groupId,
   })
 }
@@ -118,7 +128,7 @@ async function handleDeleteGroup(group: BoardGroupNode) {
   await deleteGroupWithConfirm(props.projectId, group)
 }
 
-function handleTaskChange(event: any, columnId: string | null, groupId: string | null, cellTasks: Task[]) {
+function handleTaskChange(event: any, columnId: string, groupId: string | null, cellTasks: Task[]) {
   onTaskChange(event, columnId, groupId, props.projectId, cellTasks)
 }
 

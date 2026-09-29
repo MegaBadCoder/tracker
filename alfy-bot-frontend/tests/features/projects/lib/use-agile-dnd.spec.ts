@@ -29,25 +29,6 @@ describe('useAgileDnd', () => {
       })
     })
 
-    it('дорожка «Без колонки» передаёт columnId: null', () => {
-      const taskStore = makeTaskStore()
-      const { onTaskChange } = useAgileDnd(taskStore)
-
-      onTaskChange(
-        { added: { element: { id: 'task-1' }, newIndex: 0 } },
-        null,
-        'epic-1',
-        'proj-1',
-        [{ id: 'task-1' }],
-      )
-
-      expect(taskStore.moveTask).toHaveBeenCalledWith('task-1', 'proj-1', {
-        columnId: null,
-        groupId: 'epic-1',
-        order: 0,
-      })
-    })
-
     it('блок «Без эпика» передаёт groupId: null', () => {
       const taskStore = makeTaskStore()
       const { onTaskChange } = useAgileDnd(taskStore)
@@ -65,25 +46,6 @@ describe('useAgileDnd', () => {
         groupId: null,
         order: 0,
       })
-    })
-
-    it('бэклог (groupId: undefined) не передаёт groupId в moveTask — иначе стирается эпик', () => {
-      const taskStore = makeTaskStore()
-      const { onTaskChange } = useAgileDnd(taskStore)
-
-      onTaskChange(
-        { added: { element: { id: 'task-1' }, newIndex: 0 } },
-        null,
-        undefined,
-        'proj-1',
-        [{ id: 'task-1' }],
-      )
-
-      expect(taskStore.moveTask).toHaveBeenCalledWith('task-1', 'proj-1', {
-        columnId: null,
-        order: 0,
-      })
-      expect(taskStore.moveTask.mock.calls[0][2]).not.toHaveProperty('groupId')
     })
 
     it('при добавлении с несколькими задачами также реордерит ячейку', () => {

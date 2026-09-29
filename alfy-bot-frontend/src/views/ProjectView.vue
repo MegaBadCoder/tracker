@@ -2,16 +2,19 @@
 import type { Task } from '@/features/tasks/model/types'
 import { storeToRefs } from 'pinia'
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import PageContainer from '@/components/PageContainer.vue'
+import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/composables/useConfirm'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
-import AgileBacklogPanel from '@/features/projects/ui/AgileBacklogPanel.vue'
+import { useSprintStore } from '@/features/projects/model/sprint-store'
 import AgileBoardView from '@/features/projects/ui/AgileBoardView.vue'
 import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
+import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
+import SprintBanner from '@/features/projects/ui/SprintBanner.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
@@ -38,6 +41,13 @@ const hideOverdue = useHideOverdue(projectId)
 
 const columnStore = useColumnStore()
 const columns = computed(() => columnStore.columns)
+
+const sprintStore = useSprintStore()
+const activeSprint = computed(() => sprintStore.activeSprintOf(projectId.value))
+const sprintsPending = computed(() =>
+  sprintStore.isLoading(projectId.value)
+  || (!(projectId.value in sprintStore.lists) && !sprintStore.error),
+)
 
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
@@ -105,7 +115,14 @@ async function handleViewModeChange(mode: string) {
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
   isCreatingTask.value = true
   try {
-    await createTask({ ...taskData, projectId: projectId.value })
+    if (isAgileProject.value) {
+      if (!activeSprint.value)
+        throw new Error('Нет активного спринта для новой задачи')
+      await createTask({ ...taskData, projectId: projectId.value, sprintId: activeSprint.value.id })
+    }
+    else {
+      await createTask({ ...taskData, projectId: projectId.value })
+    }
     taskFormRef.value?.resetForm()
   }
   catch (err) {
@@ -149,11 +166,18 @@ async function handleDeleteTask(taskId: string) {
 onMounted(() => {
   fetchTasks()
   columnStore.fetchColumns(projectId.value)
+  if (isAgileProject.value)
+    sprintStore.ensureSprints(projectId.value)
 })
 
 watch(projectId, (id) => {
   if (id)
     columnStore.fetchColumns(id)
+})
+
+watch([projectId, isAgileProject], ([id, isAgile]) => {
+  if (id && isAgile)
+    sprintStore.ensureSprints(id)
 })
 </script>
 
@@ -172,25 +196,45 @@ watch(projectId, (id) => {
 
     <!-- Agile view — full page -->
     <template v-if="isAgileProject">
-      <div class="px-4 py-3">
-        <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+      <div class="px-4 pt-3">
+        <ProjectTabs :project-id="projectId" />
       </div>
 
-      <div v-if="loading" class="text-center py-8">
+      <div v-if="loading || sprintsPending" class="text-center py-8">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
         <p class="mt-2 text-muted-foreground">
           Загрузка задач...
         </p>
       </div>
 
-      <div v-else-if="error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mx-4">
+      <div v-else-if="error || sprintStore.error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 m-4">
         <p class="text-destructive">
-          {{ error }}
+          {{ error || sprintStore.error }}
         </p>
       </div>
 
-      <main v-else class="flex-1 min-h-0 px-4 pb-4 flex gap-3">
-        <div class="flex-1 min-w-0">
+      <div v-else-if="!activeSprint" class="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-12 text-center">
+        <p class="text-lg font-medium">
+          Нет активного спринта
+        </p>
+        <p class="text-sm text-muted-foreground">
+          Выберите задачи в бэклоге и начните спринт
+        </p>
+        <Button as-child class="mt-2">
+          <RouterLink :to="{ name: 'tasks-project-backlog', params: { projectId } }">
+            Перейти в бэклог
+          </RouterLink>
+        </Button>
+      </div>
+
+      <template v-else>
+        <SprintBanner class="mt-3" :project-id="projectId" />
+
+        <div class="px-4 py-3">
+          <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+        </div>
+
+        <main class="flex-1 min-h-0 px-4 pb-4">
           <AgileBoardView
             :project-id="projectId"
             :show-completed="showCompleted"
@@ -198,15 +242,8 @@ watch(projectId, (id) => {
             @toggle-task="handleToggleTask"
             @open-task="handleOpenTask"
           />
-        </div>
-        <AgileBacklogPanel
-          :project-id="projectId"
-          :show-completed="showCompleted"
-          :hide-overdue="hideOverdue"
-          @toggle-task="handleToggleTask"
-          @open-task="handleOpenTask"
-        />
-      </main>
+        </main>
+      </template>
     </template>
 
     <!-- Board view — full page -->

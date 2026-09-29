@@ -8,29 +8,25 @@ interface MoveEvent {
 export function useAgileDnd(taskStore: ReturnType<typeof useTaskStore>) {
   function onTaskChange(
     event: MoveEvent,
-    columnId: string | null,
-    // undefined means "don't touch groupId" — used when dropping into the
-    // backlog panel, where an explicit null would wipe the task's epic/story.
-    groupId: string | null | undefined,
+    columnId: string,
+    groupId: string | null,
     projectId: string,
     cellTasks: { id: string }[],
   ) {
     if (event.added) {
       const taskId = event.added.element.id
       const orderedIds = cellTasks.map(t => t.id)
-      const payload: { columnId: string | null, groupId?: string | null, order: number } = {
+      taskStore.moveTask(taskId, projectId, {
         columnId,
+        groupId,
         order: event.added.newIndex,
-      }
-      if (groupId !== undefined)
-        payload.groupId = groupId
-      taskStore.moveTask(taskId, projectId, payload)
+      })
       if (orderedIds.length > 1) {
-        taskStore.reorderTasks(projectId, orderedIds, columnId ?? undefined)
+        taskStore.reorderTasks(projectId, orderedIds, columnId)
       }
     } else if (event.moved) {
       const orderedIds = cellTasks.map(t => t.id)
-      taskStore.reorderTasks(projectId, orderedIds, columnId ?? undefined)
+      taskStore.reorderTasks(projectId, orderedIds, columnId)
     }
   }
 

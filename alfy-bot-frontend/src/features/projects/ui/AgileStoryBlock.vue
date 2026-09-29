@@ -18,7 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleTask: [id: string]
   openTask: [task: Task]
-  taskChange: [event: any, columnId: string | null, groupId: string | null, tasks: Task[]]
+  taskChange: [event: any, columnId: string, groupId: string | null, tasks: Task[]]
   openGroup: [id: string]
   renameGroup: [id: string, title: string]
   setGroupColor: [id: string, color: string | null]
