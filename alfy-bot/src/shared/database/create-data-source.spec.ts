@@ -4,6 +4,7 @@ import * as path from 'path';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import {
   BoardGroup,
+  Sprint,
   PomodoroConfig,
   Project,
   ProjectColumn,
@@ -20,7 +21,15 @@ const USER_ID = 1;
 const PROJECT_A = 'project-a';
 const PROJECT_B = 'project-b';
 
-const ENTITIES = [User, Project, ProjectColumn, Task, PomodoroConfig, BoardGroup];
+const ENTITIES = [
+  User,
+  Project,
+  ProjectColumn,
+  Task,
+  PomodoroConfig,
+  BoardGroup,
+  Sprint,
+];
 
 const LEGACY_BOARD_GROUPS_SQL = `
   CREATE TABLE "board_groups" (

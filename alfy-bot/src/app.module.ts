@@ -31,6 +31,7 @@ import {
   Project,
   ProjectColumn,
   BoardGroup,
+  Sprint,
   ApiToken,
   Link,
 } from './shared/entities';
@@ -75,6 +76,7 @@ const telegramImports = isTelegramEnabled()
           Project,
           ProjectColumn,
           BoardGroup,
+          Sprint,
           ApiToken,
           Link,
         ],

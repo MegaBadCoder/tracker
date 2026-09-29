@@ -1,6 +1,7 @@
 import { DataSource, Repository } from 'typeorm';
 import {
   BoardGroup,
+  Sprint,
   PomodoroConfig,
   Project,
   ProjectColumn,
@@ -33,6 +34,7 @@ describe('BoardGroupConstraintsMigrationService (in-memory sqlite)', () => {
         Task,
         PomodoroConfig,
         BoardGroup,
+        Sprint,
       ],
       synchronize: true,
     });
