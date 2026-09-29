@@ -73,3 +73,44 @@ export interface CreateProjectPayload {
 }
 
 export type UpdateProjectPayload = Partial<CreateProjectPayload>
+
+/** Статус спринта: `planned` — запланирован, `active` — идёт (не более одного на проект), `closed` — завершён. */
+export type SprintStatus = 'planned' | 'active' | 'closed'
+
+/** Спринт agile-проекта. Даты — `YYYY-MM-DD` (локальный календарный день), `null` пока спринт не запущен. */
+export interface Sprint {
+  id: string
+  userId: number
+  projectId: string
+  name: string
+  goal: string | null
+  startDate: string | null
+  endDate: string | null
+  status: SprintStatus
+  completedAt: string | null
+  order: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateSprintPayload {
+  name: string
+  goal?: string | null
+}
+
+export interface UpdateSprintPayload {
+  name?: string
+  goal?: string | null
+}
+
+/** Запуск спринта: `endDate` — последний день спринта включительно. */
+export interface StartSprintPayload {
+  startDate: string
+  endDate: string
+  goal?: string | null
+}
+
+/** Завершение спринта: `moveTo` — `'backlog'` или id запланированного спринта, куда уходят незавершённые задачи. */
+export interface CompleteSprintPayload {
+  moveTo: 'backlog' | string
+}
