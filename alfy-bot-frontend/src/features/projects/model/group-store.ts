@@ -1,18 +1,8 @@
-import type { BoardGroup, BoardGroupNode, CreateGroupPayload, UpdateGroupPayload } from './types'
+import type { BoardGroup, BoardGroupNode, CreateGroupPayload, GroupType, UpdateGroupPayload } from './types'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as groupsApi from '../api/groups-api'
-
-function findNode(nodes: BoardGroupNode[], id: string): BoardGroupNode | undefined {
-  for (const node of nodes) {
-    if (node.id === id)
-      return node
-    const found = findNode(node.children, id)
-    if (found)
-      return found
-  }
-  return undefined
-}
+import { findGroup } from '../lib/group-tree'
 
 function replaceNode(
   nodes: BoardGroupNode[],
@@ -33,33 +23,46 @@ function removeNode(nodes: BoardGroupNode[], id: string): BoardGroupNode[] {
 }
 
 export const useGroupStore = defineStore('groups', () => {
-  const groups = ref<BoardGroupNode[]>([])
-  const currentProjectId = ref<string | null>(null)
-  const loading = ref(false)
+  const trees = ref<Record<string, BoardGroupNode[]>>({})
+  const loadingProjects = ref<Set<string>>(new Set())
   const error = ref<string | null>(null)
 
+  function groupsOf(projectId: string): BoardGroupNode[] {
+    return trees.value[projectId] ?? []
+  }
+
+  function isLoading(projectId: string): boolean {
+    return loadingProjects.value.has(projectId)
+  }
+
   const fetchGroups = async (projectId: string) => {
-    loading.value = true
+    loadingProjects.value.add(projectId)
     error.value = null
-    currentProjectId.value = projectId
 
     try {
       const { data } = await groupsApi.fetchGroups(projectId)
-      groups.value = data
+      trees.value[projectId] = data
     }
     catch (err) {
       error.value = err instanceof Error ? err.message : 'Ошибка загрузки эпиков'
     }
     finally {
-      loading.value = false
+      loadingProjects.value.delete(projectId)
     }
+  }
+
+  async function ensureGroups(projectId: string): Promise<void> {
+    if (projectId in trees.value || isLoading(projectId))
+      return
+    await fetchGroups(projectId)
   }
 
   const createGroup = async (projectId: string, payload: CreateGroupPayload) => {
     const parentId = payload.parentId ?? null
-    const type: 'epic' | 'story' = parentId ? 'story' : 'epic'
+    const type: GroupType = parentId ? 'story' : 'epic'
     const tempId = `temp-${Date.now()}`
-    const siblings = parentId ? (findNode(groups.value, parentId)?.children ?? []) : groups.value
+    const tree = trees.value[projectId] ?? []
+    const siblings = parentId ? (findGroup(tree, parentId)?.children ?? []) : tree
     const tempNode: BoardGroupNode = {
       id: tempId,
       projectId,
@@ -70,103 +73,101 @@ export const useGroupStore = defineStore('groups', () => {
       status: 'open',
       completedAt: null,
       color: payload.color ?? null,
+      startDate: payload.startDate ?? null,
+      dueDate: payload.dueDate ?? null,
       order: siblings.length,
       children: [],
     }
 
-    if (parentId) {
-      groups.value = replaceNode(groups.value, parentId, node => ({
-        ...node,
-        children: [...node.children, tempNode],
-      }))
-    }
-    else {
-      groups.value = [...groups.value, tempNode]
-    }
+    trees.value[projectId] = parentId
+      ? replaceNode(tree, parentId, node => ({
+          ...node,
+          children: [...node.children, tempNode],
+        }))
+      : [...tree, tempNode]
 
     try {
       const { data } = await groupsApi.createGroup(projectId, payload)
       const newNode: BoardGroupNode = { ...data, children: [] }
+      const current = trees.value[projectId] ?? []
 
-      if (parentId) {
-        groups.value = replaceNode(groups.value, parentId, node => ({
-          ...node,
-          children: node.children.map(child => (child.id === tempId ? newNode : child)),
-        }))
-      }
-      else {
-        groups.value = groups.value.map(node => (node.id === tempId ? newNode : node))
-      }
+      trees.value[projectId] = parentId
+        ? replaceNode(current, parentId, node => ({
+            ...node,
+            children: node.children.map(child => (child.id === tempId ? newNode : child)),
+          }))
+        : current.map(node => (node.id === tempId ? newNode : node))
 
       return data
     }
     catch (err) {
-      if (parentId) {
-        groups.value = replaceNode(groups.value, parentId, node => ({
-          ...node,
-          children: node.children.filter(child => child.id !== tempId),
-        }))
-      }
-      else {
-        groups.value = groups.value.filter(node => node.id !== tempId)
-      }
+      const current = trees.value[projectId] ?? []
+      trees.value[projectId] = parentId
+        ? replaceNode(current, parentId, node => ({
+            ...node,
+            children: node.children.filter(child => child.id !== tempId),
+          }))
+        : current.filter(node => node.id !== tempId)
       throw err
     }
   }
 
   const updateGroup = async (projectId: string, groupId: string, payload: UpdateGroupPayload) => {
-    const previous = groups.value
-    const target = findNode(groups.value, groupId)
+    const tree = trees.value[projectId] ?? []
+    const previous = tree
+    const target = findGroup(tree, groupId)
     if (!target)
       return
 
-    groups.value = replaceNode(groups.value, groupId, node => ({ ...node, ...payload }))
+    trees.value[projectId] = replaceNode(tree, groupId, node => ({ ...node, ...payload }))
 
     try {
       const { data } = await groupsApi.updateGroup(projectId, groupId, payload)
-      groups.value = replaceNode(groups.value, groupId, node => ({ ...node, ...data }))
+      trees.value[projectId] = replaceNode(trees.value[projectId] ?? [], groupId, node => ({ ...node, ...data }))
       return data
     }
     catch (err) {
-      groups.value = previous
+      trees.value[projectId] = previous
       throw err
     }
   }
 
   const deleteGroup = async (projectId: string, groupId: string) => {
-    const previous = groups.value
-    const target = findNode(groups.value, groupId)
+    const tree = trees.value[projectId] ?? []
+    const previous = tree
+    const target = findGroup(tree, groupId)
     if (!target)
       return
 
-    groups.value = removeNode(groups.value, groupId)
+    trees.value[projectId] = removeNode(tree, groupId)
 
     try {
       await groupsApi.deleteGroup(projectId, groupId)
     }
     catch (err) {
-      groups.value = previous
+      trees.value[projectId] = previous
       throw err
     }
   }
 
   const reorderGroups = async (projectId: string, orderedIds: string[]) => {
-    const previous = groups.value
+    const tree = trees.value[projectId] ?? []
+    const previous = tree
     const firstId = orderedIds[0]
-    const isRootLevel = groups.value.some(node => node.id === firstId)
+    const isRootLevel = tree.some(node => node.id === firstId)
 
     if (isRootLevel) {
-      groups.value = orderedIds
+      trees.value[projectId] = orderedIds
         .map((id, i) => {
-          const node = groups.value.find(n => n.id === id)
+          const node = tree.find(n => n.id === id)
           return node ? { ...node, order: i } : null
         })
         .filter((n): n is BoardGroupNode => n !== null)
     }
     else {
-      const parent = groups.value.find(epic => epic.children.some(child => child.id === firstId))
+      const parent = tree.find(epic => epic.children.some(child => child.id === firstId))
       if (parent) {
-        groups.value = replaceNode(groups.value, parent.id, node => ({
+        trees.value[projectId] = replaceNode(tree, parent.id, node => ({
           ...node,
           children: orderedIds
             .map((id, i) => {
@@ -182,26 +183,27 @@ export const useGroupStore = defineStore('groups', () => {
       await groupsApi.reorderGroups(projectId, orderedIds)
     }
     catch (err) {
-      groups.value = previous
+      trees.value[projectId] = previous
       throw err
     }
   }
 
-  const toggleEpicDone = async (projectId: string, epic: BoardGroup) => {
-    const nextStatus: 'open' | 'done' = epic.status === 'done' ? 'open' : 'done'
-    return updateGroup(projectId, epic.id, { status: nextStatus })
+  const toggleGroupDone = async (projectId: string, group: BoardGroup) => {
+    const nextStatus: 'open' | 'done' = group.status === 'done' ? 'open' : 'done'
+    return updateGroup(projectId, group.id, { status: nextStatus })
   }
 
   return {
-    groups,
-    currentProjectId,
-    loading,
+    trees,
     error,
+    groupsOf,
+    isLoading,
     fetchGroups,
+    ensureGroups,
     createGroup,
     updateGroup,
     deleteGroup,
     reorderGroups,
-    toggleEpicDone,
+    toggleGroupDone,
   }
 })

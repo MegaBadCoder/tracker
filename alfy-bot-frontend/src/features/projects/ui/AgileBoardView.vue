@@ -49,7 +49,7 @@ const projectTasks = computed(() =>
 // are backlog — they live in AgileBacklogPanel, not on the board.
 const lanes = computed<ProjectColumn[]>(() => sortedColumns.value)
 
-const rows = computed(() => buildAgileRows(groupStore.groups, projectTasks.value))
+const rows = computed(() => buildAgileRows(groupStore.groupsOf(props.projectId), projectTasks.value))
 
 const projectTasksByColumn = computed(() => groupTasksByColumn(projectTasks.value))
 
@@ -58,7 +58,7 @@ function laneTaskCount(lane: ProjectColumn): number {
 }
 
 async function handleToggleEpicDone(epic: BoardGroup) {
-  await groupStore.toggleEpicDone(props.projectId, epic)
+  await groupStore.toggleGroupDone(props.projectId, epic)
 }
 
 function handleTaskChange(event: any, columnId: string | null, groupId: string | null, cellTasks: Task[]) {
@@ -74,7 +74,7 @@ watch(() => props.projectId, (id) => {
 </script>
 
 <template>
-  <div v-if="columnStore.loading || groupStore.loading" class="text-center py-8">
+  <div v-if="columnStore.loading || groupStore.isLoading(projectId)" class="text-center py-8">
     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
   </div>
   <div v-else class="overflow-x-auto pb-4 h-full">

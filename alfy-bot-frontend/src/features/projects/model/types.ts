@@ -36,6 +36,8 @@ export interface BoardGroup {
   status: GroupStatus
   completedAt: string | null
   color: string | null
+  startDate: string | null
+  dueDate: string | null
   order: number
 }
 
@@ -48,6 +50,8 @@ export interface CreateGroupPayload {
   parentId?: string | null
   description?: string | null
   color?: string | null
+  startDate?: string | null
+  dueDate?: string | null
 }
 
 export type UpdateGroupPayload = Partial<CreateGroupPayload> & {

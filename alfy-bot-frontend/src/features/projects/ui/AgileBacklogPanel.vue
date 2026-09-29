@@ -54,7 +54,7 @@ const groupById = computed(() => {
       walk(node.children)
     }
   }
-  walk(groupStore.groups)
+  walk(groupStore.groupsOf(props.projectId))
   return map
 })
 
