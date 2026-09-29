@@ -72,7 +72,7 @@ export const useSprintStore = defineStore('sprints', () => {
       id: tempId,
       userId: 0,
       projectId,
-      name: payload.name,
+      name: payload.name ?? `Спринт ${current.length + 1}`,
       goal: payload.goal ?? null,
       startDate: null,
       endDate: null,

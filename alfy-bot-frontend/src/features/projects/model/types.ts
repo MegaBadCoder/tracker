@@ -93,14 +93,17 @@ export interface Sprint {
   updatedAt: string
 }
 
+/** Без `name` сервер называет спринт «Спринт N». */
 export interface CreateSprintPayload {
-  name: string
+  name?: string
   goal?: string | null
 }
 
 export interface UpdateSprintPayload {
   name?: string
   goal?: string | null
+  startDate?: string | null
+  endDate?: string | null
 }
 
 /** Запуск спринта: `endDate` — последний день спринта включительно. */
