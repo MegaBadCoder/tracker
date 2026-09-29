@@ -27,6 +27,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { intlLocale, weekStartsOn } from '@/composables/useLocale'
 import { toLocalISODate } from '@/features/goals/lib/dates'
 import { toCalendarDateValue, toDate } from '@/features/tasks/lib/dateTime'
+import { formatDueDate } from '@/features/tasks/lib/formatters'
 import { openTaskDetail } from '@/features/tasks/lib/task-detail-navigation'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { findGroup, groupPath, groupProgress } from '../lib/group-tree'
@@ -94,9 +95,10 @@ function handleOpenTask(task: Task) {
 async function handleDelete() {
   if (!group.value || !projectId.value)
     return
-  const deleted = await deleteGroupWithConfirm(projectId.value, group.value)
-  if (deleted)
-    groupDetail.close()
+  const toDelete = group.value
+  const toDeleteProjectId = projectId.value
+  groupDetail.close()
+  await deleteGroupWithConfirm(toDeleteProjectId, toDelete)
 }
 
 const titleRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
@@ -167,13 +169,25 @@ async function commitEpicDate(field: 'startDate' | 'dueDate', date: Date | undef
   }
 }
 
+const startDateOpen = ref(false)
+const dueDateOpen = ref(false)
+
 function onStartDateChange(val: unknown) {
+  startDateOpen.value = false
   commitEpicDate('startDate', toDate(val))
 }
 
 function onDueDateChange(val: unknown) {
+  dueDateOpen.value = false
   commitEpicDate('dueDate', toDate(val))
 }
+
+const statusLabel = computed(() => {
+  const done = group.value?.status === 'done'
+  if (group.value?.type === 'epic')
+    return done ? 'Закрыт' : 'Открыт'
+  return done ? 'Закрыта' : 'Открыта'
+})
 
 const sortedStories = computed(() =>
   epic.value ? [...epic.value.children].sort((a, b) => a.order - b.order) : [],
@@ -306,7 +320,7 @@ const ownTasks = computed(() => {
           <div class="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
             <span class="text-[11px] text-muted-foreground/60 font-medium">Статус</span>
             <div class="flex items-center gap-2">
-              <span class="text-[13px]">{{ group.status === 'done' ? 'Закрыта' : 'Открыта' }}</span>
+              <span class="text-[13px]">{{ statusLabel }}</span>
               <Switch :checked="group.status === 'done'" @update:checked="handleToggleDone" />
             </div>
           </div>
@@ -330,7 +344,7 @@ const ownTasks = computed(() => {
               <ColorPicker :model-value="epic.color" @update:model-value="handleSetColor" />
             </div>
 
-            <Popover>
+            <Popover v-model:open="startDateOpen">
               <div class="relative border-b border-border/40">
                 <PopoverTrigger as-child>
                   <button type="button" class="w-full px-4 py-2.5 text-left cursor-pointer hover:bg-muted/50 transition-colors">
@@ -339,7 +353,7 @@ const ownTasks = computed(() => {
                       <span class="text-[11px] text-muted-foreground/60 font-medium">Начало</span>
                     </div>
                     <div class="text-[13px] truncate" :class="[epic.startDate ? '' : 'text-muted-foreground/40']">
-                      {{ epic.startDate ?? 'Не задано' }}
+                      {{ startDateValue ? formatDueDate(startDateValue, { includeYear: true }) : 'Не задано' }}
                     </div>
                   </button>
                 </PopoverTrigger>
@@ -365,7 +379,7 @@ const ownTasks = computed(() => {
               </PopoverContent>
             </Popover>
 
-            <Popover>
+            <Popover v-model:open="dueDateOpen">
               <div class="relative border-b border-border/40">
                 <PopoverTrigger as-child>
                   <button type="button" class="w-full px-4 py-2.5 text-left cursor-pointer hover:bg-muted/50 transition-colors">
@@ -374,7 +388,7 @@ const ownTasks = computed(() => {
                       <span class="text-[11px] text-muted-foreground/60 font-medium">Срок</span>
                     </div>
                     <div class="text-[13px] truncate" :class="[epic.dueDate ? '' : 'text-muted-foreground/40']">
-                      {{ epic.dueDate ?? 'Не задано' }}
+                      {{ dueDateValue ? formatDueDate(dueDateValue, { includeYear: true }) : 'Не задано' }}
                     </div>
                   </button>
                 </PopoverTrigger>
