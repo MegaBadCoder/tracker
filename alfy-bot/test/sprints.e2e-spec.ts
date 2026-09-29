@@ -160,6 +160,20 @@ describe('Sprints (e2e)', () => {
       .expect(400);
   });
 
+  it('PATCH с name: null даёт 400, а не 500', async () => {
+    const { body: created } = (await request(app.getHttpServer())
+      .post(sprintsUrl())
+      .set('Authorization', auth())
+      .send({})
+      .expect(201)) as { body: SprintBody };
+
+    await request(app.getHttpServer())
+      .patch(`${sprintsUrl()}/${created.id}`)
+      .set('Authorization', auth())
+      .send({ name: null })
+      .expect(400);
+  });
+
   describe('назначение задач в спринт через API задач', () => {
     interface TaskBody {
       id: string;

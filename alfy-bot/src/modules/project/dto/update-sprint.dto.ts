@@ -1,9 +1,15 @@
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateSprintDto {
   @ApiPropertyOptional({ example: 'Спринт 3' })
-  @IsOptional()
+  @ValidateIf((o: UpdateSprintDto) => o.name !== undefined)
   @IsString()
   @IsNotEmpty()
   name?: string;

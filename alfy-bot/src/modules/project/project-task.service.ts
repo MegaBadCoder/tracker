@@ -136,11 +136,16 @@ export class ProjectTaskService {
         throw new NotFoundException(`Group #${targetGroupId} not found`);
     }
 
+    const columnId =
+      targetSprintId && !targetColumnId && targetProjectId
+        ? await this.firstColumnId(targetProjectId)
+        : targetColumnId;
+
     return this.taskRepo.updatePosition(
       taskId,
       userId,
       targetProjectId,
-      targetColumnId,
+      columnId,
       targetGroupId,
       targetSprintId,
       order,
@@ -160,5 +165,11 @@ export class ProjectTaskService {
 
     const updates = dto.orderedIds.map((id, index) => ({ id, order: index }));
     await this.taskRepo.reorderTasks(updates);
+  }
+
+  private async firstColumnId(projectId: string): Promise<string | null> {
+    const columns = await this.columnRepo.findAllByProject(projectId);
+    if (columns.length === 0) return null;
+    return columns.reduce((min, c) => (c.order < min.order ? c : min)).id;
   }
 }

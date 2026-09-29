@@ -114,11 +114,11 @@ describe('SprintService', () => {
   });
 
   describe('create', () => {
-    it('даёт имя «Спринт N», где N — число всех спринтов проекта + 1, а order — число незакрытых', async () => {
+    it('даёт имя «Спринт N», где N — число всех спринтов проекта + 1, а order — следующий после максимального незакрытого', async () => {
       sprintRepo.findAllByProject.mockResolvedValue([
-        makeSprint({ id: 'a', status: 'closed' }),
-        makeSprint({ id: 'b', status: 'active' }),
-        makeSprint({ id: 'c', status: 'planned' }),
+        makeSprint({ id: 'a', status: 'closed', order: 5 }),
+        makeSprint({ id: 'b', status: 'active', order: 0 }),
+        makeSprint({ id: 'c', status: 'planned', order: 1 }),
       ]);
 
       await service.create(1, 'proj-1', {});
@@ -130,6 +130,19 @@ describe('SprintService', () => {
         goal: null,
         order: 2,
       });
+    });
+
+    it('после удаления спринтов из середины новый встаёт в конец очереди, а не перед старыми', async () => {
+      sprintRepo.findAllByProject.mockResolvedValue([
+        makeSprint({ id: 'c', status: 'planned', order: 2 }),
+        makeSprint({ id: 'd', status: 'planned', order: 3 }),
+      ]);
+
+      await service.create(1, 'proj-1', {});
+
+      expect(sprintRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ order: 4 }),
+      );
     });
 
     it('сохраняет явно заданные имя и цель', async () => {

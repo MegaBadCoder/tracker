@@ -135,6 +135,14 @@ describe('Board groups (e2e)', () => {
         .expect(400);
     });
 
+    it('PATCH с title: null даёт 400, а не 500', async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/projects/${projectId}/groups/${storyId}`)
+        .set('Authorization', auth())
+        .send({ title: null })
+        .expect(400);
+    });
+
     it('закрытие эпика проставляет completedAt, открытие — обнуляет', async () => {
       const { body: done } = await request(app.getHttpServer())
         .patch(`/api/projects/${projectId}/groups/${epicId}`)

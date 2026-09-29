@@ -551,6 +551,33 @@ describe('ProjectTaskService — move & reorder', () => {
       );
     });
 
+    it('задача спринта без columnId в запросе получает первую колонку проекта, а не теряет её', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          sprintId: 'sprint-1',
+        }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject());
+      colRepo.findAllByProject.mockResolvedValue([
+        makeColumn({ id: 'col-2', order: 1 }),
+        makeColumn({ id: 'col-1', order: 0 }),
+      ]);
+
+      await service.moveTask(1, 'proj-1', 'task-1', { order: 1 });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        null,
+        'sprint-1',
+        1,
+      );
+    });
+
     it('обнуляет groupId, когда null пришёл явно', async () => {
       taskRepo.findById.mockResolvedValue(makeTask({ groupId: 'group-1' }));
       projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));

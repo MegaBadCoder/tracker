@@ -55,8 +55,9 @@ export class SprintService {
 
   /**
    * Создаёт спринт в статусе `planned`. Имя по умолчанию — «Спринт N», где N —
-   * число всех спринтов проекта (с закрытыми) плюс один; `order` — число
-   * незакрытых спринтов, то есть спринт встаёт в конец очереди планирования.
+   * число всех спринтов проекта (с закрытыми) плюс один; `order` — на единицу
+   * больше максимального среди незакрытых, то есть спринт встаёт в конец
+   * очереди планирования.
    */
   async create(
     userId: number,
@@ -66,14 +67,16 @@ export class SprintService {
     await this.validateProjectAccess(userId, projectId);
 
     const existing = await this.sprintRepo.findAllByProject(projectId);
-    const open = existing.filter((s) => s.status !== 'closed');
+    const openOrders = existing
+      .filter((s) => s.status !== 'closed')
+      .map((s) => s.order);
 
     return this.sprintRepo.create({
       userId,
       projectId,
       name: dto.name ?? `Спринт ${existing.length + 1}`,
       goal: dto.goal ?? null,
-      order: open.length,
+      order: openOrders.length ? Math.max(...openOrders) + 1 : 0,
     });
   }
 

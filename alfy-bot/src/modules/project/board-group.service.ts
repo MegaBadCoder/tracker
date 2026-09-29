@@ -151,7 +151,10 @@ export class BoardGroupService {
     group.startDate = finalStartDate;
     group.dueDate = finalDueDate;
 
-    if (dto.title !== undefined) group.title = dto.title;
+    if (dto.title !== undefined) {
+      if (!dto.title) throw new BadRequestException('Group title is required');
+      group.title = dto.title;
+    }
     if (dto.description !== undefined) group.description = dto.description;
     if (dto.color !== undefined) group.color = dto.color;
 
