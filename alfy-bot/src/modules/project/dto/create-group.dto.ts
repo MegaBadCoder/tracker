@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateGroupDto {
@@ -20,4 +20,14 @@ export class CreateGroupDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @ApiPropertyOptional({ example: '2026-01-01', nullable: true })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  startDate?: string | null;
+
+  @ApiPropertyOptional({ example: '2026-01-31', nullable: true })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  dueDate?: string | null;
 }

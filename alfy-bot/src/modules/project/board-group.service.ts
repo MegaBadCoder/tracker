@@ -21,6 +21,19 @@ export class BoardGroupService {
     private readonly projectRepo: ProjectRepositoryPort,
   ) {}
 
+  private assertDates(
+    type: 'epic' | 'story',
+    startDate: string | null,
+    dueDate: string | null,
+  ): void {
+    if (type === 'story' && (startDate !== null || dueDate !== null)) {
+      throw new BadRequestException('Only epics have dates');
+    }
+    if (startDate !== null && dueDate !== null && startDate > dueDate) {
+      throw new BadRequestException('startDate must not be after dueDate');
+    }
+  }
+
   private async validateProjectAccess(userId: number, projectId: string) {
     const project = await this.projectRepo.findById(projectId, userId);
     if (!project)
@@ -78,6 +91,10 @@ export class BoardGroupService {
     const siblings = existing.filter((g) => g.parentId === parentId);
     const nextOrder = siblings.length;
 
+    const startDate = dto.startDate ?? null;
+    const dueDate = dto.dueDate ?? null;
+    this.assertDates(type, startDate, dueDate);
+
     return this.groupRepo.create({
       userId,
       projectId,
@@ -87,6 +104,8 @@ export class BoardGroupService {
       description: dto.description ?? null,
       color: dto.color ?? null,
       order: nextOrder,
+      startDate,
+      dueDate,
     });
   }
 
@@ -123,6 +142,14 @@ export class BoardGroupService {
       group.parentId = dto.parentId;
       group.type = 'story';
     }
+
+    const finalStartDate =
+      dto.startDate !== undefined ? dto.startDate : group.startDate;
+    const finalDueDate =
+      dto.dueDate !== undefined ? dto.dueDate : group.dueDate;
+    this.assertDates(group.type, finalStartDate, finalDueDate);
+    group.startDate = finalStartDate;
+    group.dueDate = finalDueDate;
 
     if (dto.title !== undefined) group.title = dto.title;
     if (dto.description !== undefined) group.description = dto.description;

@@ -18,6 +18,14 @@ import { Project } from './project.entity';
   'CHK_board_group_depth',
   "(parentId IS NULL AND type = 'epic') OR (parentId IS NOT NULL AND type = 'story')",
 )
+@Check(
+  'CHK_board_group_dates_epic_only',
+  "type = 'epic' OR (startDate IS NULL AND dueDate IS NULL)",
+)
+@Check(
+  'CHK_board_group_date_order',
+  'startDate IS NULL OR dueDate IS NULL OR startDate <= dueDate',
+)
 export class BoardGroup {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -51,6 +59,12 @@ export class BoardGroup {
 
   @Column({ type: 'integer', default: 0 })
   order: number;
+
+  @Column({ type: 'text', nullable: true })
+  startDate: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  dueDate: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

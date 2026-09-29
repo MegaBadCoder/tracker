@@ -44,6 +44,8 @@ function makeGroup(overrides: Partial<BoardGroup> = {}): BoardGroup {
     completedAt: null,
     color: null,
     order: 0,
+    startDate: null,
+    dueDate: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -211,6 +213,52 @@ describe('BoardGroupService', () => {
         ForbiddenException,
       );
     });
+
+    it('создаёт эпик с startDate и dueDate', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      groupRepo.findAllByProject.mockResolvedValue([]);
+
+      await service.create(1, 'proj-1', {
+        title: 'Эпик с датами',
+        startDate: '2026-01-01',
+        dueDate: '2026-01-31',
+      });
+
+      expect(groupRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          startDate: '2026-01-01',
+          dueDate: '2026-01-31',
+        }),
+      );
+    });
+
+    it('бросает BadRequestException при создании истории с датой', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      const epic = makeGroup({ id: 'epic-1', parentId: null });
+      groupRepo.findById.mockResolvedValue(epic);
+      groupRepo.findAllByProject.mockResolvedValue([]);
+
+      await expect(
+        service.create(1, 'proj-1', {
+          title: 'История с датой',
+          parentId: 'epic-1',
+          startDate: '2026-01-01',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('бросает BadRequestException если startDate позже dueDate', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      groupRepo.findAllByProject.mockResolvedValue([]);
+
+      await expect(
+        service.create(1, 'proj-1', {
+          title: 'Эпик с некорректными датами',
+          startDate: '2026-02-01',
+          dueDate: '2026-01-01',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   // ── update ──────────────────────────────────────────────────────
@@ -314,6 +362,88 @@ describe('BoardGroupService', () => {
       await expect(
         service.update(1, 'proj-1', 'group-1', { title: 'X' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('бросает BadRequestException при обновлении истории датой', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      groupRepo.findById.mockResolvedValue(
+        makeGroup({ id: 'story-1', type: 'story', parentId: 'epic-1' }),
+      );
+
+      await expect(
+        service.update(1, 'proj-1', 'story-1', { startDate: '2026-01-01' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('бросает BadRequestException если новая startDate позже уже сохранённой dueDate', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      groupRepo.findById.mockResolvedValue(
+        makeGroup({ dueDate: '2026-10-01', startDate: null }),
+      );
+
+      await expect(
+        service.update(1, 'proj-1', 'group-1', { startDate: '2026-10-05' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('очищает startDate значением null', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      groupRepo.findById.mockResolvedValue(
+        makeGroup({ startDate: '2026-01-01', dueDate: '2026-01-31' }),
+      );
+
+      await service.update(1, 'proj-1', 'group-1', { startDate: null });
+
+      expect(groupRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ startDate: null, dueDate: '2026-01-31' }),
+      );
+    });
+
+    it('бросает BadRequestException при переносе эпика с датами в историю (reparenting)', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      const dated = makeGroup({
+        id: 'epic-1',
+        parentId: null,
+        startDate: '2026-01-01',
+        dueDate: '2026-01-31',
+      });
+      groupRepo.findById
+        .mockResolvedValueOnce(dated)
+        .mockResolvedValueOnce(makeGroup({ id: 'epic-2', parentId: null }));
+      groupRepo.countChildren.mockResolvedValue(0);
+
+      await expect(
+        service.update(1, 'proj-1', 'epic-1', { parentId: 'epic-2' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('разрешает перенос эпика с датами в историю, если обе даты очищаются в том же запросе', async () => {
+      projRepo.findById.mockResolvedValue(makeProject());
+      const dated = makeGroup({
+        id: 'epic-1',
+        parentId: null,
+        startDate: '2026-01-01',
+        dueDate: '2026-01-31',
+      });
+      groupRepo.findById
+        .mockResolvedValueOnce(dated)
+        .mockResolvedValueOnce(makeGroup({ id: 'epic-2', parentId: null }));
+      groupRepo.countChildren.mockResolvedValue(0);
+
+      await service.update(1, 'proj-1', 'epic-1', {
+        parentId: 'epic-2',
+        startDate: null,
+        dueDate: null,
+      });
+
+      expect(groupRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parentId: 'epic-2',
+          type: 'story',
+          startDate: null,
+          dueDate: null,
+        }),
+      );
     });
   });
 

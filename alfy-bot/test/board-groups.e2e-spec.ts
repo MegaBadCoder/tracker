@@ -152,6 +152,63 @@ describe('Board groups (e2e)', () => {
     });
   });
 
+  describe('даты эпика', () => {
+    let epicId: string;
+    let storyId: string;
+
+    beforeAll(async () => {
+      const { body: epic } = await request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .send({ title: 'Эпик с датами' })
+        .expect(201);
+      epicId = epic.id;
+
+      const { body: story } = await request(app.getHttpServer())
+        .post(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .send({ title: 'История без дат', parentId: epicId })
+        .expect(201);
+      storyId = story.id;
+    });
+
+    it('PATCH эпика с датами → 200, значения видны в ответе и в дереве', async () => {
+      const { body: updated } = await request(app.getHttpServer())
+        .patch(`/api/projects/${projectId}/groups/${epicId}`)
+        .set('Authorization', auth())
+        .send({ startDate: '2026-01-01', dueDate: '2026-01-31' })
+        .expect(200);
+
+      expect(updated.startDate).toBe('2026-01-01');
+      expect(updated.dueDate).toBe('2026-01-31');
+
+      const { body: tree } = await request(app.getHttpServer())
+        .get(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .expect(200);
+
+      const epicNode = tree.find((e: { id: string }) => e.id === epicId);
+      expect(epicNode.startDate).toBe('2026-01-01');
+      expect(epicNode.dueDate).toBe('2026-01-31');
+    });
+
+    it('PATCH истории с датой → 400', async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/projects/${projectId}/groups/${storyId}`)
+        .set('Authorization', auth())
+        .send({ startDate: '2026-01-01' })
+        .expect(400);
+    });
+
+    it('PATCH эпика с некорректным форматом даты → 400', async () => {
+      await request(app.getHttpServer())
+        .patch(`/api/projects/${projectId}/groups/${epicId}`)
+        .set('Authorization', auth())
+        .send({ startDate: '2026-13-1x' })
+        .expect(400);
+    });
+  });
+
   describe('задача в ячейке', () => {
     let taskId: string;
     let columnId: string;

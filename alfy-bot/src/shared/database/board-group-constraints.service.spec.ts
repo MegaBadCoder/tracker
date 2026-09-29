@@ -197,4 +197,38 @@ describe('BoardGroupConstraintsMigrationService (in-memory sqlite)', () => {
       }),
     ).rejects.toThrow();
   });
+
+  it('7. schema recreated with startDate/dueDate columns still rejects a cross-project task after re-migration', async () => {
+    const rows: { sql: string }[] = await dataSource.query(
+      'SELECT sql FROM sqlite_master WHERE type = ? AND name = ?',
+      ['table', 'board_groups'],
+    );
+    const originalSql = rows[0].sql;
+    expect(originalSql).toContain('startDate');
+    expect(originalSql).toContain('dueDate');
+
+    await makeEpic('epic-1', PROJECT_A);
+    await makeStory('story-1', 'epic-1', PROJECT_A);
+
+    await dataSource.query(
+      'ALTER TABLE board_groups RENAME TO board_groups_old',
+    );
+    await dataSource.query(originalSql);
+    await dataSource.query(
+      'INSERT INTO board_groups SELECT * FROM board_groups_old',
+    );
+    await dataSource.query('DROP TABLE board_groups_old');
+
+    await service.onApplicationBootstrap();
+
+    await expect(
+      taskRepo.save({
+        id: 'task-2',
+        userId: USER_ID,
+        title: 'Cross-project task, post re-migration',
+        projectId: PROJECT_B,
+        groupId: 'story-1',
+      }),
+    ).rejects.toThrow();
+  });
 });
