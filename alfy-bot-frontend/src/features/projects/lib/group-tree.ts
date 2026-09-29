@@ -1,5 +1,6 @@
 import type { BoardGroupNode } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
+import { pluralRu } from '@/lib/plural'
 
 /** Ищет узел (эпик или историю) по id в дереве групп проекта. */
 export function findGroup(tree: BoardGroupNode[], id: string): BoardGroupNode | undefined {
@@ -61,4 +62,28 @@ export function deletionImpact(group: BoardGroupNode, tasks: Task[]): { stories:
     stories: group.children.length,
     tasks: affectedTasks.length,
   }
+}
+
+/**
+ * Текст подтверждения удаления эпика/истории: называет последствия
+ * ({@link deletionImpact}) до подтверждения. Один источник для доски и
+ * карточки группы — тексты не должны расходиться.
+ */
+export function groupDeletionMessage(group: BoardGroupNode, impact: { stories: number, tasks: number }): string {
+  const parts = [`Удалить ${group.type === 'epic' ? 'эпик' : 'историю'} „${group.title}“?`]
+
+  if (group.type === 'epic' && impact.stories > 0) {
+    const verb = pluralRu(impact.stories, ['удалится', 'удалятся', 'удалятся'])
+    const word = pluralRu(impact.stories, ['история', 'истории', 'историй'])
+    parts.push(`Вместе с ним ${verb} ${impact.stories} ${word}.`)
+  }
+
+  if (impact.tasks > 0) {
+    const remainVerb = pluralRu(impact.tasks, ['останется', 'останутся', 'останутся'])
+    const moveVerb = pluralRu(impact.tasks, ['переедет', 'переедут', 'переедут'])
+    const word = pluralRu(impact.tasks, ['задача', 'задачи', 'задач'])
+    parts.push(`${impact.tasks} ${word} ${remainVerb} и ${moveVerb} в „Без эпика“.`)
+  }
+
+  return parts.join(' ')
 }

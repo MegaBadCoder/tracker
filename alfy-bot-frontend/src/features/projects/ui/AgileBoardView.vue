@@ -5,12 +5,10 @@ import type { Task } from '@/features/tasks/model/types'
 import { Plus } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { useConfirm } from '@/composables/useConfirm'
 import { useTaskStore } from '@/features/tasks/model/task-store'
-import { pluralRu } from '@/lib/plural'
 import { buildAgileRows, groupTasksByColumn } from '../lib/agile-layout'
-import { deletionImpact, groupTaskIds } from '../lib/group-tree'
 import { useAgileDnd } from '../lib/use-agile-dnd'
+import { useGroupDeletion } from '../lib/use-group-deletion'
 import { useColumnStore } from '../model/column-store'
 import { useGroupStore } from '../model/group-store'
 import { useGroupDetail } from '../model/use-group-detail'
@@ -39,7 +37,7 @@ const groupStore = useGroupStore()
 const taskStore = useTaskStore()
 const { tasks } = storeToRefs(taskStore)
 const { onTaskChange } = useAgileDnd(taskStore)
-const { confirm } = useConfirm()
+const { deleteGroupWithConfirm } = useGroupDeletion()
 const groupDetail = useGroupDetail()
 
 const addingEpic = ref(false)
@@ -81,25 +79,6 @@ function laneTaskCount(lane: ProjectColumn): number {
   return projectTasksByColumn.value.get(lane.id)?.length ?? 0
 }
 
-function buildDeleteMessage(group: BoardGroupNode, impact: { stories: number, tasks: number }): string {
-  const parts = [`Удалить ${group.type === 'epic' ? 'эпик' : 'историю'} „${group.title}“?`]
-
-  if (group.type === 'epic' && impact.stories > 0) {
-    const verb = pluralRu(impact.stories, ['удалится', 'удалятся', 'удалятся'])
-    const word = pluralRu(impact.stories, ['история', 'истории', 'историй'])
-    parts.push(`Вместе с ним ${verb} ${impact.stories} ${word}.`)
-  }
-
-  if (impact.tasks > 0) {
-    const remainVerb = pluralRu(impact.tasks, ['останется', 'останутся', 'останутся'])
-    const moveVerb = pluralRu(impact.tasks, ['переедет', 'переедут', 'переедут'])
-    const word = pluralRu(impact.tasks, ['задача', 'задачи', 'задач'])
-    parts.push(`${impact.tasks} ${word} ${remainVerb} и ${moveVerb} в „Без эпика“.`)
-  }
-
-  return parts.join(' ')
-}
-
 async function handleToggleGroupDone(group: BoardGroupNode) {
   await groupStore.toggleGroupDone(props.projectId, group)
 }
@@ -136,27 +115,7 @@ async function handleCreateTask(groupId: string, title: string) {
 }
 
 async function handleDeleteGroup(group: BoardGroupNode) {
-  const impact = deletionImpact(group, allProjectTasks.value)
-  const confirmed = await confirm({
-    title: group.type === 'epic' ? 'Удалить эпик?' : 'Удалить историю?',
-    message: buildDeleteMessage(group, impact),
-    confirmText: 'Удалить',
-    cancelText: 'Отмена',
-    variant: 'destructive',
-  })
-  if (!confirmed)
-    return
-
-  try {
-    await groupStore.deleteGroup(props.projectId, group.id)
-  }
-  catch (err) {
-    console.error('Ошибка удаления группы:', err)
-    return
-  }
-
-  const clearedIds = new Set(groupTaskIds(group))
-  tasks.value = tasks.value.map(t => (t.groupId && clearedIds.has(t.groupId)) ? { ...t, groupId: null } : t)
+  await deleteGroupWithConfirm(props.projectId, group)
 }
 
 function handleTaskChange(event: any, columnId: string | null, groupId: string | null, cellTasks: Task[]) {
