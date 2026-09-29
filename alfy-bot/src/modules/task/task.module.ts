@@ -8,6 +8,7 @@ import {
   Link,
   Goal,
   Project,
+  BoardGroup,
 } from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
 import { UserModule } from '../user/user.module';
@@ -24,6 +25,8 @@ import { UserSettingsPort } from './domain/user-settings.port';
 import { TypeOrmUserSettingsAdapter } from './infrastructure/typeorm-user-settings.adapter';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { TypeOrmProjectTypeAdapter } from './infrastructure/typeorm-project-type.adapter';
+import { BoardGroupQueryPort } from './domain/board-group-query.port';
+import { TypeOrmBoardGroupQueryAdapter } from './infrastructure/typeorm-board-group-query.adapter';
 import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-session.repository';
 import { TelegramNotificationAdapter } from './infrastructure/telegram-notification.adapter';
 import { TelegramUserLookupAdapter } from './infrastructure/telegram-user-lookup.adapter';
@@ -55,6 +58,7 @@ const notificationProviders = isTelegramEnabled()
       Link,
       Goal,
       Project,
+      BoardGroup,
     ]),
     AuthModule,
     UserModule,
@@ -71,6 +75,7 @@ const notificationProviders = isTelegramEnabled()
     },
     { provide: UserSettingsPort, useClass: TypeOrmUserSettingsAdapter },
     { provide: ProjectTypeQueryPort, useClass: TypeOrmProjectTypeAdapter },
+    { provide: BoardGroupQueryPort, useClass: TypeOrmBoardGroupQueryAdapter },
     ...notificationProviders,
     {
       provide: TelegramUserLookupPort,

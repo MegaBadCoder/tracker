@@ -203,6 +203,35 @@ describe('Board groups (e2e)', () => {
       expect(body.groupId).toBe(storyId);
     });
 
+    it('POST /api/tasks с groupId группы этого проекта → 201 и groupId на задаче', async () => {
+      const { body } = await request(app.getHttpServer())
+        .post('/api/tasks')
+        .set('Authorization', auth())
+        .send({ title: 'Refresh токен', projectId, groupId: storyId })
+        .expect(201);
+
+      expect(body.groupId).toBe(storyId);
+    });
+
+    it('PATCH /api/tasks/:id с группой другого проекта → 400, не 500', async () => {
+      const { body: otherProject } = await request(app.getHttpServer())
+        .post('/api/projects')
+        .set('Authorization', auth())
+        .send({ title: 'Другой проект e2e' })
+        .expect(201);
+      const { body: otherGroup } = await request(app.getHttpServer())
+        .post(`/api/projects/${otherProject.id}/groups`)
+        .set('Authorization', auth())
+        .send({ title: 'Чужой эпик' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/api/tasks/${taskId}`)
+        .set('Authorization', auth())
+        .send({ groupId: otherGroup.id })
+        .expect(400);
+    });
+
     // Разрушающая операция: если PRAGMA foreign_keys окажется выключенным
     // или onDelete не тем, пользователь потеряет задачи вместе с эпиком.
     // Юнит-спек это не ловит — там репозиторий замокан.

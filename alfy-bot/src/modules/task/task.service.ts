@@ -26,6 +26,7 @@ import {
 import { hasCrossedPomodoroTarget } from './domain/pomodoro.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
+import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
@@ -57,6 +58,7 @@ export class TaskService {
     private readonly userSettings: UserSettingsPort,
     private readonly linkPort: TaskLinkPort,
     private readonly projectTypeQuery: ProjectTypeQueryPort,
+    private readonly boardGroupQuery: BoardGroupQueryPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
@@ -104,6 +106,10 @@ export class TaskService {
     const uniqueGoalIds = goalIds?.length
       ? await this.assertOwnedGoals(userId, goalIds)
       : [];
+
+    if (dto.groupId) {
+      await this.assertGroupInProject(dto.groupId, dto.projectId ?? null);
+    }
 
     const created = await this.taskRepo.create(taskData);
     if (uniqueGoalIds.length) {
@@ -239,12 +245,19 @@ export class TaskService {
       }
     }
 
+    if (dto.groupId !== undefined && dto.groupId !== null) {
+      const targetProjectId = isChangingProject
+        ? (dto.projectId ?? null)
+        : task.projectId;
+      await this.assertGroupInProject(dto.groupId, targetProjectId);
+    }
+
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),
     );
     Object.assign(task, defined);
-    if (isChangingProject) {
+    if (isChangingProject && dto.groupId === undefined) {
       task.groupId = null;
     }
     if (dueDate !== undefined) {
@@ -671,6 +684,23 @@ export class TaskService {
     if (id.includes('__virtual__')) {
       throw new BadRequestException(
         'Virtual task instances cannot be modified directly.',
+      );
+    }
+  }
+
+  private async assertGroupInProject(
+    groupId: string,
+    projectId: string | null,
+  ): Promise<void> {
+    if (projectId === null) {
+      throw new BadRequestException(
+        'Cannot assign a group to a task without a project',
+      );
+    }
+    const groupProjectId = await this.boardGroupQuery.getProjectId(groupId);
+    if (groupProjectId !== projectId) {
+      throw new BadRequestException(
+        'Group does not belong to the task project',
       );
     }
   }

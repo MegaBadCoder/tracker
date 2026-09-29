@@ -5,6 +5,7 @@ import { TaskRepositoryPort } from './domain/task-repository.port';
 import { TaskLinkPort } from './domain/task-link.port';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
+import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -59,6 +60,7 @@ describe('TaskService', () => {
   let repo: Record<string, jest.Mock>;
   let linkPort: Record<string, jest.Mock>;
   let projectTypeQuery: Record<string, jest.Mock>;
+  let boardGroupQuery: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -116,6 +118,10 @@ describe('TaskService', () => {
       getType: jest.fn().mockResolvedValue('simple'),
     };
 
+    boardGroupQuery = {
+      getProjectId: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
@@ -123,6 +129,7 @@ describe('TaskService', () => {
         { provide: TaskLinkPort, useValue: linkPort },
         { provide: UserSettingsPort, useValue: userSettings },
         { provide: ProjectTypeQueryPort, useValue: projectTypeQuery },
+        { provide: BoardGroupQueryPort, useValue: boardGroupQuery },
       ],
     }).compile();
 
@@ -230,6 +237,48 @@ describe('TaskService', () => {
 
       const arg = repo.create.mock.calls[0][0] as Partial<Task>;
       expect(arg.pomodoroConfig).toBeUndefined();
+    });
+  });
+
+  describe('create — groupId', () => {
+    it('создаёт задачу с группой своего проекта', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+
+      const result = await service.create(1, {
+        title: 'В эпике',
+        projectId: 'proj-1',
+        groupId: 'group-1',
+      });
+
+      expect(boardGroupQuery.getProjectId).toHaveBeenCalledWith('group-1');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ groupId: 'group-1', projectId: 'proj-1' }),
+      );
+      expect(result.groupId).toBe('group-1');
+    });
+
+    it('бросает BadRequestException при группе чужого проекта', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-2');
+
+      await expect(
+        service.create(1, {
+          title: 'Чужая группа',
+          projectId: 'proj-1',
+          groupId: 'group-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при groupId без проекта', async () => {
+      await expect(
+        service.create(1, {
+          title: 'Без проекта',
+          groupId: 'group-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
     });
   });
 
@@ -348,6 +397,83 @@ describe('TaskService', () => {
 
       expect(projectTypeQuery.getType).not.toHaveBeenCalled();
       expect(result.task.title).toBe('Новое название');
+    });
+
+    it('groupId своей группы — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: null }),
+      );
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+
+      const result = await service.update(1, 'task-1', {
+        groupId: 'group-1',
+      });
+
+      expect(boardGroupQuery.getProjectId).toHaveBeenCalledWith('group-1');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ groupId: 'group-1' }),
+      );
+      expect(result.task.groupId).toBe('group-1');
+    });
+
+    it('бросает BadRequestException при группе чужого проекта', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: null }),
+      );
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-2');
+
+      await expect(
+        service.update(1, 'task-1', { groupId: 'group-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('groupId: null — группа снята', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', { groupId: null });
+
+      expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ groupId: null }),
+      );
+      expect(result.task.groupId).toBeNull();
+    });
+
+    it('смена проекта без groupId — группа обнуляется (как раньше)', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', groupId: null }),
+      );
+      expect(result.task.groupId).toBeNull();
+    });
+
+    it('смена проекта с groupId группы целевого проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-old' }),
+      );
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-2');
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        groupId: 'group-2',
+      });
+
+      expect(boardGroupQuery.getProjectId).toHaveBeenCalledWith('group-2');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', groupId: 'group-2' }),
+      );
+      expect(result.task.groupId).toBe('group-2');
     });
   });
 
