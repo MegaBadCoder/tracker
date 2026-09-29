@@ -1,6 +1,6 @@
 # Спринты в agile-проекте
 
-**Status:** planning
+**Status:** executing
 **Branch:** feat/agile-board
 **Worktree:** .worktrees/feat-agile-board
 **Mode:** interactive
