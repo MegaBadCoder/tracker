@@ -6,6 +6,7 @@ import { TaskLinkPort } from './domain/task-link.port';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { BoardGroupQueryPort } from './domain/board-group-query.port';
+import { SprintQueryPort } from './domain/sprint-query.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -61,6 +62,7 @@ describe('TaskService', () => {
   let linkPort: Record<string, jest.Mock>;
   let projectTypeQuery: Record<string, jest.Mock>;
   let boardGroupQuery: Record<string, jest.Mock>;
+  let sprintQuery: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -122,6 +124,11 @@ describe('TaskService', () => {
       getProjectId: jest.fn().mockResolvedValue(null),
     };
 
+    sprintQuery = {
+      getSprint: jest.fn().mockResolvedValue(null),
+      firstColumnId: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
@@ -130,6 +137,7 @@ describe('TaskService', () => {
         { provide: UserSettingsPort, useValue: userSettings },
         { provide: ProjectTypeQueryPort, useValue: projectTypeQuery },
         { provide: BoardGroupQueryPort, useValue: boardGroupQuery },
+        { provide: SprintQueryPort, useValue: sprintQuery },
       ],
     }).compile();
 
@@ -279,6 +287,120 @@ describe('TaskService', () => {
       ).rejects.toThrow(BadRequestException);
       expect(repo.create).not.toHaveBeenCalled();
       expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create — sprintId', () => {
+    it('создаёт задачу в спринте своего проекта и проставляет первую колонку', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-first');
+
+      const result = await service.create(1, {
+        title: 'В спринте',
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+
+      expect(sprintQuery.getSprint).toHaveBeenCalledWith('sprint-1');
+      expect(sprintQuery.firstColumnId).toHaveBeenCalledWith('proj-1');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sprintId: 'sprint-1',
+          columnId: 'col-first',
+        }),
+      );
+      expect(result.columnId).toBe('col-first');
+    });
+
+    it('не трогает заданный columnId', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'active',
+      });
+
+      await service.create(1, {
+        title: 'В спринте',
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+        columnId: 'col-2',
+      });
+
+      expect(sprintQuery.firstColumnId).not.toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ sprintId: 'sprint-1', columnId: 'col-2' }),
+      );
+    });
+
+    it('оставляет columnId пустым, если у проекта нет колонок', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue(null);
+
+      const result = await service.create(1, {
+        title: 'Без колонок',
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+
+      expect(result.columnId ?? null).toBeNull();
+    });
+
+    it('бросает BadRequestException при спринте чужого проекта', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Чужой спринт',
+          projectId: 'proj-1',
+          sprintId: 'sprint-1',
+        }),
+      ).rejects.toThrow('Sprint does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при несуществующем спринте', async () => {
+      sprintQuery.getSprint.mockResolvedValue(null);
+
+      await expect(
+        service.create(1, {
+          title: 'Нет спринта',
+          projectId: 'proj-1',
+          sprintId: 'sprint-1',
+        }),
+      ).rejects.toThrow('Sprint does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при закрытом спринте', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'closed',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Закрытый',
+          projectId: 'proj-1',
+          sprintId: 'sprint-1',
+        }),
+      ).rejects.toThrow('Cannot assign a task to a closed sprint');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при sprintId без проекта', async () => {
+      await expect(
+        service.create(1, { title: 'Без проекта', sprintId: 'sprint-1' }),
+      ).rejects.toThrow('Cannot assign a sprint to a task without a project');
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(sprintQuery.getSprint).not.toHaveBeenCalled();
     });
   });
 
@@ -477,6 +599,149 @@ describe('TaskService', () => {
     });
   });
 
+  describe('update — sprintId', () => {
+    it('спринт своего проекта — сохраняется, колонка берётся первая', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', columnId: null }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-first');
+
+      const result = await service.update(1, 'task-1', {
+        sprintId: 'sprint-1',
+      });
+
+      expect(sprintQuery.firstColumnId).toHaveBeenCalledWith('proj-1');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sprintId: 'sprint-1',
+          columnId: 'col-first',
+        }),
+      );
+      expect(result.task.sprintId).toBe('sprint-1');
+    });
+
+    it('заданная колонка задачи не трогается', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', columnId: 'col-2' }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'active',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        sprintId: 'sprint-1',
+      });
+
+      expect(sprintQuery.firstColumnId).not.toHaveBeenCalled();
+      expect(result.task.columnId).toBe('col-2');
+    });
+
+    it('спринт чужого проекта даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('несуществующий спринт даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      sprintQuery.getSprint.mockResolvedValue(null);
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('закрытый спринт даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'closed',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow('Cannot assign a task to a closed sprint');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('sprintId без проекта у задачи даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: null }));
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow('Cannot assign a sprint to a task without a project');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('sprintId: null — задача уходит в бэклог, колонка сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          sprintId: 'sprint-1',
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', { sprintId: null });
+
+      expect(sprintQuery.getSprint).not.toHaveBeenCalled();
+      expect(sprintQuery.firstColumnId).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ sprintId: null, columnId: 'col-2' }),
+      );
+      expect(result.task.sprintId).toBeNull();
+    });
+
+    it('смена проекта без sprintId — спринт обнуляется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', sprintId: null }),
+      );
+      expect(result.task.sprintId).toBeNull();
+    });
+
+    it('смена проекта со спринтом целевого проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-old' }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        sprintId: 'sprint-2',
+      });
+
+      expect(sprintQuery.getSprint).toHaveBeenCalledWith('sprint-2');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', sprintId: 'sprint-2' }),
+      );
+      expect(result.task.sprintId).toBe('sprint-2');
+    });
+  });
+
   describe('moveToInbox', () => {
     // Тот же случай, что и смена projectId в update: задача уезжает из
     // проекта, а groupId указывает на группу этого проекта. Триггер
@@ -498,6 +763,18 @@ describe('TaskService', () => {
           columnId: null,
           groupId: null,
         }),
+      );
+    });
+
+    it('обнуляет sprintId вместе с projectId', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-1' }),
+      );
+
+      await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, sprintId: null }),
       );
     });
 

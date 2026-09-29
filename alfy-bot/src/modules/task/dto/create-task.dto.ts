@@ -116,6 +116,14 @@ export class CreateTaskDto {
   @IsUUID()
   groupId?: string | null;
 
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440003',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  sprintId?: string | null;
+
   @ApiPropertyOptional({ description: 'Recurrence rule for repeating tasks' })
   @IsOptional()
   @IsObject()

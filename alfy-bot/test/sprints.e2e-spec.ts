@@ -159,4 +159,98 @@ describe('Sprints (e2e)', () => {
       .send({ name: 'Новое имя' })
       .expect(400);
   });
+
+  describe('назначение задач в спринт через API задач', () => {
+    interface TaskBody {
+      id: string;
+      columnId: string | null;
+      sprintId: string | null;
+    }
+    interface ColumnBody {
+      id: string;
+      order: number;
+    }
+
+    const createAgileProject = async (title: string): Promise<string> => {
+      const { body } = await request(app.getHttpServer())
+        .post('/api/projects')
+        .set('Authorization', auth())
+        .send({ title, viewMode: 'board', type: 'agile' })
+        .expect(201);
+      return (body as { id: string }).id;
+    };
+
+    const createSprintIn = async (project: string): Promise<SprintBody> => {
+      const { body } = await request(app.getHttpServer())
+        .post(`/api/projects/${project}/sprints`)
+        .set('Authorization', auth())
+        .send({})
+        .expect(201);
+      return body as SprintBody;
+    };
+
+    it('создание с sprintId без columnId проставляет первую колонку', async () => {
+      const project = await createAgileProject('Assign create');
+      const sprint = await createSprintIn(project);
+      const { body: columns } = (await request(app.getHttpServer())
+        .get(`/api/projects/${project}/columns`)
+        .set('Authorization', auth())
+        .expect(200)) as { body: ColumnBody[] };
+      const first = [...columns].sort((a, b) => a.order - b.order)[0];
+
+      const { body: task } = (await request(app.getHttpServer())
+        .post('/api/tasks')
+        .set('Authorization', auth())
+        .send({ title: 'В спринт', projectId: project, sprintId: sprint.id })
+        .expect(201)) as { body: TaskBody };
+
+      expect(task.sprintId).toBe(sprint.id);
+      expect(task.columnId).toBe(first.id);
+    });
+
+    it('PATCH: закрытый спринт и спринт другого проекта дают 400, снятие сохраняет колонку', async () => {
+      const project = await createAgileProject('Assign patch');
+      const other = await createAgileProject('Assign other');
+      const otherSprint = await createSprintIn(other);
+      const target = await createSprintIn(project);
+      const closing = await createSprintIn(project);
+
+      await request(app.getHttpServer())
+        .post(`/api/projects/${project}/sprints/${closing.id}/start`)
+        .set('Authorization', auth())
+        .send({ startDate: '2026-03-01', endDate: '2026-03-14' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/api/projects/${project}/sprints/${closing.id}/complete`)
+        .set('Authorization', auth())
+        .send({ moveTo: target.id })
+        .expect(201);
+
+      const { body: task } = (await request(app.getHttpServer())
+        .post('/api/tasks')
+        .set('Authorization', auth())
+        .send({ title: 'Задача', projectId: project })
+        .expect(201)) as { body: TaskBody };
+      const patch = (payload: Record<string, unknown>) =>
+        request(app.getHttpServer())
+          .patch(`/api/tasks/${task.id}`)
+          .set('Authorization', auth())
+          .send(payload);
+
+      await patch({ sprintId: closing.id }).expect(400);
+      await patch({ sprintId: otherSprint.id }).expect(400);
+
+      const { body: assigned } = (await patch({ sprintId: target.id }).expect(
+        200,
+      )) as { body: { task: TaskBody } };
+      expect(assigned.task.sprintId).toBe(target.id);
+      expect(assigned.task.columnId).not.toBeNull();
+
+      const { body: released } = (await patch({ sprintId: null }).expect(
+        200,
+      )) as { body: { task: TaskBody } };
+      expect(released.task.sprintId).toBeNull();
+      expect(released.task.columnId).toBe(assigned.task.columnId);
+    });
+  });
 });

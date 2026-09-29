@@ -27,6 +27,7 @@ import { hasCrossedPomodoroTarget } from './domain/pomodoro.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { BoardGroupQueryPort } from './domain/board-group-query.port';
+import { SprintQueryPort } from './domain/sprint-query.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
@@ -59,6 +60,7 @@ export class TaskService {
     private readonly linkPort: TaskLinkPort,
     private readonly projectTypeQuery: ProjectTypeQueryPort,
     private readonly boardGroupQuery: BoardGroupQueryPort,
+    private readonly sprintQuery: SprintQueryPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
@@ -109,6 +111,13 @@ export class TaskService {
 
     if (dto.groupId) {
       await this.assertGroupInProject(dto.groupId, dto.projectId ?? null);
+    }
+
+    if (dto.sprintId) {
+      await this.assertSprintAssignable(dto.sprintId, dto.projectId ?? null);
+      if (!taskData.columnId && dto.projectId) {
+        taskData.columnId = await this.sprintQuery.firstColumnId(dto.projectId);
+      }
     }
 
     const created = await this.taskRepo.create(taskData);
@@ -252,6 +261,13 @@ export class TaskService {
       await this.assertGroupInProject(dto.groupId, targetProjectId);
     }
 
+    if (dto.sprintId !== undefined && dto.sprintId !== null) {
+      const targetProjectId = isChangingProject
+        ? (dto.projectId ?? null)
+        : task.projectId;
+      await this.assertSprintAssignable(dto.sprintId, targetProjectId);
+    }
+
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),
@@ -259,6 +275,12 @@ export class TaskService {
     Object.assign(task, defined);
     if (isChangingProject && dto.groupId === undefined) {
       task.groupId = null;
+    }
+    if (isChangingProject && dto.sprintId === undefined) {
+      task.sprintId = null;
+    }
+    if (task.sprintId && task.projectId && !task.columnId) {
+      task.columnId = await this.sprintQuery.firstColumnId(task.projectId);
     }
     if (dueDate !== undefined) {
       const newDue = dueDate ? new Date(dueDate) : null;
@@ -629,6 +651,7 @@ export class TaskService {
     // Группа принадлежит проекту, из которого задача уезжает — оставить
     // groupId значит нарваться на trg_task_group_same_project и отдать 500.
     task.groupId = null;
+    task.sprintId = null;
     task.order = order;
     return this.attachGoalIdsOne(userId, await this.taskRepo.save(task));
   }
@@ -702,6 +725,26 @@ export class TaskService {
       throw new BadRequestException(
         'Group does not belong to the task project',
       );
+    }
+  }
+
+  private async assertSprintAssignable(
+    sprintId: string,
+    projectId: string | null,
+  ): Promise<void> {
+    if (projectId === null) {
+      throw new BadRequestException(
+        'Cannot assign a sprint to a task without a project',
+      );
+    }
+    const sprint = await this.sprintQuery.getSprint(sprintId);
+    if (!sprint || sprint.projectId !== projectId) {
+      throw new BadRequestException(
+        'Sprint does not belong to the task project',
+      );
+    }
+    if (sprint.status === 'closed') {
+      throw new BadRequestException('Cannot assign a task to a closed sprint');
     }
   }
 
