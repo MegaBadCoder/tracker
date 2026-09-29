@@ -7,7 +7,10 @@ import {
   Task,
   User,
 } from '../entities';
-import { BoardGroupConstraintsMigrationService } from './board-group-constraints.service';
+import {
+  BoardGroupConstraintsMigrationService,
+  dropBoardGroupTriggers,
+} from './board-group-constraints.service';
 
 describe('BoardGroupConstraintsMigrationService (in-memory sqlite)', () => {
   let dataSource: DataSource;
@@ -210,16 +213,31 @@ describe('BoardGroupConstraintsMigrationService (in-memory sqlite)', () => {
     await makeEpic('epic-1', PROJECT_A);
     await makeStory('story-1', 'epic-1', PROJECT_A);
 
+    await dropBoardGroupTriggers(dataSource);
+    await dataSource.query('PRAGMA foreign_keys = OFF');
     await dataSource.query(
-      'ALTER TABLE board_groups RENAME TO board_groups_old',
+      originalSql.replace('"board_groups"', '"temporary_board_groups"'),
     );
-    await dataSource.query(originalSql);
     await dataSource.query(
-      'INSERT INTO board_groups SELECT * FROM board_groups_old',
+      'INSERT INTO temporary_board_groups SELECT * FROM board_groups',
     );
-    await dataSource.query('DROP TABLE board_groups_old');
+    await dataSource.query('DROP TABLE board_groups');
+    await dataSource.query(
+      'ALTER TABLE temporary_board_groups RENAME TO board_groups',
+    );
+    await dataSource.query('PRAGMA foreign_keys = ON');
 
     await service.onApplicationBootstrap();
+
+    await expect(
+      taskRepo.save({
+        id: 'task-1',
+        userId: USER_ID,
+        title: 'Same-project task, post re-migration',
+        projectId: PROJECT_A,
+        groupId: 'story-1',
+      }),
+    ).resolves.toBeDefined();
 
     await expect(
       taskRepo.save({
@@ -229,6 +247,8 @@ describe('BoardGroupConstraintsMigrationService (in-memory sqlite)', () => {
         projectId: PROJECT_B,
         groupId: 'story-1',
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(
+      'task: group must belong to the same project as the task',
+    );
   });
 });
