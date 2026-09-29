@@ -30,6 +30,7 @@ import {
   Bell,
   BookMarked,
   Target,
+  Zap,
 } from 'lucide-vue-next'
 import { formatDueDate, formatDate, DATE_WITH_TIME } from '../lib/formatters'
 import { PRIORITY_LABELS } from '../model/constants'
@@ -56,6 +57,12 @@ const props = defineProps<{
    * Входящих не показывают недоступное им поле.
    */
   groupTitle?: string | null
+  /**
+   * Текст поля «Спринт» (см. `sprintLabel`). Чип рендерится, только когда
+   * проп передан (даже `null` — «загрузка», без значения). `undefined`
+   * скрывает чип для задач обычных проектов и Входящих.
+   */
+  sprintTitle?: string | null
   editable: boolean
 }>()
 
@@ -93,6 +100,14 @@ const chips = computed<ChipDef[]>(() => [
         icon: BookMarked,
         label: props.groupTitle ?? 'Без эпика',
         isSet: !!props.groupTitle,
+      }]),
+  ...(props.sprintTitle === undefined
+    ? []
+    : [{
+        key: 'sprint',
+        icon: Zap,
+        label: props.sprintTitle ?? 'Бэклог',
+        isSet: !!props.sprintTitle,
       }]),
   {
     key: 'dueDate',

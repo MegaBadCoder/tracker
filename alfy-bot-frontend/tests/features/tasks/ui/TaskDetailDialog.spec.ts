@@ -1,4 +1,4 @@
-import type { BoardGroupNode, Project } from '@/features/projects/model/types'
+import type { BoardGroupNode, Project, Sprint } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GoalPicker from '@/features/goals/ui/GoalPicker.vue'
 import { useGroupStore } from '@/features/projects/model/group-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { useGroupDetail } from '@/features/projects/model/use-group-detail'
 import GroupPicker from '@/features/projects/ui/GroupPicker.vue'
+import SprintPicker from '@/features/projects/ui/SprintPicker.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 
 vi.mock('@/api/client', () => ({
@@ -329,6 +331,154 @@ describe('taskDetailDialog — эпик/история agile-задачи', () =
     await flushPromises()
 
     expect(wrapper.findComponent(GroupPicker).props('modelValue')).toBeNull()
+
+    const updates = wrapper.emitted('update') as Array<[Task]>
+    expect(updates.length).toBe(1)
+    expect(updates[0]![0].projectId).toBe('proj-agile-2')
+  })
+})
+
+function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
+  return {
+    id: 'sprint-1',
+    userId: 1,
+    projectId: 'proj-agile',
+    name: 'Спринт 1',
+    goal: null,
+    startDate: null,
+    endDate: null,
+    status: 'planned',
+    completedAt: null,
+    order: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('taskDetailDialog — спринт agile-задачи', () => {
+  let wrapper: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+  })
+
+  it('agile-задача показывает поле «Спринт» с именем спринта', async () => {
+    useProjectStore().projects = [makeAgileProject()]
+    useSprintStore().lists['proj-agile'] = [makeSprint({ id: 'sprint-2', name: 'Спринт 2', status: 'active' })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile', sprintId: 'sprint-2' }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent(SprintPicker).exists()).toBe(true)
+    expect(document.body.textContent).toContain('Спринт 2')
+  })
+
+  it('задача обычного проекта не показывает поле «Спринт»', async () => {
+    useProjectStore().projects = [makeProject({ id: 'proj-simple' })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-simple' }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent(SprintPicker).exists()).toBe(false)
+  })
+
+  it('задача во Входящих не показывает поле «Спринт»', async () => {
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: null }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent(SprintPicker).exists()).toBe(false)
+  })
+
+  it('выбор спринта эмитит обновление с sprintId', async () => {
+    useProjectStore().projects = [makeAgileProject()]
+    useSprintStore().lists['proj-agile'] = [makeSprint({ id: 'sprint-2', name: 'Спринт 2' })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile', sprintId: null }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.findComponent(SprintPicker).vm.$emit('update:modelValue', 'sprint-2')
+    await flushPromises()
+
+    const updates = wrapper.emitted('update') as Array<[Task]>
+    expect(updates.at(-1)![0].sprintId).toBe('sprint-2')
+  })
+
+  it('«Бэклог» эмитит sprintId: null', async () => {
+    useProjectStore().projects = [makeAgileProject()]
+    useSprintStore().lists['proj-agile'] = [makeSprint({ id: 'sprint-2', status: 'active' })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile', sprintId: 'sprint-2' }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    await wrapper.findComponent(SprintPicker).vm.$emit('update:modelValue', null)
+    await flushPromises()
+
+    const updates = wrapper.emitted('update') as Array<[Task]>
+    expect(updates.at(-1)![0].sprintId).toBeNull()
+  })
+
+  it('задача в закрытом спринте показывает «Спринт 1 (закрыт)»', async () => {
+    useProjectStore().projects = [makeAgileProject()]
+    useSprintStore().lists['proj-agile'] = [makeSprint({ id: 'sprint-1', name: 'Спринт 1', status: 'closed' })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile', sprintId: 'sprint-1' }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.body.textContent).toContain('Спринт 1 (закрыт)')
+  })
+
+  it('смена проекта обнуляет локальное поле спринта без отдельного PATCH', async () => {
+    useProjectStore().projects = [
+      makeAgileProject({ id: 'proj-agile-1' }),
+      makeAgileProject({ id: 'proj-agile-2' }),
+    ]
+    const sprintStore = useSprintStore()
+    sprintStore.lists['proj-agile-1'] = [makeSprint({ id: 'sprint-1', projectId: 'proj-agile-1', status: 'active' })]
+    sprintStore.lists['proj-agile-2'] = []
+
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile-1', sprintId: 'sprint-1' }), open: true },
+      global: { stubs },
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent(SprintPicker).props('modelValue')).toBe('sprint-1')
+
+    await wrapper.findComponent({ name: 'ProjectPicker' }).vm.$emit('update:modelValue', 'proj-agile-2')
+    await flushPromises()
+
+    expect(wrapper.findComponent(SprintPicker).props('modelValue')).toBeNull()
 
     const updates = wrapper.emitted('update') as Array<[Task]>
     expect(updates.length).toBe(1)

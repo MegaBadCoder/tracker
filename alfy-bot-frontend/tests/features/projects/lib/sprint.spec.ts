@@ -6,6 +6,7 @@ import {
   defaultCompleteTarget,
   sprintDeletionMessage,
   sprintEndFromDuration,
+  sprintLabel,
   sprintProgress,
   sprintTasks,
 } from '@/features/projects/lib/sprint'
@@ -154,5 +155,32 @@ describe('sprintDeletionMessage', () => {
 
   it('пять задач', () => {
     expect(sprintDeletionMessage(sprint, 5)).toBe('Удалить „Спринт 2“? 5 задач вернутся в бэклог.')
+  })
+})
+
+describe('sprintLabel', () => {
+  const sprints = [
+    makeSprint({ id: 'active', name: 'Спринт 2', status: 'active' }),
+    makeSprint({ id: 'planned', name: 'Спринт 3', status: 'planned' }),
+    makeSprint({ id: 'closed', name: 'Спринт 1', status: 'closed' }),
+  ]
+
+  it('null и undefined — «Бэклог»', () => {
+    expect(sprintLabel(sprints, null)).toBe('Бэклог')
+    expect(sprintLabel(sprints, undefined)).toBe('Бэклог')
+  })
+
+  it('активный и запланированный спринт — просто имя', () => {
+    expect(sprintLabel(sprints, 'active')).toBe('Спринт 2')
+    expect(sprintLabel(sprints, 'planned')).toBe('Спринт 3')
+  })
+
+  it('закрытый спринт — «Имя (закрыт)»', () => {
+    expect(sprintLabel(sprints, 'closed')).toBe('Спринт 1 (закрыт)')
+  })
+
+  it('спринт не найден (ещё грузится) — null, а не «Бэклог»', () => {
+    expect(sprintLabel([], 'active')).toBeNull()
+    expect(sprintLabel(sprints, 'unknown')).toBeNull()
   })
 })

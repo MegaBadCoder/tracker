@@ -193,6 +193,7 @@
             :goals-set="localGoalIds.length > 0"
             :hide-goals="isAgileProject"
             :group-title="isAgileProject ? groupChipTitle : undefined"
+            :sprint-title="isAgileProject ? sprintChipTitle : undefined"
             :editable="effectiveEditable"
             class="-mx-7 border-y border-border/40"
             @select="activeDrawer = ($event as DrawerField)"
@@ -291,6 +292,14 @@
             :model-value="localGroupId"
             :disabled="!effectiveEditable"
             @update:model-value="onGroupChange"
+          />
+
+          <SprintPicker
+            v-if="isAgileProject && localProjectId"
+            :project-id="localProjectId"
+            :model-value="localSprintId"
+            :disabled="!effectiveEditable"
+            @update:model-value="onSprintChange"
           />
 
           <GoalPicker
@@ -529,6 +538,12 @@
           :model-value="localGroupId"
           @update:model-value="onGroupChange"
         />
+        <SprintPickerContent
+          v-if="activeDrawer === 'sprint' && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localSprintId"
+          @update:model-value="onSprintChange"
+        />
         <GoalPickerContent
           v-if="activeDrawer === 'goals' && !isAgileProject"
           :model-value="localGoalIds"
@@ -623,10 +638,14 @@ import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
 import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
 import { countFromDurationMinutes } from '../lib/duration'
 import { groupLabel, groupPath } from '@/features/projects/lib/group-tree'
+import { sprintLabel } from '@/features/projects/lib/sprint'
 import { useGroupStore } from '@/features/projects/model/group-store'
+import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { useGroupDetail } from '@/features/projects/model/use-group-detail'
 import GroupPicker from '@/features/projects/ui/GroupPicker.vue'
 import GroupPickerContent from '@/features/projects/ui/GroupPickerContent.vue'
+import SprintPicker from '@/features/projects/ui/SprintPicker.vue'
+import SprintPickerContent from '@/features/projects/ui/SprintPickerContent.vue'
 import { toTimerTask, useTimerStore } from '@/features/task-timer'
 
 const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
@@ -661,7 +680,7 @@ const isDesktop = useMediaQuery('(min-width: 640px)')
 const isMobile = computed(() => !isDesktop.value)
 
 // Drawer state
-type DrawerField = 'project' | 'group' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
+type DrawerField = 'project' | 'group' | 'sprint' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
 const activeDrawer = ref<DrawerField | null>(null)
 const drawerOpen = computed({
   get: () => activeDrawer.value !== null,
@@ -671,6 +690,7 @@ const drawerOpen = computed({
 const DRAWER_TITLES: Record<DrawerField, string> = {
   project: 'Проект',
   group: 'Эпик / История',
+  sprint: 'Спринт',
   goals: 'Цель',
   dueDate: 'Срок',
   deadline: 'Дедлайн',
@@ -781,10 +801,13 @@ const isAgileProject = computed(() =>
 const localGroupId = ref<string | null>(null)
 const groupStore = useGroupStore()
 const groupDetail = useGroupDetail()
+const localSprintId = ref<string | null>(null)
+const sprintStore = useSprintStore()
 
 function onProjectChange(value: string | null) {
   localProjectId.value = value
   localGroupId.value = null
+  localSprintId.value = null
   emitUpdate({ projectId: value })
   activeDrawer.value = null
 }
@@ -812,9 +835,23 @@ function onGroupChange(value: string | null) {
   activeDrawer.value = null
 }
 
+const sprintChipTitle = computed<string | null>(() =>
+  localSprintId.value && localProjectId.value
+    ? sprintLabel(sprintStore.sprintsOf(localProjectId.value), localSprintId.value)
+    : null,
+)
+
+function onSprintChange(value: string | null) {
+  localSprintId.value = value
+  emitUpdate({ sprintId: value })
+  activeDrawer.value = null
+}
+
 watch(localProjectId, (projectId) => {
-  if (isAgileProject.value && projectId)
+  if (isAgileProject.value && projectId) {
     groupStore.ensureGroups(projectId)
+    sprintStore.ensureSprints(projectId)
+  }
 }, { immediate: true })
 
 const localGoalIds = ref<number[]>([])
@@ -903,6 +940,7 @@ watch(() => props.task, (task) => {
     localTags.value = task.tags ? [...task.tags] : []
     localProjectId.value = task.projectId ?? null
     localGroupId.value = task.groupId ?? null
+    localSprintId.value = task.sprintId ?? null
     localGoalIds.value = task.goalIds ? [...task.goalIds] : []
     localRecurrence.value = task.recurrence ?? null
     localOnMissed.value = task.onMissed ?? 'shift'

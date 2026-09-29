@@ -66,3 +66,19 @@ export function sprintDeletionMessage(sprint: Sprint, taskCount: number): string
   const word = pluralRu(taskCount, ['задача', 'задачи', 'задач'])
   return `${question} ${taskCount} ${word} ${verb} в бэклог.`
 }
+
+/**
+ * Текст для поля/чипа «Спринт»: «Бэклог» для `null`/`undefined`, имя спринта
+ * для активного и запланированного, «Имя (закрыт)» для завершённого. `null`,
+ * если `sprintId` указан, но не найден в переданном списке (спринты ещё грузятся).
+ */
+export function sprintLabel(sprints: Sprint[], sprintId: string | null | undefined): string | null {
+  if (sprintId == null)
+    return 'Бэклог'
+
+  const sprint = sprints.find(s => s.id === sprintId)
+  if (!sprint)
+    return null
+
+  return sprint.status === 'closed' ? `${sprint.name} (закрыт)` : sprint.name
+}

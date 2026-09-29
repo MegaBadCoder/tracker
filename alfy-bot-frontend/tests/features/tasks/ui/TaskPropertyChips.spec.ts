@@ -46,3 +46,33 @@ describe('taskPropertyChips — чип эпика/истории', () => {
     expect(wrapper.emitted('select')?.[0]).toEqual(['group'])
   })
 })
+
+describe('taskPropertyChips — чип спринта', () => {
+  it('не рендерит чип спринта, когда sprintTitle не передан', () => {
+    const wrapper = mount(TaskPropertyChips, { props: baseProps() })
+    expect(wrapper.text()).not.toContain('Бэклог')
+  })
+
+  it('рендерит чип со значением sprintTitle, когда проп передан', () => {
+    const wrapper = mount(TaskPropertyChips, {
+      props: { ...baseProps(), sprintTitle: 'Спринт 1 (закрыт)' },
+    })
+    expect(wrapper.text()).toContain('Спринт 1 (закрыт)')
+  })
+
+  it('рендерит «Бэклог», когда sprintTitle передан как null', () => {
+    const wrapper = mount(TaskPropertyChips, {
+      props: { ...baseProps(), sprintTitle: null },
+    })
+    expect(wrapper.text()).toContain('Бэклог')
+  })
+
+  it('эмитит select с ключом sprint при клике на чип', async () => {
+    const wrapper = mount(TaskPropertyChips, {
+      props: { ...baseProps(), sprintTitle: 'Спринт 2' },
+    })
+    const button = wrapper.findAll('button').find(b => b.text().includes('Спринт 2'))
+    await button!.trigger('click')
+    expect(wrapper.emitted('select')?.[0]).toEqual(['sprint'])
+  })
+})
