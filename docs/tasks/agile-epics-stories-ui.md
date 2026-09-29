@@ -1,6 +1,6 @@
 # Эпики и истории: управление в интерфейсе
 
-**Status:** executing
+**Status:** done
 **Branch:** feat/agile-board
 **Worktree:** .worktrees/feat-agile-board
 **Mode:** interactive
@@ -296,7 +296,22 @@ Notes:
 - Не исправлено, косметика: при автофокусе поля ввода доска прокручивается вбок на ~16px (браузер скроллит к фокусу). Цвета в подменю «Цвет» подписаны hex-кодом.
 
 ## Conclusion
-<empty — filled by up:ureview>
+
+Outcome: эпиками и историями теперь управляют на доске, из карточки группы и из диалога задачи; у эпиков есть даты; старт бэкенда больше не падает при изменении схемы `board_groups`. HEAD `1175c38`.
+
+Invariants:
+- Задача ссылается только на группу своего проекта (400, не 500) — `task.service.spec.ts`, e2e и живой API (`POST`/`PATCH` с чужой группой → 400).
+- У задачи во Входящих `groupId = null` — `groupId` без проекта → 400; `moveToInbox` обнуляет группу.
+- Даты только у эпика, `startDate ≤ dueDate` — `board-group.service.spec.ts`, CHECK в сущности, живой API.
+- Удаление группы не удаляет задач — живой API после удаления из UI: обе задачи в проекте с `groupId = null`.
+- Триггеры переживают изменение схемы — `create-data-source.spec.ts` на файловой БД и старт на реальной dev-базе.
+- Одна модалка — `GroupDetailDialog.spec.ts`; на живом UI ровно один `[role=dialog]`.
+- Один `group-store`, чужой проект не трогает дерево доски — `group-store.spec.ts`.
+- Календари с локалью — `GroupDetailDialog.spec.ts` и живой UI (русский, неделя с понедельника).
+
+Review findings: независимый ревьюер Critical и Important не нашёл.
+
+Verified by: три UI-дефекта (кнопки уезжали за край доски, фокус после меню, подтверждение под карточкой) пойманы только на живом браузере, тесты happy-dom их не видели. Подробности в Verify → Notes.
 
 ### Deviations from plan
 
