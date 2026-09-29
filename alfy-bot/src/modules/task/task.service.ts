@@ -261,11 +261,15 @@ export class TaskService {
       await this.assertGroupInProject(dto.groupId, targetProjectId);
     }
 
-    if (dto.sprintId !== undefined && dto.sprintId !== null) {
+    const isChangingSprint =
+      dto.sprintId !== undefined &&
+      (dto.sprintId !== task.sprintId || isChangingProject);
+
+    if (isChangingSprint && dto.sprintId !== null) {
       const targetProjectId = isChangingProject
         ? (dto.projectId ?? null)
         : task.projectId;
-      await this.assertSprintAssignable(dto.sprintId, targetProjectId);
+      await this.assertSprintAssignable(dto.sprintId!, targetProjectId);
     }
 
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
@@ -278,6 +282,9 @@ export class TaskService {
     }
     if (isChangingProject && dto.sprintId === undefined) {
       task.sprintId = null;
+    }
+    if (isChangingProject && dto.columnId === undefined) {
+      task.columnId = null;
     }
     if (task.sprintId && task.projectId && !task.columnId) {
       task.columnId = await this.sprintQuery.firstColumnId(task.projectId);

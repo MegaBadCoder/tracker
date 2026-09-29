@@ -641,6 +641,48 @@ describe('TaskService', () => {
       expect(result.task.columnId).toBe('col-2');
     });
 
+    it('повторная отправка текущего закрытого спринта не отклоняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          sprintId: 'sprint-closed',
+        }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'closed',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        sprintId: 'sprint-closed',
+        title: 'Новое название',
+      });
+
+      expect(sprintQuery.getSprint).not.toHaveBeenCalled();
+      expect(result.task.sprintId).toBe('sprint-closed');
+    });
+
+    it('при смене проекта колонка старого проекта сбрасывается и берётся первая колонка нового', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', columnId: 'col-old', sprintId: null }),
+      );
+      projectTypeQuery.getType.mockResolvedValue('agile');
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'active',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-new-first');
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        sprintId: 'sprint-2',
+      });
+
+      expect(sprintQuery.firstColumnId).toHaveBeenCalledWith('proj-2');
+      expect(result.task.columnId).toBe('col-new-first');
+    });
+
     it('спринт чужого проекта даёт 400 без записи', async () => {
       repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
       sprintQuery.getSprint.mockResolvedValue({
