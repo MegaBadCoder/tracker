@@ -9,6 +9,7 @@ import AgileBoardView from '@/features/projects/ui/AgileBoardView.vue'
 import BoardView from '@/features/projects/ui/BoardView.vue'
 import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
 import SprintBanner from '@/features/projects/ui/SprintBanner.vue'
+import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import ProjectView from '@/views/ProjectView.vue'
@@ -146,6 +147,24 @@ describe('projectView — agile-проект и активный спринт', 
     expect(wrapper.findComponent(AgileBoardView).exists()).toBe(false)
     expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
     expect(wrapper.findComponent(SprintBanner).exists()).toBe(false)
+  })
+
+  it('баннер активного спринта разрешает «Завершить спринт» и открывает диалог завершения', async () => {
+    const wrapper = mountAgile([makeSprint({ id: 'sprint-1' })])
+    await flushPromises()
+    expect(wrapper.findComponent(SprintCompleteDialog).exists()).toBe(false)
+
+    const banner = wrapper.findComponent(SprintBanner)
+    expect(banner.props('canComplete')).toBe(true)
+
+    banner.vm.$emit('complete')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(SprintCompleteDialog)
+    expect(dialog.exists()).toBe(true)
+    expect(dialog.props('open')).toBe(true)
+    expect((dialog.props('sprint') as Sprint).id).toBe('sprint-1')
+    wrapper.unmount()
   })
 
   it('кнопка «Перейти в бэклог» ведёт на маршрут бэклога проекта', async () => {

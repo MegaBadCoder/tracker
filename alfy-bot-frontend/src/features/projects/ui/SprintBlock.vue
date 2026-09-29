@@ -65,6 +65,7 @@ const sprintStore = useSprintStore()
 const taskStore = useTaskStore()
 
 const addingTask = ref(false)
+const keepFocusOnClose = ref(false)
 
 const showStart = computed(() =>
   props.canStart && props.sprint?.status === 'planned' && !props.hasActiveSprint,
@@ -97,6 +98,18 @@ const dates = computed(() => {
 function handleChange(event: { added?: { element: Task } }) {
   if (event.added)
     emit('moveTask', event.added.element.id, props.sprint?.id ?? null)
+}
+
+function handleEdit() {
+  keepFocusOnClose.value = true
+  emit('edit')
+}
+
+function onCloseAutoFocus(event: Event) {
+  if (!keepFocusOnClose.value)
+    return
+  keepFocusOnClose.value = false
+  event.preventDefault()
 }
 
 function handleCreateTask(taskTitle: string) {
@@ -132,8 +145,8 @@ function handleCreateTask(taskTitle: string) {
               <Ellipsis :size="16" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="emit('edit')">
+          <DropdownMenuContent align="end" @close-auto-focus="onCloseAutoFocus">
+            <DropdownMenuItem @click="handleEdit">
               <Pencil :size="14" class="mr-2" />
               Изменить
             </DropdownMenuItem>

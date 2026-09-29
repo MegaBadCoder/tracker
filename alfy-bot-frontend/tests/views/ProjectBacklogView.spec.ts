@@ -3,12 +3,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { useConfirm } from '@/composables/useConfirm'
 import * as columnsApi from '@/features/projects/api/columns-api'
 import * as groupsApi from '@/features/projects/api/groups-api'
+import { sprintDeletionMessage } from '@/features/projects/lib/sprint'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import BacklogEpicsPanel from '@/features/projects/ui/BacklogEpicsPanel.vue'
 import SprintBlock from '@/features/projects/ui/SprintBlock.vue'
+import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
+import SprintFormDialog from '@/features/projects/ui/SprintFormDialog.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 import ProjectBacklogView from '@/views/ProjectBacklogView.vue'
 
@@ -229,6 +233,97 @@ describe('projectBacklogView', () => {
     const dialog = wrapper.findComponent(TaskDetailDialog)
     expect(dialog.props('open')).toBe(true)
     expect((dialog.props('task') as { id: string }).id).toBe('a')
+    wrapper.unmount()
+  })
+})
+
+describe('projectBacklogView — действия со спринтами', () => {
+  const planned = (overrides: Partial<Sprint> = {}) =>
+    makeSprint({ id: 'planned', name: 'Спринт 2', status: 'planned', order: 1, startDate: null, endDate: null, ...overrides })
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('«Начать спринт» открывает форму в режиме start для выбранного спринта', async () => {
+    const wrapper = await mountView([planned()])
+    expect(wrapper.findComponent(SprintFormDialog).exists()).toBe(false)
+
+    const button = wrapper.findAll('button').find(b => b.text() === 'Начать спринт')
+    await button!.trigger('click')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(SprintFormDialog)
+    expect(dialog.props('mode')).toBe('start')
+    expect(dialog.props('projectId')).toBe('proj-1')
+    expect((dialog.props('sprint') as Sprint).id).toBe('planned')
+    wrapper.unmount()
+  })
+
+  it('при активном спринте «Начать спринт» не показывается, а у активного есть «Завершить»', async () => {
+    const wrapper = await mountView([makeSprint(), planned()])
+
+    expect(wrapper.findAll('button').some(b => b.text() === 'Начать спринт')).toBe(false)
+    const complete = wrapper.findAll('button').find(b => b.text() === 'Завершить')
+    expect(complete).toBeTruthy()
+
+    await complete!.trigger('click')
+    await flushPromises()
+
+    const dialog = wrapper.findComponent(SprintCompleteDialog)
+    expect((dialog.props('sprint') as Sprint).id).toBe('sprint-1')
+    wrapper.unmount()
+  })
+
+  it('«Изменить» открывает форму в режиме edit', async () => {
+    const wrapper = await mountView([planned()])
+
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('edit')
+    await flushPromises()
+
+    expect(wrapper.findComponent(SprintFormDialog).props('mode')).toBe('edit')
+    wrapper.unmount()
+  })
+
+  it('удаление показывает confirm с текстом sprintDeletionMessage и после подтверждения вызывает deleteSprint', async () => {
+    const sprint = planned()
+    const wrapper = await mountView([sprint], [
+      rawTask({ id: 'a', sprintId: 'planned' }),
+      rawTask({ id: 'b', sprintId: 'planned', completed: true }),
+    ])
+    const deleteSpy = vi.spyOn(useSprintStore(), 'deleteSprint').mockResolvedValue(undefined)
+    const { options, handleConfirm } = useConfirm()
+
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('delete')
+    await flushPromises()
+
+    expect(options.value).toMatchObject({
+      title: 'Удалить спринт?',
+      message: sprintDeletionMessage(sprint, 2),
+      variant: 'destructive',
+    })
+    expect(options.value?.message).toBe('Удалить „Спринт 2“? 2 задачи вернутся в бэклог.')
+    expect(deleteSpy).not.toHaveBeenCalled()
+
+    handleConfirm()
+    await flushPromises()
+
+    expect(deleteSpy).toHaveBeenCalledWith('proj-1', 'planned')
+    wrapper.unmount()
+  })
+
+  it('при отмене подтверждения deleteSprint не вызывается', async () => {
+    const wrapper = await mountView([planned()])
+    const deleteSpy = vi.spyOn(useSprintStore(), 'deleteSprint').mockResolvedValue(undefined)
+    const { handleCancel } = useConfirm()
+
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('delete')
+    await flushPromises()
+    handleCancel()
+    await flushPromises()
+
+    expect(deleteSpy).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })

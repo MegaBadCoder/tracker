@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Sprint } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { storeToRefs } from 'pinia'
 import { computed, inject, onMounted, ref, watch } from 'vue'
@@ -15,6 +16,7 @@ import BoardView from '@/features/projects/ui/BoardView.vue'
 import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
 import SprintBanner from '@/features/projects/ui/SprintBanner.vue'
+import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
@@ -48,6 +50,8 @@ const sprintsPending = computed(() =>
   sprintStore.isLoading(projectId.value)
   || (!(projectId.value in sprintStore.lists) && !sprintStore.error),
 )
+
+const completeTarget = ref<Sprint | null>(null)
 
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
@@ -228,7 +232,7 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
       </div>
 
       <template v-else>
-        <SprintBanner class="mt-3" :project-id="projectId" />
+        <SprintBanner class="mt-3" :project-id="projectId" can-complete @complete="completeTarget = activeSprint" />
 
         <div class="px-4 py-3">
           <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
@@ -335,6 +339,13 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
       />
     </PageContainer>
   </div>
+  <SprintCompleteDialog
+    v-if="completeTarget"
+    :open="true"
+    :project-id="projectId"
+    :sprint="completeTarget"
+    @update:open="completeTarget = null"
+  />
   <TaskDetailDialog
     :task="selectedTask"
     :open="isDetailOpen"
