@@ -266,3 +266,8 @@ TDD, тесты первыми — фазы 1-3:
 
 ## Conclusion
 <empty — filled by up:ureview>
+
+### Deviations from plan
+
+- Добавлен коммит `8b8c48a` (вне фаз, согласован с пользователем): бэкенд поднимает `DataSource` через `dataSourceFactory` → `initializeWithSchemaSync` (`shared/database/create-data-source.ts`). Там БД открывается без `synchronize`, триггеры снимаются `dropBoardGroupTriggers`, затем вызывается `synchronize()`. Причина: на базе с уже установленными триггерами любое изменение схемы `board_groups` роняло старт — `error in trigger trg_task_group_same_project_insert: no such table: main.board_groups`. SQLite перепроверяет триггер на `tasks` при переименовании пересобранной таблицы. Воспроизведено на копии dev-базы, закрыто `create-data-source.spec.ts` на файловой БД. Design исходил из того, что `synchronize` лишь молча роняет триггеры, а сервис их вернёт; на деле старт до сервиса не доходил.
+- Тест 7 фазы 2 в `board-group-constraints.service.spec.ts` переписан (`1c64932`). Он эмулировал пересборку переименованием `board_groups → board_groups_old`, а SQLite при этом переписывает тела чужих триггеров на `board_groups_old`. Тест «отклонял» кросс-проектную задачу из-за сломанного триггера, а не по правилу. Теперь тест повторяет порядок TypeORM (снять триггеры, `foreign_keys = OFF`, temporary → drop → rename), проверяет, что задача своего проекта вставляется, и ждёт конкретное сообщение триггера.
