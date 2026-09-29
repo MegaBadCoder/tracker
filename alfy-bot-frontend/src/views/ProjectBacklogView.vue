@@ -1,23 +1,216 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
-import { useRoute } from 'vue-router'
+import type { Task } from '@/features/tasks/model/types'
+import { Plus } from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
+import { computed, inject, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
+import { Button } from '@/components/ui/button'
+import { useConfirm } from '@/composables/useConfirm'
+import { sprintTasks } from '@/features/projects/lib/sprint'
+import { useColumnStore } from '@/features/projects/model/column-store'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useSprintStore } from '@/features/projects/model/sprint-store'
+import BacklogEpicsPanel from '@/features/projects/ui/BacklogEpicsPanel.vue'
 import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
+import SprintBlock from '@/features/projects/ui/SprintBlock.vue'
+import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
+import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
+import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
+import { useTaskStore } from '@/features/tasks/model/task-store'
+import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskListOptionsMenu from '@/features/tasks/ui/TaskListOptionsMenu.vue'
 
 const openSidebar = inject<() => void>('openSidebar')
 const route = useRoute()
+const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
 
 const projectStore = useProjectStore()
 const project = computed(() => projectStore.projectMap.get(projectId.value))
+const isAgileProject = computed(() => project.value?.type === 'agile')
+
+const showCompleted = useShowCompleted(projectId)
+const hideOverdue = useHideOverdue(projectId)
+
+const columnStore = useColumnStore()
+const groupStore = useGroupStore()
+const sprintStore = useSprintStore()
+const taskStore = useTaskStore()
+const { tasks, loading, error } = storeToRefs(taskStore)
+
+const { confirm } = useConfirm()
+
+const {
+  selectedTask,
+  isDetailOpen,
+  handleOpenTask,
+  handleUpdateTask,
+  handleUpdateChecklist,
+  handleUpdatePomodoroConfig,
+  handleDeleteFromDialog,
+} = useTaskDetailHandlers(taskStore, confirm)
+
+const activeSprint = computed(() => sprintStore.activeSprintOf(projectId.value))
+const plannedSprints = computed(() => sprintStore.plannedSprintsOf(projectId.value))
+
+const sprintsPending = computed(() =>
+  sprintStore.isLoading(projectId.value)
+  || (!(projectId.value in sprintStore.lists) && !sprintStore.error),
+)
+const initialLoading = computed(() => sprintsPending.value || (loading.value && tasks.value.length === 0))
+const loadError = computed(() => error.value || sprintStore.error)
+
+function blockTasks(sprintId: string | null): Task[] {
+  return sprintTasks(tasks.value, sprintId, projectId.value)
+    .filter(t => showCompleted.value || !t.completed)
+    .filter(t => !hideOverdue.value || !t.isOverdue)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+async function handleMoveTask(taskId: string, sprintId: string | null) {
+  try {
+    await taskStore.updateTask(taskId, { sprintId })
+  }
+  catch (err) {
+    console.error('Ошибка переноса задачи:', err)
+  }
+}
+
+async function handleCreateTask(sprintId: string | null, title: string) {
+  try {
+    await taskStore.createTask({ title, completed: false, projectId: projectId.value, sprintId })
+  }
+  catch (err) {
+    console.error('Ошибка создания задачи:', err)
+  }
+}
+
+async function handleToggleTask(taskId: string) {
+  try {
+    await taskStore.toggleTask(taskId)
+  }
+  catch (err) {
+    console.error('Ошибка обновления задачи:', err)
+  }
+}
+
+async function handleCreateSprint() {
+  try {
+    await sprintStore.createSprint(projectId.value, {})
+  }
+  catch (err) {
+    console.error('Ошибка создания спринта:', err)
+  }
+}
+
+function loadProjectData(id: string) {
+  columnStore.fetchColumns(id)
+  groupStore.ensureGroups(id)
+}
+
+onMounted(() => {
+  taskStore.fetchTasks()
+  loadProjectData(projectId.value)
+})
+
+watch(projectId, (id) => {
+  if (id)
+    loadProjectData(id)
+})
+
+watch([projectId, project], ([id, current]) => {
+  if (id && current && current.type !== 'agile')
+    router.replace({ name: 'tasks-project', params: { projectId: id } })
+}, { immediate: true })
+
+watch([projectId, isAgileProject], ([id, isAgile]) => {
+  if (id && isAgile)
+    sprintStore.ensureSprints(id)
+}, { immediate: true })
 </script>
 
 <template>
   <div class="flex flex-col">
-    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" fluid />
+    <AppHeader :title="project?.title ?? 'Проект'" :on-menu-click="openSidebar" fluid>
+      <template #right>
+        <TaskListOptionsMenu v-model:show-completed="showCompleted" v-model:hide-overdue="hideOverdue" />
+      </template>
+    </AppHeader>
+
     <div class="px-4 py-3">
       <ProjectTabs :project-id="projectId" />
     </div>
+
+    <div v-if="initialLoading" class="py-8 text-center">
+      <div class="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-primary" />
+      <p class="mt-2 text-muted-foreground">
+        Загрузка бэклога...
+      </p>
+    </div>
+
+    <template v-else>
+      <div v-if="loadError" class="mx-4 mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
+        <p class="text-destructive">
+          {{ loadError }}
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-4 px-4 pb-6 md:flex-row md:items-start">
+        <BacklogEpicsPanel :project-id="projectId" />
+
+        <div class="flex min-w-0 flex-1 flex-col gap-4">
+          <SprintBlock
+            v-if="activeSprint"
+            :project-id="projectId"
+            :sprint="activeSprint"
+            :tasks="blockTasks(activeSprint.id)"
+            :has-active-sprint="true"
+            @move-task="handleMoveTask"
+            @create-task="handleCreateTask(activeSprint.id, $event)"
+            @open-task="handleOpenTask"
+            @toggle-task="handleToggleTask"
+          />
+          <SprintBlock
+            v-for="sprint in plannedSprints"
+            :key="sprint.id"
+            :project-id="projectId"
+            :sprint="sprint"
+            :tasks="blockTasks(sprint.id)"
+            :has-active-sprint="!!activeSprint"
+            @move-task="handleMoveTask"
+            @create-task="handleCreateTask(sprint.id, $event)"
+            @open-task="handleOpenTask"
+            @toggle-task="handleToggleTask"
+          />
+          <div>
+            <Button variant="outline" size="sm" @click="handleCreateSprint">
+              <Plus :size="14" />
+              Создать спринт
+            </Button>
+          </div>
+          <SprintBlock
+            :project-id="projectId"
+            :sprint="null"
+            :tasks="blockTasks(null)"
+            :has-active-sprint="!!activeSprint"
+            @move-task="handleMoveTask"
+            @create-task="handleCreateTask(null, $event)"
+            @open-task="handleOpenTask"
+            @toggle-task="handleToggleTask"
+          />
+        </div>
+      </div>
+    </template>
   </div>
+  <TaskDetailDialog
+    :task="selectedTask"
+    :open="isDetailOpen"
+    @update:open="isDetailOpen = $event"
+    @delete="handleDeleteFromDialog"
+    @update="handleUpdateTask"
+    @update:checklist="handleUpdateChecklist"
+    @update:pomodoro-config="handleUpdatePomodoroConfig"
+  />
 </template>

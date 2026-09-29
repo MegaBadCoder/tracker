@@ -4,7 +4,8 @@ import { pluralRu } from '@/lib/plural'
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-function parseLocalDate(iso: string): Date {
+/** Локальная полночь календарного дня `YYYY-MM-DD` (без сдвига по UTC). */
+export function parseLocalDate(iso: string): Date {
   const [year, month, day] = iso.split('-').map(Number)
   return new Date(year!, month! - 1, day!)
 }
