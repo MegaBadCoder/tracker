@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import type { BoardGroup, ProjectColumn } from '../model/types'
+import type { AgileEpicRow, AgileUngroupedRow } from '../lib/agile-layout'
+import type { BoardGroupNode, ProjectColumn } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
+import { Plus } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useConfirm } from '@/composables/useConfirm'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import { pluralRu } from '@/lib/plural'
 import { buildAgileRows, groupTasksByColumn } from '../lib/agile-layout'
+import { deletionImpact, groupTaskIds } from '../lib/group-tree'
 import { useAgileDnd } from '../lib/use-agile-dnd'
 import { useColumnStore } from '../model/column-store'
 import { useGroupStore } from '../model/group-store'
+import { useGroupDetail } from '../model/use-group-detail'
 import AgileCell from './AgileCell.vue'
 import AgileEpicBlock from './AgileEpicBlock.vue'
+import InlineTitleInput from './InlineTitleInput.vue'
 
 const props = withDefaults(defineProps<{
   projectId: string
@@ -32,15 +39,22 @@ const groupStore = useGroupStore()
 const taskStore = useTaskStore()
 const { tasks } = storeToRefs(taskStore)
 const { onTaskChange } = useAgileDnd(taskStore)
+const { confirm } = useConfirm()
+const groupDetail = useGroupDetail()
+
+const addingEpic = ref(false)
 
 const sortedColumns = computed(() =>
   [...columnStore.columns].sort((a, b) => a.order - b.order),
 )
 
+const allProjectTasks = computed(() =>
+  tasks.value.filter(t => t.projectId === props.projectId),
+)
+
 const projectTasks = computed(() =>
-  tasks.value.filter(t =>
-    t.projectId === props.projectId
-    && (props.showCompleted || !t.completed)
+  allProjectTasks.value.filter(t =>
+    (props.showCompleted || !t.completed)
     && (!props.hideOverdue || !t.isOverdue),
   ),
 )
@@ -51,14 +65,98 @@ const lanes = computed<ProjectColumn[]>(() => sortedColumns.value)
 
 const rows = computed(() => buildAgileRows(groupStore.groupsOf(props.projectId), projectTasks.value))
 
+const epicRows = computed(() =>
+  rows.value.filter((row): row is AgileEpicRow => row.kind === 'epic'),
+)
+
+const ungroupedRow = computed(() =>
+  rows.value.find((row): row is AgileUngroupedRow => row.kind === 'ungrouped'),
+)
+
+const ungroupedTasksByColumn = computed(() => groupTasksByColumn(ungroupedRow.value?.tasks ?? []))
+
 const projectTasksByColumn = computed(() => groupTasksByColumn(projectTasks.value))
 
 function laneTaskCount(lane: ProjectColumn): number {
   return projectTasksByColumn.value.get(lane.id)?.length ?? 0
 }
 
-async function handleToggleEpicDone(epic: BoardGroup) {
-  await groupStore.toggleGroupDone(props.projectId, epic)
+function buildDeleteMessage(group: BoardGroupNode, impact: { stories: number, tasks: number }): string {
+  const parts = [`Удалить ${group.type === 'epic' ? 'эпик' : 'историю'} „${group.title}“?`]
+
+  if (group.type === 'epic' && impact.stories > 0) {
+    const verb = pluralRu(impact.stories, ['удалится', 'удалятся', 'удалятся'])
+    const word = pluralRu(impact.stories, ['история', 'истории', 'историй'])
+    parts.push(`Вместе с ним ${verb} ${impact.stories} ${word}.`)
+  }
+
+  if (impact.tasks > 0) {
+    const remainVerb = pluralRu(impact.tasks, ['останется', 'останутся', 'останутся'])
+    const moveVerb = pluralRu(impact.tasks, ['переедет', 'переедут', 'переедут'])
+    const word = pluralRu(impact.tasks, ['задача', 'задачи', 'задач'])
+    parts.push(`${impact.tasks} ${word} ${remainVerb} и ${moveVerb} в „Без эпика“.`)
+  }
+
+  return parts.join(' ')
+}
+
+async function handleToggleGroupDone(group: BoardGroupNode) {
+  await groupStore.toggleGroupDone(props.projectId, group)
+}
+
+function handleOpenGroup(id: string) {
+  groupDetail.open(props.projectId, id)
+}
+
+async function handleRenameGroup(id: string, title: string) {
+  await groupStore.updateGroup(props.projectId, id, { title })
+}
+
+async function handleSetGroupColor(id: string, color: string | null) {
+  await groupStore.updateGroup(props.projectId, id, { color })
+}
+
+async function handleCreateStory(epicId: string, title: string) {
+  await groupStore.createGroup(props.projectId, { title, parentId: epicId })
+}
+
+async function handleCreateEpic(title: string) {
+  addingEpic.value = false
+  await groupStore.createGroup(props.projectId, { title })
+}
+
+async function handleCreateTask(groupId: string, title: string) {
+  await taskStore.createTask({
+    title,
+    completed: false,
+    projectId: props.projectId,
+    columnId: lanes.value[0]?.id ?? null,
+    groupId,
+  })
+}
+
+async function handleDeleteGroup(group: BoardGroupNode) {
+  const impact = deletionImpact(group, allProjectTasks.value)
+  const confirmed = await confirm({
+    title: group.type === 'epic' ? 'Удалить эпик?' : 'Удалить историю?',
+    message: buildDeleteMessage(group, impact),
+    confirmText: 'Удалить',
+    cancelText: 'Отмена',
+    variant: 'destructive',
+  })
+  if (!confirmed)
+    return
+
+  try {
+    await groupStore.deleteGroup(props.projectId, group.id)
+  }
+  catch (err) {
+    console.error('Ошибка удаления группы:', err)
+    return
+  }
+
+  const clearedIds = new Set(groupTaskIds(group))
+  tasks.value = tasks.value.map(t => (t.groupId && clearedIds.has(t.groupId)) ? { ...t, groupId: null } : t)
 }
 
 function handleTaskChange(event: any, columnId: string | null, groupId: string | null, cellTasks: Task[]) {
@@ -95,34 +193,59 @@ watch(() => props.projectId, (id) => {
         </div>
       </div>
 
-      <template v-for="row in rows" :key="row.kind === 'epic' ? row.epic.id : 'ungrouped'">
-        <AgileEpicBlock
-          v-if="row.kind === 'epic'"
-          :epic="row.epic"
-          :stories="row.stories"
-          :epic-tasks="row.epicTasks"
-          :lanes="lanes"
-          @toggle-task="$emit('toggleTask', $event)"
-          @open-task="$emit('openTask', $event)"
-          @toggle-done="handleToggleEpicDone(row.epic)"
-          @task-change="handleTaskChange"
-        />
-        <div v-else class="col-span-full grid [grid-template-columns:subgrid] border-t-2 border-border">
-          <div class="col-span-full px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Без эпика
-          </div>
-          <AgileCell
-            v-for="lane in lanes"
-            :key="lane.id"
-            :tasks="groupTasksByColumn(row.tasks).get(lane.id) ?? []"
-            :column-id="lane.id"
-            :group-id="null"
-            @toggle-task="$emit('toggleTask', $event)"
-            @open-task="$emit('openTask', $event)"
-            @task-change="handleTaskChange"
+      <AgileEpicBlock
+        v-for="row in epicRows"
+        :key="row.epic.id"
+        :epic="row.epic"
+        :stories="row.stories"
+        :epic-tasks="row.epicTasks"
+        :lanes="lanes"
+        @toggle-task="$emit('toggleTask', $event)"
+        @open-task="$emit('openTask', $event)"
+        @task-change="handleTaskChange"
+        @open-group="handleOpenGroup"
+        @rename-group="handleRenameGroup"
+        @set-group-color="handleSetGroupColor"
+        @create-story="handleCreateStory"
+        @toggle-group-done="handleToggleGroupDone"
+        @delete-group="handleDeleteGroup"
+        @create-task="handleCreateTask"
+      />
+
+      <div class="col-span-full grid [grid-template-columns:subgrid]">
+        <div class="col-span-full px-3 py-2">
+          <button
+            v-if="!addingEpic"
+            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            @click="addingEpic = true"
+          >
+            <Plus :size="14" />
+            Эпик
+          </button>
+          <InlineTitleInput
+            v-else
+            placeholder="Название эпика"
+            @submit="handleCreateEpic"
+            @cancel="addingEpic = false"
           />
         </div>
-      </template>
+      </div>
+
+      <div class="col-span-full grid [grid-template-columns:subgrid] border-t-2 border-border">
+        <div class="col-span-full px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Без эпика
+        </div>
+        <AgileCell
+          v-for="lane in lanes"
+          :key="lane.id"
+          :tasks="ungroupedTasksByColumn.get(lane.id) ?? []"
+          :column-id="lane.id"
+          :group-id="null"
+          @toggle-task="$emit('toggleTask', $event)"
+          @open-task="$emit('openTask', $event)"
+          @task-change="handleTaskChange"
+        />
+      </div>
     </div>
   </div>
 </template>
