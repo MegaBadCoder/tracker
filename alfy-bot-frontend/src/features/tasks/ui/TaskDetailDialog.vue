@@ -8,17 +8,43 @@
     ]">
       <!-- Header -->
       <div class="flex items-center justify-between px-5 py-3 border-b border-border/60">
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-2.5 min-w-0">
           <RoundCheckbox
             :model-value="task?.completed"
             :disabled="!effectiveEditable"
             class="shrink-0"
             @update:model-value="effectiveEditable && task && emitUpdate({ completed: !task.completed })"
           />
-          <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span v-if="!isAgileProject" class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <FolderOpen :size="11" />
             {{ localProjectId ? projectStore.projectMap.get(localProjectId)?.title ?? 'Проект' : 'Все входящие' }}
           </span>
+          <div v-else class="flex items-center gap-1 min-w-0 text-[11px] text-muted-foreground">
+            <FolderOpen :size="11" class="shrink-0" />
+            <span class="truncate max-w-[10rem]">{{ projectTitle ?? 'Проект' }}</span>
+            <template v-if="groupBreadcrumb">
+              <ChevronRight :size="11" class="shrink-0" />
+              <button
+                type="button"
+                class="truncate max-w-[10rem] hover:text-foreground hover:underline cursor-pointer"
+                aria-label="Открыть эпик"
+                @click="openGroupCard(groupBreadcrumb.epic.id)"
+              >
+                {{ groupBreadcrumb.epic.title }}
+              </button>
+              <template v-if="groupBreadcrumb.story">
+                <ChevronRight :size="11" class="shrink-0" />
+                <button
+                  type="button"
+                  class="truncate max-w-[10rem] hover:text-foreground hover:underline cursor-pointer"
+                  aria-label="Открыть историю"
+                  @click="openGroupCard(groupBreadcrumb.story.id)"
+                >
+                  {{ groupBreadcrumb.story.title }}
+                </button>
+              </template>
+            </template>
+          </div>
         </div>
         <div class="flex items-center gap-0.5">
           <DropdownMenu v-if="effectiveEditable">
@@ -166,6 +192,7 @@
             :goals-label="goalsChipLabel"
             :goals-set="localGoalIds.length > 0"
             :hide-goals="isAgileProject"
+            :group-title="isAgileProject ? groupChipTitle : undefined"
             :editable="effectiveEditable"
             class="-mx-7 border-y border-border/40"
             @select="activeDrawer = ($event as DrawerField)"
@@ -256,6 +283,14 @@
             :model-value="localProjectId"
             :disabled="!effectiveEditable"
             @update:model-value="onProjectChange"
+          />
+
+          <GroupPicker
+            v-if="isAgileProject && localProjectId"
+            :project-id="localProjectId"
+            :model-value="localGroupId"
+            :disabled="!effectiveEditable"
+            @update:model-value="onGroupChange"
           />
 
           <GoalPicker
@@ -488,6 +523,12 @@
           :model-value="localProjectId"
           @update:model-value="onProjectChange"
         />
+        <GroupPickerContent
+          v-if="activeDrawer === 'group' && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localGroupId"
+          @update:model-value="onGroupChange"
+        />
         <GoalPickerContent
           v-if="activeDrawer === 'goals' && !isAgileProject"
           :model-value="localGoalIds"
@@ -544,6 +585,7 @@ import {
   EllipsisVertical,
   Trash2,
   Calendar as CalendarIcon,
+  ChevronRight,
   Clock,
   Flag,
   MapPin,
@@ -580,6 +622,11 @@ import { getPriorityColor } from '../lib/priority'
 import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
 import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
 import { countFromDurationMinutes } from '../lib/duration'
+import { groupLabel, groupPath } from '@/features/projects/lib/group-tree'
+import { useGroupStore } from '@/features/projects/model/group-store'
+import { useGroupDetail } from '@/features/projects/model/use-group-detail'
+import GroupPicker from '@/features/projects/ui/GroupPicker.vue'
+import GroupPickerContent from '@/features/projects/ui/GroupPickerContent.vue'
 import { toTimerTask, useTimerStore } from '@/features/task-timer'
 
 const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
@@ -614,7 +661,7 @@ const isDesktop = useMediaQuery('(min-width: 640px)')
 const isMobile = computed(() => !isDesktop.value)
 
 // Drawer state
-type DrawerField = 'project' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
+type DrawerField = 'project' | 'group' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
 const activeDrawer = ref<DrawerField | null>(null)
 const drawerOpen = computed({
   get: () => activeDrawer.value !== null,
@@ -623,6 +670,7 @@ const drawerOpen = computed({
 
 const DRAWER_TITLES: Record<DrawerField, string> = {
   project: 'Проект',
+  group: 'Эпик / История',
   goals: 'Цель',
   dueDate: 'Срок',
   deadline: 'Дедлайн',
@@ -730,11 +778,44 @@ const isAgileProject = computed(() =>
     : false,
 )
 
+const localGroupId = ref<string | null>(null)
+const groupStore = useGroupStore()
+const groupDetail = useGroupDetail()
+
 function onProjectChange(value: string | null) {
   localProjectId.value = value
+  localGroupId.value = null
   emitUpdate({ projectId: value })
   activeDrawer.value = null
 }
+
+const groupTree = computed(() => (localProjectId.value ? groupStore.groupsOf(localProjectId.value) : []))
+
+const groupBreadcrumb = computed(() =>
+  localGroupId.value ? groupPath(groupTree.value, localGroupId.value) : null,
+)
+
+const groupChipTitle = computed<string | null>(() =>
+  localGroupId.value ? groupLabel(groupTree.value, localGroupId.value) : null,
+)
+
+function openGroupCard(groupId: string) {
+  if (!localProjectId.value)
+    return
+  emit('update:open', false)
+  groupDetail.open(localProjectId.value, groupId)
+}
+
+function onGroupChange(value: string | null) {
+  localGroupId.value = value
+  emitUpdate({ groupId: value })
+  activeDrawer.value = null
+}
+
+watch(localProjectId, (projectId) => {
+  if (isAgileProject.value && projectId)
+    groupStore.ensureGroups(projectId)
+}, { immediate: true })
 
 const localGoalIds = ref<number[]>([])
 const taskStore = useTaskStore()
@@ -821,6 +902,7 @@ watch(() => props.task, (task) => {
     localLocation.value = task.location || ''
     localTags.value = task.tags ? [...task.tags] : []
     localProjectId.value = task.projectId ?? null
+    localGroupId.value = task.groupId ?? null
     localGoalIds.value = task.goalIds ? [...task.goalIds] : []
     localRecurrence.value = task.recurrence ?? null
     localOnMissed.value = task.onMissed ?? 'shift'

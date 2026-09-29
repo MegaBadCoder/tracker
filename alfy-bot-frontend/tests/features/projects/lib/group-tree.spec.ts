@@ -1,7 +1,7 @@
 import type { BoardGroupNode } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { describe, expect, it } from 'vitest'
-import { deletionImpact, findGroup, groupPath, groupProgress, groupTaskIds } from '@/features/projects/lib/group-tree'
+import { deletionImpact, findGroup, groupLabel, groupPath, groupProgress, groupTaskIds } from '@/features/projects/lib/group-tree'
 
 function makeGroup(overrides: Partial<BoardGroupNode> = {}): BoardGroupNode {
   return {
@@ -61,6 +61,29 @@ describe('groupPath', () => {
   it('для отсутствующего id возвращает null', () => {
     const epic = makeGroup({ id: 'epic-1' })
     expect(groupPath([epic], 'missing')).toBeNull()
+  })
+})
+
+describe('groupLabel', () => {
+  it('для groupId: null возвращает «Без эпика»', () => {
+    const tree = [makeGroup({ id: 'epic-1' })]
+    expect(groupLabel(tree, null)).toBe('Без эпика')
+  })
+
+  it('для истории возвращает «Эпик › История»', () => {
+    const story = makeGroup({ id: 'story-1', type: 'story', parentId: 'epic-1', title: 'История' })
+    const epic = makeGroup({ id: 'epic-1', title: 'Эпик', children: [story] })
+    expect(groupLabel([epic], 'story-1')).toBe('Эпик › История')
+  })
+
+  it('для эпика возвращает только его название', () => {
+    const epic = makeGroup({ id: 'epic-1', title: 'Эпик' })
+    expect(groupLabel([epic], 'epic-1')).toBe('Эпик')
+  })
+
+  it('для не найденного id возвращает null', () => {
+    const tree = [makeGroup({ id: 'epic-1' })]
+    expect(groupLabel(tree, 'missing')).toBeNull()
   })
 })
 

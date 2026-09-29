@@ -28,6 +28,7 @@ import {
   FolderOpen,
   Repeat,
   Bell,
+  BookMarked,
   Target,
 } from 'lucide-vue-next'
 import { formatDueDate, formatDate, DATE_WITH_TIME } from '../lib/formatters'
@@ -48,6 +49,13 @@ const props = defineProps<{
   goalsLabel: string
   goalsSet: boolean
   hideGoals?: boolean
+  /**
+   * Текст поля «Эпик / История» (см. `groupLabel`). Чип рендерится, только
+   * когда проп передан (даже `null` — «загрузка», без чипа). Отсутствие
+   * пропа (`undefined`) скрывает чип — так задачи обычных проектов и
+   * Входящих не показывают недоступное им поле.
+   */
+  groupTitle?: string | null
   editable: boolean
 }>()
 
@@ -77,6 +85,14 @@ const chips = computed<ChipDef[]>(() => [
         icon: Target,
         label: props.goalsLabel,
         isSet: props.goalsSet,
+      }]),
+  ...(props.groupTitle === undefined
+    ? []
+    : [{
+        key: 'group',
+        icon: BookMarked,
+        label: props.groupTitle ?? 'Без эпика',
+        isSet: !!props.groupTitle,
       }]),
   {
     key: 'dueDate',

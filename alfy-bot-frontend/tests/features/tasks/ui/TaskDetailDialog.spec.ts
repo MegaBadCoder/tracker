@@ -1,10 +1,13 @@
-import type { Project } from '@/features/projects/model/types'
+import type { BoardGroupNode, Project } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import GoalPicker from '@/features/goals/ui/GoalPicker.vue'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useGroupDetail } from '@/features/projects/model/use-group-detail'
+import GroupPicker from '@/features/projects/ui/GroupPicker.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 
 vi.mock('@/api/client', () => ({
@@ -135,5 +138,200 @@ describe('taskDetailDialog — блок целей и agile-проекты', () 
 
     expect(wrapper.findComponent(GoalPicker).exists()).toBe(true)
     expect(wrapper.findComponent(GoalPicker).props('modelValue')).toEqual([1, 2])
+  })
+})
+
+function makeAgileProject(overrides: Partial<Project> = {}): Project {
+  return makeProject({ id: 'proj-agile', type: 'agile', viewMode: 'list', title: 'Проект', ...overrides })
+}
+
+function makeGroupNode(overrides: Partial<BoardGroupNode> = {}): BoardGroupNode {
+  return {
+    id: 'epic-1',
+    projectId: 'proj-agile',
+    parentId: null,
+    type: 'epic',
+    title: 'Эпик',
+    description: null,
+    status: 'open',
+    completedAt: null,
+    color: null,
+    startDate: null,
+    dueDate: null,
+    order: 0,
+    children: [],
+    ...overrides,
+  }
+}
+
+describe('taskDetailDialog — эпик/история agile-задачи', () => {
+  let wrapper: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+  })
+
+  it('agile-задача в истории показывает крошки и поле «Эпик / История»', async () => {
+    const projectStore = useProjectStore()
+    projectStore.projects = [makeAgileProject()]
+    const groupStore = useGroupStore()
+    const story = makeGroupNode({ id: 'story-1', type: 'story', parentId: 'epic-1', title: 'История' })
+    groupStore.trees['proj-agile'] = [makeGroupNode({ children: [story] })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: 'proj-agile', groupId: 'story-1' }),
+        open: true,
+      },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const crumbButtons = Array.from(document.querySelectorAll('button[aria-label^="Открыть"]'))
+    expect(crumbButtons.map(b => b.textContent?.trim())).toEqual(['Эпик', 'История'])
+    expect(document.body.textContent).toContain('Проект')
+    expect(document.body.textContent).toContain('Эпик / История')
+    expect(document.body.textContent).toContain('Эпик › История')
+  })
+
+  it('задача обычного проекта не показывает ни крошек, ни поля', async () => {
+    const projectStore = useProjectStore()
+    projectStore.projects = [makeProject({ id: 'proj-simple' })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: 'proj-simple' }),
+        open: true,
+      },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.querySelectorAll('button[aria-label^="Открыть"]').length).toBe(0)
+    expect(wrapper.findComponent(GroupPicker).exists()).toBe(false)
+    expect(document.body.textContent).not.toContain('Эпик / История')
+  })
+
+  it('задача во Входящих не показывает ни крошек, ни поля', async () => {
+    wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: null }),
+        open: true,
+      },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.querySelectorAll('button[aria-label^="Открыть"]').length).toBe(0)
+    expect(wrapper.findComponent(GroupPicker).exists()).toBe(false)
+    expect(document.body.textContent).not.toContain('Эпик / История')
+  })
+
+  it('выбор истории в GroupPicker эмитит обновление с groupId', async () => {
+    const projectStore = useProjectStore()
+    projectStore.projects = [makeAgileProject()]
+    const groupStore = useGroupStore()
+    const story = makeGroupNode({ id: 'story-1', type: 'story', parentId: 'epic-1', title: 'История' })
+    groupStore.trees['proj-agile'] = [makeGroupNode({ children: [story] })]
+
+    const wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: 'proj-agile', groupId: null }),
+        open: true,
+      },
+      global: { stubs },
+    })
+    await flushPromises()
+
+    await wrapper.findComponent(GroupPicker).vm.$emit('update:modelValue', 'story-1')
+
+    const updates = wrapper.emitted('update') as Array<[Task]>
+    expect(updates.at(-1)![0].groupId).toBe('story-1')
+  })
+
+  it('«Без эпика» эмитит groupId: null', async () => {
+    const projectStore = useProjectStore()
+    projectStore.projects = [makeAgileProject()]
+    const groupStore = useGroupStore()
+    groupStore.trees['proj-agile'] = [makeGroupNode()]
+
+    const wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: 'proj-agile', groupId: 'epic-1' }),
+        open: true,
+      },
+      global: { stubs },
+    })
+    await flushPromises()
+
+    await wrapper.findComponent(GroupPicker).vm.$emit('update:modelValue', null)
+
+    const updates = wrapper.emitted('update') as Array<[Task]>
+    expect(updates.at(-1)![0].groupId).toBeNull()
+  })
+
+  it('клик по эпику в крошках закрывает диалог и открывает карточку группы', async () => {
+    const projectStore = useProjectStore()
+    projectStore.projects = [makeAgileProject()]
+    const groupStore = useGroupStore()
+    const story = makeGroupNode({ id: 'story-1', type: 'story', parentId: 'epic-1', title: 'История' })
+    groupStore.trees['proj-agile'] = [makeGroupNode({ children: [story] })]
+
+    wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: 'proj-agile', groupId: 'story-1' }),
+        open: true,
+      },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    const epicButton = document.querySelector('button[aria-label="Открыть эпик"]') as HTMLButtonElement
+    epicButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    await flushPromises()
+
+    expect(wrapper.emitted('update:open')?.at(-1)).toEqual([false])
+    expect(useGroupDetail().current.value).toEqual({ projectId: 'proj-agile', groupId: 'epic-1' })
+  })
+
+  it('смена проекта обнуляет локальное поле группы', async () => {
+    const projectStore = useProjectStore()
+    projectStore.projects = [
+      makeAgileProject({ id: 'proj-agile-1' }),
+      makeAgileProject({ id: 'proj-agile-2' }),
+    ]
+    const groupStore = useGroupStore()
+    groupStore.trees['proj-agile-1'] = [makeGroupNode({ id: 'epic-1', projectId: 'proj-agile-1' })]
+    groupStore.trees['proj-agile-2'] = []
+
+    const wrapper = mount(TaskDetailDialog, {
+      props: {
+        task: makeTask({ projectId: 'proj-agile-1', groupId: 'epic-1' }),
+        open: true,
+      },
+      global: { stubs },
+    })
+    await flushPromises()
+
+    expect(wrapper.findComponent(GroupPicker).props('modelValue')).toBe('epic-1')
+
+    await wrapper.findComponent({ name: 'ProjectPicker' }).vm.$emit('update:modelValue', 'proj-agile-2')
+    await flushPromises()
+
+    expect(wrapper.findComponent(GroupPicker).props('modelValue')).toBeNull()
+
+    const updates = wrapper.emitted('update') as Array<[Task]>
+    expect(updates.length).toBe(1)
+    expect(updates[0]![0].projectId).toBe('proj-agile-2')
   })
 })

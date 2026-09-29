@@ -33,6 +33,22 @@ export function groupPath(
 }
 
 /**
+ * Текст для поля/чипа «Эпик / История»: «Эпик › История» для истории,
+ * «Эпик» для самого эпика, «Без эпика» для `groupId: null`. `null`, если
+ * `groupId` указан, но не найден в переданном дереве (дерево ещё грузится).
+ */
+export function groupLabel(tree: BoardGroupNode[], groupId: string | null): string | null {
+  if (groupId === null)
+    return 'Без эпика'
+
+  const path = groupPath(tree, groupId)
+  if (!path)
+    return null
+
+  return path.story ? `${path.epic.title} › ${path.story.title}` : path.epic.title
+}
+
+/**
  * Id задач, принадлежащих группе: для эпика — id самого эпика и всех его
  * историй; для истории — только её собственный id.
  */
