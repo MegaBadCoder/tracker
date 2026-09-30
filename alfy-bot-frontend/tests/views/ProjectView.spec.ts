@@ -1,4 +1,5 @@
 import type { Project, Sprint } from '@/features/projects/model/types'
+import type { Task } from '@/features/tasks/model/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +12,7 @@ import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
 import SprintBanner from '@/features/projects/ui/SprintBanner.vue'
 import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
+import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import ProjectView from '@/views/ProjectView.vue'
 
@@ -194,6 +196,19 @@ describe('projectView — agile-проект и активный спринт', 
 
     expect(wrapper.find('.animate-spin').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Нет активного спринта')
+  })
+
+  it('повторная загрузка задач не снимает доску с экрана, если задачи уже есть', async () => {
+    const wrapper = mountAgile([makeSprint({ id: 'sprint-1' })])
+    await flushPromises()
+
+    const taskStore = useTaskStore()
+    taskStore.tasks = [{ id: 't1', title: 'Задача', completed: false, projectId: 'proj-1', sprintId: 'sprint-1' } as Task]
+    taskStore.loading = true
+    await flushPromises()
+
+    expect(wrapper.findComponent(AgileBoardView).exists()).toBe(true)
+    expect(wrapper.find('.animate-spin').exists()).toBe(false)
   })
 
   it('не рендерит ProjectTabs и боковую панель у обычного проекта', async () => {
