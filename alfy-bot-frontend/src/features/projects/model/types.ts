@@ -117,3 +117,47 @@ export interface StartSprintPayload {
 export interface CompleteSprintPayload {
   moveTo: 'backlog' | string
 }
+
+/** Статус релиза: `planned` — запланирован, `released` — выпущен (только чтение). */
+export type ReleaseStatus = 'planned' | 'released'
+
+/** Релиз agile-проекта. Даты — `YYYY-MM-DD` (локальный календарный день), `releasedAt` — ISO-момент выпуска. */
+export interface Release {
+  id: string
+  userId: number
+  projectId: string
+  name: string
+  description: string | null
+  startDate: string | null
+  releaseDate: string | null
+  status: ReleaseStatus
+  releasedAt: string | null
+  order: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** Имя релиза обязательно: естественной нумерации, как у спринтов, нет. */
+export interface CreateReleasePayload {
+  name: string
+  description?: string | null
+  startDate?: string | null
+  releaseDate?: string | null
+}
+
+export interface UpdateReleasePayload {
+  name?: string
+  description?: string | null
+  startDate?: string | null
+  releaseDate?: string | null
+}
+
+/** Выпуск релиза: `moveTo` — `'none'` или id запланированного релиза, куда уходят незавершённые задачи. */
+export interface ReleaseActionPayload {
+  moveTo: 'none' | string
+}
+
+/** Назначение всех задач группы (эпик вместе с историями либо история) в релиз. */
+export interface AssignGroupToReleasePayload {
+  groupId: string
+}

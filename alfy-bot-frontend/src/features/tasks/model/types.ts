@@ -45,6 +45,7 @@ export interface Task {
   columnId?: string | null
   groupId?: string | null
   sprintId?: string | null
+  releaseId?: string | null
   order?: number
   parentId?: string
   goalIds?: number[]
