@@ -19,4 +19,12 @@ describe('маршрут бэклога проекта', () => {
     expect(backlog.href).toBe(`${board.href}/backlog`)
     expect(backlog.matched.at(-1)?.name).toBe('tasks-project-backlog')
   })
+
+  it('tasks-project-releases существует и не пересекается с другими вкладками', () => {
+    const releases = router.resolve({ name: 'tasks-project-releases', params: { projectId: 'p1' } })
+    const board = router.resolve({ name: 'tasks-project', params: { projectId: 'p1' } })
+
+    expect(releases.href).toBe(`${board.href}/releases`)
+    expect(releases.matched.at(-1)?.name).toBe('tasks-project-releases')
+  })
 })

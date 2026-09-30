@@ -23,13 +23,14 @@ describe('projectTabs', () => {
     return wrapper.findAllComponents({ name: 'RouterLink' })
   }
 
-  it('рендерит две вкладки «Доска» и «Бэклог» со ссылками на маршруты проекта', () => {
+  it('рендерит три вкладки «Доска», «Бэклог» и «Релизы» со ссылками на маршруты проекта', () => {
     const wrapper = mount(ProjectTabs, { props: { projectId: 'proj-1' } })
 
     const items = links(wrapper)
-    expect(items.map(l => l.text())).toEqual(['Доска', 'Бэклог'])
+    expect(items.map(l => l.text())).toEqual(['Доска', 'Бэклог', 'Релизы'])
     expect(items[0]!.props('to')).toEqual({ name: 'tasks-project', params: { projectId: 'proj-1' } })
     expect(items[1]!.props('to')).toEqual({ name: 'tasks-project-backlog', params: { projectId: 'proj-1' } })
+    expect(items[2]!.props('to')).toEqual({ name: 'tasks-project-releases', params: { projectId: 'proj-1' } })
   })
 
   it('подсвечивает «Доска» на маршруте доски', () => {
@@ -47,5 +48,15 @@ describe('projectTabs', () => {
     const [board, backlog] = links(wrapper)
     expect(board!.attributes('aria-current')).toBeUndefined()
     expect(backlog!.attributes('aria-current')).toBe('page')
+  })
+
+  it('подсвечивает «Релизы» на маршруте релизов', () => {
+    route.name = 'tasks-project-releases'
+    const wrapper = mount(ProjectTabs, { props: { projectId: 'proj-1' } })
+
+    const [board, backlog, releases] = links(wrapper)
+    expect(board!.attributes('aria-current')).toBeUndefined()
+    expect(backlog!.attributes('aria-current')).toBeUndefined()
+    expect(releases!.attributes('aria-current')).toBe('page')
   })
 })
