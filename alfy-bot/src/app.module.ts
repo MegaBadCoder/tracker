@@ -40,6 +40,7 @@ import { ScheduleMigrationService } from './shared/database/schedule-migration.s
 import { BoardGroupConstraintsMigrationService } from './shared/database/board-group-constraints.service';
 import { initializeWithSchemaSync } from './shared/database/create-data-source';
 import { ProjectTypeMigrationService } from './shared/database/project-type-migration.service';
+import { TaskNumberMigrationService } from './shared/database/task-number-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
 import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
 import { RecurringSeriesRepairService } from './shared/database/recurring-series-repair.service';
@@ -114,6 +115,7 @@ const telegramImports = isTelegramEnabled()
     RecurringSeriesRepairService,
     BoardGroupConstraintsMigrationService,
     ProjectTypeMigrationService,
+    TaskNumberMigrationService,
   ],
 })
 export class AppModule {}

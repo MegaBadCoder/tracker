@@ -34,6 +34,13 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
     });
   }
 
+  async findByTaskKeyPrefix(
+    userId: number,
+    taskKeyPrefix: string,
+  ): Promise<Project | null> {
+    return this.repo.findOne({ where: { userId, taskKeyPrefix } });
+  }
+
   async create(data: Partial<Project>): Promise<Project> {
     const entity = this.repo.create(data);
     return this.repo.save(entity);

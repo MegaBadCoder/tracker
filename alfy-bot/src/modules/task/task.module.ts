@@ -34,6 +34,8 @@ import { SprintQueryPort } from './domain/sprint-query.port';
 import { TypeOrmSprintQueryAdapter } from './infrastructure/typeorm-sprint-query.adapter';
 import { ReleaseQueryPort } from './domain/release-query.port';
 import { TypeOrmReleaseQueryAdapter } from './infrastructure/typeorm-release-query.adapter';
+import { TaskNumberPort } from './domain/task-number.port';
+import { TypeOrmTaskNumberAdapter } from './infrastructure/typeorm-task-number.adapter';
 import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-session.repository';
 import { TelegramNotificationAdapter } from './infrastructure/telegram-notification.adapter';
 import { TelegramUserLookupAdapter } from './infrastructure/telegram-user-lookup.adapter';
@@ -88,6 +90,7 @@ const notificationProviders = isTelegramEnabled()
     { provide: BoardGroupQueryPort, useClass: TypeOrmBoardGroupQueryAdapter },
     { provide: SprintQueryPort, useClass: TypeOrmSprintQueryAdapter },
     { provide: ReleaseQueryPort, useClass: TypeOrmReleaseQueryAdapter },
+    { provide: TaskNumberPort, useClass: TypeOrmTaskNumberAdapter },
     ...notificationProviders,
     {
       provide: TelegramUserLookupPort,
@@ -100,6 +103,6 @@ const notificationProviders = isTelegramEnabled()
     OverdueRecurringScheduler,
     { provide: TaskGoalQueryPort, useExisting: TaskService },
   ],
-  exports: [TaskService, TaskRepositoryPort, TaskGoalQueryPort],
+  exports: [TaskService, TaskRepositoryPort, TaskGoalQueryPort, TaskNumberPort],
 })
 export class TaskModule {}

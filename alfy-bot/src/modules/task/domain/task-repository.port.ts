@@ -40,6 +40,7 @@ export abstract class TaskRepositoryPort {
     groupId: string | null,
     sprintId: string | null,
     releaseId: string | null,
+    number: number | null,
     order: number,
   ): Promise<Task | null>;
   abstract reorderTasks(

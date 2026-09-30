@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToOne,
@@ -19,6 +20,10 @@ import type { ChecklistData } from '../types/checklist.types';
 import type { RecurrenceRule } from '../types/recurrence.types';
 
 @Entity('tasks')
+@Index('IDX_task_project_number', ['projectId', 'number'], {
+  unique: true,
+  where: 'number IS NOT NULL',
+})
 export class Task {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -70,6 +75,9 @@ export class Task {
 
   @Column({ type: 'text', nullable: true })
   releaseId: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  number: number | null;
 
   @Column({ type: 'integer', default: 0 })
   order: number;

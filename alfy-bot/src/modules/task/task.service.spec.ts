@@ -8,6 +8,7 @@ import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { SprintQueryPort } from './domain/sprint-query.port';
 import { ReleaseQueryPort } from './domain/release-query.port';
+import { TaskNumberPort } from './domain/task-number.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -65,6 +66,7 @@ describe('TaskService', () => {
   let boardGroupQuery: Record<string, jest.Mock>;
   let sprintQuery: Record<string, jest.Mock>;
   let releaseQuery: Record<string, jest.Mock>;
+  let taskNumbers: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -135,6 +137,10 @@ describe('TaskService', () => {
       getRelease: jest.fn().mockResolvedValue(null),
     };
 
+    taskNumbers = {
+      allocate: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
@@ -145,6 +151,7 @@ describe('TaskService', () => {
         { provide: BoardGroupQueryPort, useValue: boardGroupQuery },
         { provide: SprintQueryPort, useValue: sprintQuery },
         { provide: ReleaseQueryPort, useValue: releaseQuery },
+        { provide: TaskNumberPort, useValue: taskNumbers },
       ],
     }).compile();
 
@@ -2256,6 +2263,128 @@ describe('TaskService', () => {
       const result = await service.replaceTaskLinksForGoal(1, 5, []);
       expect(linkPort.replaceTaskLinksForGoal).toHaveBeenCalledWith(1, 5, []);
       expect(result).toEqual({ taskIds: [] });
+    });
+  });
+
+  describe('номера задач', () => {
+    it('create в agile-проекте получает выданный номер', async () => {
+      taskNumbers.allocate.mockResolvedValue(7);
+
+      await service.create(1, { title: 'Задача', projectId: 'proj-agile' });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBe(7);
+    });
+
+    it('create в обычном проекте получает number = null', async () => {
+      taskNumbers.allocate.mockResolvedValue(null);
+
+      await service.create(1, { title: 'Задача', projectId: 'proj-simple' });
+
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBeNull();
+    });
+
+    it('create во Входящих запрашивает номер для null-проекта и получает null', async () => {
+      await service.create(1, { title: 'Задача' });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith(null);
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBeNull();
+    });
+
+    it('materializeOccurrence выдаёт экземпляру свой номер в проекте источника', async () => {
+      const weekly: RecurrenceRule = { frequency: 'weekly', interval: 1 };
+      const source = makeTask({
+        id: 'root-1',
+        projectId: 'proj-agile',
+        number: 1,
+        recurrence: weekly,
+        dueDate: new Date('2026-04-06T10:00:00.000Z'),
+      });
+      repo.findById.mockResolvedValue(source);
+      repo.findByParentId.mockResolvedValue([source]);
+      taskNumbers.allocate.mockResolvedValue(5);
+
+      await service.materializeOccurrence(1, 'root-1', {
+        occurrenceDate: '2026-04-13T10:00:00.000Z',
+      });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBe(5);
+    });
+
+    it('завершение повторяющейся задачи создаёт следующий экземпляр со своим номером', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+      try {
+        const task = makeTask({
+          id: 'root-1',
+          projectId: 'proj-agile',
+          number: 1,
+          recurrence: { frequency: 'daily', interval: 1 },
+          dueDate: new Date('2026-04-05T10:00:00.000Z'),
+        });
+        repo.findById.mockResolvedValue(task);
+        repo.findByParentId.mockResolvedValue([task]);
+        taskNumbers.allocate.mockResolvedValue(2);
+
+        await service.update(1, 'root-1', { completed: true });
+
+        expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+        const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+        expect(arg.number).toBe(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('update со сменой проекта выдаёт новый номер в целевом проекте до сохранения', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', number: null }),
+      );
+      taskNumbers.allocate.mockResolvedValue(3);
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-agile',
+      });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-agile', number: 3 }),
+      );
+      expect(result.task.number).toBe(3);
+    });
+
+    it('update с уходом из проекта во Входящие обнуляет номер', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', number: 4 }),
+      );
+
+      await service.update(1, 'task-1', { projectId: null });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, number: null }),
+      );
+    });
+
+    it('update без смены проекта сохраняет номер и не выдаёт новый', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-agile', number: 4 }),
+      );
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      await service.update(1, 'task-1', {
+        title: 'Новое',
+        projectId: 'proj-agile',
+      });
+
+      expect(taskNumbers.allocate).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ number: 4 }),
+      );
     });
   });
 });

@@ -9,6 +9,7 @@ import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
 import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
+import { TaskNumberPort } from '../task/domain/task-number.port';
 import {
   Project,
   ProjectColumn,
@@ -93,6 +94,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     groupId: null,
     sprintId: null,
     releaseId: null,
+    number: null,
     order: 0,
     pomodoroConfig: null,
     createdAt: new Date(),
@@ -108,6 +110,7 @@ describe('ProjectTaskService — move & reorder', () => {
   let colRepo: Record<string, jest.Mock>;
   let groupRepo: Record<string, jest.Mock>;
   let taskRepo: Record<string, jest.Mock>;
+  let taskNumbers: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     projRepo = {
@@ -161,6 +164,7 @@ describe('ProjectTaskService — move & reorder', () => {
             groupId,
             sprintId,
             releaseId,
+            number,
             order,
           ) =>
             Promise.resolve(
@@ -172,10 +176,15 @@ describe('ProjectTaskService — move & reorder', () => {
                 groupId,
                 sprintId,
                 releaseId,
+                number,
               }),
             ),
         ),
       reorderTasks: jest.fn().mockResolvedValue(undefined),
+    };
+
+    taskNumbers = {
+      allocate: jest.fn().mockResolvedValue(null),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -185,6 +194,7 @@ describe('ProjectTaskService — move & reorder', () => {
         { provide: ProjectColumnRepositoryPort, useValue: colRepo },
         { provide: BoardGroupRepositoryPort, useValue: groupRepo },
         { provide: TaskRepositoryPort, useValue: taskRepo },
+        { provide: TaskNumberPort, useValue: taskNumbers },
       ],
     }).compile();
 
@@ -211,6 +221,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         null,
+        null,
         0,
       );
     });
@@ -227,6 +238,7 @@ describe('ProjectTaskService — move & reorder', () => {
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
         'task-1',
         1,
+        null,
         null,
         null,
         null,
@@ -255,6 +267,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         null,
+        null,
         2,
       );
     });
@@ -280,6 +293,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         null,
+        null,
         0,
       );
     });
@@ -297,6 +311,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-1',
+        null,
         null,
         null,
         null,
@@ -490,6 +505,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'group-1',
         null,
         null,
+        null,
         0,
       );
     });
@@ -515,6 +531,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         null,
+        null,
         0,
       );
     });
@@ -534,6 +551,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-2',
+        null,
         null,
         null,
         null,
@@ -567,6 +585,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         'sprint-1',
         null,
+        null,
         0,
       );
     });
@@ -586,6 +605,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-2',
+        null,
         null,
         null,
         null,
@@ -619,6 +639,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         'release-1',
+        null,
         0,
       );
     });
@@ -647,6 +668,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         'sprint-1',
         null,
+        null,
         1,
       );
     });
@@ -668,6 +690,7 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         'col-1',
+        null,
         null,
         null,
         null,
@@ -695,8 +718,89 @@ describe('ProjectTaskService — move & reorder', () => {
         'group-1',
         null,
         null,
+        null,
         0,
       );
+    });
+
+    describe('номер задачи', () => {
+      it('сохраняет номер при перемещении внутри проекта', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-1', columnId: 'col-1', number: 5 }),
+        );
+        projRepo.findById.mockResolvedValue(makeProject());
+        colRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2' }));
+
+        await service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          order: 0,
+        });
+
+        expect(taskNumbers.allocate).not.toHaveBeenCalled();
+        expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+          'task-1',
+          1,
+          'proj-1',
+          'col-2',
+          null,
+          null,
+          null,
+          5,
+          0,
+        );
+      });
+
+      it('выдаёт новый номер при переезде в другой проект', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-1', number: null }),
+        );
+        projRepo.findById.mockResolvedValue(
+          makeProject({ id: 'proj-2', type: 'agile' }),
+        );
+        taskNumbers.allocate.mockResolvedValue(9);
+
+        await service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-2',
+          order: 0,
+        });
+
+        expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-2');
+        expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+          'task-1',
+          1,
+          'proj-2',
+          null,
+          null,
+          null,
+          null,
+          9,
+          0,
+        );
+      });
+
+      it('при переезде из обычного проекта во Входящие номер null', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockResolvedValue(makeProject());
+
+        await service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: null,
+          order: 0,
+        });
+
+        expect(taskNumbers.allocate).toHaveBeenCalledWith(null);
+        expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+          'task-1',
+          1,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+        );
+      });
     });
 
     // Запрет действует независимо от того, что стоит в URL: перетаскивание

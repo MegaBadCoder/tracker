@@ -29,6 +29,7 @@ import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { SprintQueryPort } from './domain/sprint-query.port';
 import { ReleaseQueryPort } from './domain/release-query.port';
+import { TaskNumberPort } from './domain/task-number.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
@@ -63,6 +64,7 @@ export class TaskService {
     private readonly boardGroupQuery: BoardGroupQueryPort,
     private readonly sprintQuery: SprintQueryPort,
     private readonly releaseQuery: ReleaseQueryPort,
+    private readonly taskNumbers: TaskNumberPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
@@ -125,6 +127,8 @@ export class TaskService {
     if (dto.releaseId) {
       await this.assertReleaseAssignable(dto.releaseId, dto.projectId ?? null);
     }
+
+    taskData.number = await this.taskNumbers.allocate(dto.projectId ?? null);
 
     const created = await this.taskRepo.create(taskData);
     if (uniqueGoalIds.length) {
@@ -206,7 +210,10 @@ export class TaskService {
       );
     }
 
-    const created = await this.taskRepo.create(instanceData);
+    const created = await this.taskRepo.create({
+      ...instanceData,
+      number: await this.taskNumbers.allocate(instanceData.projectId),
+    });
     await this.linkPort.copyGoalLinks(userId, source.id, created.id);
     return this.attachGoalIdsOne(userId, created);
   }
@@ -305,6 +312,9 @@ export class TaskService {
     }
     if (isChangingProject && dto.columnId === undefined) {
       task.columnId = null;
+    }
+    if (isChangingProject) {
+      task.number = await this.taskNumbers.allocate(dto.projectId ?? null);
     }
     if (task.sprintId && task.projectId && !task.columnId) {
       task.columnId = await this.sprintQuery.firstColumnId(task.projectId);
@@ -446,7 +456,10 @@ export class TaskService {
               task.pomodoroConfig,
             );
           }
-          nextInstance = await this.taskRepo.create(instanceData);
+          nextInstance = await this.taskRepo.create({
+            ...instanceData,
+            number: await this.taskNumbers.allocate(instanceData.projectId),
+          });
           await this.linkPort.copyGoalLinks(userId, task.id, nextInstance.id);
         }
 

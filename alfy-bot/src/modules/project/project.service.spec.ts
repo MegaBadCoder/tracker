@@ -40,6 +40,7 @@ describe('ProjectService', () => {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
       findByIdWithRelations: jest.fn().mockResolvedValue(null),
+      findByTaskKeyPrefix: jest.fn().mockResolvedValue(null),
       create: jest
         .fn()
         .mockImplementation((data) => Promise.resolve(makeProject(data))),
@@ -247,6 +248,123 @@ describe('ProjectService', () => {
       await expect(
         service.create(1, { title: 'X', parentId: 'proj-1' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('create — префикс ключей задач', () => {
+    it('agile-проект сохраняет префикс', async () => {
+      await service.create(1, {
+        title: 'Спринт',
+        type: 'agile',
+        taskKeyPrefix: 'ALF',
+      });
+
+      expect(repo.findByTaskKeyPrefix).toHaveBeenCalledWith(1, 'ALF');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ taskKeyPrefix: 'ALF' }),
+      );
+    });
+
+    it('agile-проект без префикса создаётся с taskKeyPrefix = null', async () => {
+      await service.create(1, { title: 'Спринт', type: 'agile' });
+
+      expect(repo.findByTaskKeyPrefix).not.toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ taskKeyPrefix: null }),
+      );
+    });
+
+    it('обычный проект с префиксом — 400', async () => {
+      await expect(
+        service.create(1, { title: 'Простой', taskKeyPrefix: 'ALF' }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is only for agile projects'),
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('занятый пользователем префикс — 400', async () => {
+      repo.findByTaskKeyPrefix.mockResolvedValue(
+        makeProject({ id: 'other', taskKeyPrefix: 'ALF' }),
+      );
+
+      await expect(
+        service.create(1, {
+          title: 'Спринт',
+          type: 'agile',
+          taskKeyPrefix: 'ALF',
+        }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is already used'),
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — префикс ключей задач', () => {
+    it('agile-проект принимает префикс', async () => {
+      repo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+
+      const result = await service.update(1, 'proj-1', {
+        taskKeyPrefix: 'ALF',
+      });
+
+      expect(repo.findByTaskKeyPrefix).toHaveBeenCalledWith(1, 'ALF');
+      expect(result.taskKeyPrefix).toBe('ALF');
+    });
+
+    it('обычный проект с префиксом — 400', async () => {
+      repo.findById.mockResolvedValue(makeProject({ type: 'simple' }));
+
+      await expect(
+        service.update(1, 'proj-1', { taskKeyPrefix: 'ALF' }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is only for agile projects'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('префикс другого проекта пользователя — 400', async () => {
+      repo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+      repo.findByTaskKeyPrefix.mockResolvedValue(
+        makeProject({ id: 'other', taskKeyPrefix: 'ALF' }),
+      );
+
+      await expect(
+        service.update(1, 'proj-1', { taskKeyPrefix: 'ALF' }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is already used'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('повторная установка собственного префикса — не конфликт', async () => {
+      repo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }),
+      );
+      repo.findByTaskKeyPrefix.mockResolvedValue(
+        makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }),
+      );
+
+      const result = await service.update(1, 'proj-1', {
+        taskKeyPrefix: 'ALF',
+        title: 'Новое',
+      });
+
+      expect(result.taskKeyPrefix).toBe('ALF');
+    });
+
+    it('null очищает префикс', async () => {
+      repo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }),
+      );
+
+      const result = await service.update(1, 'proj-1', {
+        taskKeyPrefix: null,
+      });
+
+      expect(repo.findByTaskKeyPrefix).not.toHaveBeenCalled();
+      expect(result.taskKeyPrefix).toBeNull();
     });
   });
 

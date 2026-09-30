@@ -8,6 +8,7 @@ import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
 import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
+import { TaskNumberPort } from '../task/domain/task-number.port';
 import { MoveTaskDto } from './dto/move-task.dto';
 import { ReorderTasksDto } from './dto/reorder-tasks.dto';
 
@@ -18,6 +19,7 @@ export class ProjectTaskService {
     private readonly columnRepo: ProjectColumnRepositoryPort,
     private readonly groupRepo: BoardGroupRepositoryPort,
     private readonly taskRepo: TaskRepositoryPort,
+    private readonly taskNumbers: TaskNumberPort,
   ) {}
 
   async moveTask(
@@ -142,6 +144,10 @@ export class ProjectTaskService {
         ? await this.firstColumnId(targetProjectId)
         : targetColumnId;
 
+    const number = keepsProject
+      ? task.number
+      : await this.taskNumbers.allocate(targetProjectId);
+
     return this.taskRepo.updatePosition(
       taskId,
       userId,
@@ -150,6 +156,7 @@ export class ProjectTaskService {
       targetGroupId,
       targetSprintId,
       targetReleaseId,
+      number,
       order,
     );
   }

@@ -40,13 +40,18 @@ export class ProjectService {
         throw new ForbiddenException('Parent project belongs to another user');
     }
 
+    const type = dto.type ?? 'simple';
+    const taskKeyPrefix = dto.taskKeyPrefix ?? null;
+    await this.assertTaskKeyPrefixAllowed(userId, type, taskKeyPrefix, null);
+
     const created = await this.projectRepo.create({
       userId,
       title: dto.title,
       description: dto.description,
       parentId: dto.parentId ?? null,
       viewMode: dto.viewMode ?? 'list',
-      type: dto.type ?? 'simple',
+      type,
+      taskKeyPrefix,
       icon: dto.icon,
       color: dto.color,
     });
@@ -56,6 +61,27 @@ export class ProjectService {
     }
 
     return created;
+  }
+
+  private async assertTaskKeyPrefixAllowed(
+    userId: number,
+    type: Project['type'],
+    taskKeyPrefix: string | null,
+    projectId: string | null,
+  ): Promise<void> {
+    if (taskKeyPrefix === null) return;
+    if (type !== 'agile') {
+      throw new BadRequestException(
+        'Task key prefix is only for agile projects',
+      );
+    }
+    const holder = await this.projectRepo.findByTaskKeyPrefix(
+      userId,
+      taskKeyPrefix,
+    );
+    if (holder && holder.id !== projectId) {
+      throw new BadRequestException('Task key prefix is already used');
+    }
   }
 
   private async seedAgileColumns(projectId: string): Promise<void> {
@@ -84,6 +110,13 @@ export class ProjectService {
       if (parent.userId !== userId)
         throw new ForbiddenException('Parent project belongs to another user');
     }
+
+    await this.assertTaskKeyPrefixAllowed(
+      userId,
+      project.type,
+      dto.taskKeyPrefix ?? null,
+      project.id,
+    );
 
     Object.assign(project, dto);
     return this.projectRepo.save(project);
