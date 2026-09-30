@@ -66,8 +66,8 @@ const props = defineProps<{
   sprintTitle?: string | null
   /**
    * Текст поля «Релиз» (см. `releaseLabel`). Чип рендерится, только когда
-   * проп передан (даже `null` — «загрузка», без значения). `undefined`
-   * скрывает чип для задач обычных проектов и Входящих.
+   * проп передан; `null` показывает «Без релиза». `undefined` скрывает чип
+   * для задач обычных проектов и Входящих.
    */
   releaseTitle?: string | null
   editable: boolean
