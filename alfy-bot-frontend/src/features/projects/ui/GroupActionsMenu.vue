@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BoardGroup } from '../model/types'
-import { CircleCheck, Ellipsis, Palette, Pencil, Plus, RotateCcw, SquareArrowOutUpRight, Trash2 } from 'lucide-vue-next'
+import { CircleCheck, Ellipsis, Palette, Pencil, Plus, Rocket, RotateCcw, SquareArrowOutUpRight, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,10 +14,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { PROJECT_COLOR_PALETTE } from '../model/project-color-palette'
+import { useReleaseStore } from '../model/release-store'
 
 /**
  * Меню действий эпика/истории на agile-доске. «Цвет» и «Добавить историю»
  * доступны только эпику — у истории нет ни своего цвета, ни вложенных историй.
+ * «В релиз…» назначает в запланированный релиз все задачи группы напрямую
+ * через `release-store`, поэтому меню требует активного Pinia.
  */
 const props = defineProps<{
   group: BoardGroup
@@ -35,6 +38,23 @@ const emit = defineEmits<{
 const isEpic = computed(() => props.group.type === 'epic')
 const triggerLabel = computed(() => (isEpic.value ? 'Действия с эпиком' : 'Действия с историей'))
 const toggleDoneLabel = computed(() => (props.group.status === 'done' ? 'Открыть' : 'Закрыть'))
+
+const releaseStore = useReleaseStore()
+const plannedReleases = computed(() => releaseStore.plannedReleasesOf(props.group.projectId))
+
+function onMenuOpenChange(open: boolean) {
+  if (open)
+    releaseStore.ensureReleases(props.group.projectId)
+}
+
+async function assignToRelease(releaseId: string) {
+  try {
+    await releaseStore.assignGroup(props.group.projectId, releaseId, props.group.id)
+  }
+  catch (err) {
+    console.error('Не удалось назначить группу в релиз:', err)
+  }
+}
 
 const keepFocusOnClose = ref(false)
 
@@ -55,7 +75,7 @@ function onCloseAutoFocus(event: Event) {
 </script>
 
 <template>
-  <DropdownMenu>
+  <DropdownMenu @update:open="onMenuOpenChange">
     <DropdownMenuTrigger as-child>
       <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground" :aria-label="triggerLabel">
         <Ellipsis :size="16" />
@@ -93,6 +113,21 @@ function onCloseAutoFocus(event: Event) {
         <Plus :size="14" class="mr-2" />
         Добавить историю
       </DropdownMenuItem>
+      <DropdownMenuSub v-if="plannedReleases.length > 0">
+        <DropdownMenuSubTrigger>
+          <Rocket :size="14" class="mr-2" />
+          В релиз…
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>
+          <DropdownMenuItem
+            v-for="release in plannedReleases"
+            :key="release.id"
+            @click="assignToRelease(release.id)"
+          >
+            {{ release.name }}
+          </DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
       <DropdownMenuItem @click="$emit('toggleDone')">
         <RotateCcw v-if="group.status === 'done'" :size="14" class="mr-2" />
         <CircleCheck v-else :size="14" class="mr-2" />

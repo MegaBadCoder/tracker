@@ -194,6 +194,7 @@
             :hide-goals="isAgileProject"
             :group-title="isAgileProject ? groupChipTitle : undefined"
             :sprint-title="isAgileProject ? sprintChipTitle : undefined"
+            :release-title="isAgileProject ? releaseChipTitle : undefined"
             :editable="effectiveEditable"
             class="-mx-7 border-y border-border/40"
             @select="activeDrawer = ($event as DrawerField)"
@@ -300,6 +301,14 @@
             :model-value="localSprintId"
             :disabled="!effectiveEditable"
             @update:model-value="onSprintChange"
+          />
+
+          <ReleasePicker
+            v-if="isAgileProject && localProjectId"
+            :project-id="localProjectId"
+            :model-value="localReleaseId"
+            :disabled="!effectiveEditable"
+            @update:model-value="onReleaseChange"
           />
 
           <GoalPicker
@@ -544,6 +553,12 @@
           :model-value="localSprintId"
           @update:model-value="onSprintChange"
         />
+        <ReleasePickerContent
+          v-if="activeDrawer === 'release' && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localReleaseId"
+          @update:model-value="onReleaseChange"
+        />
         <GoalPickerContent
           v-if="activeDrawer === 'goals' && !isAgileProject"
           :model-value="localGoalIds"
@@ -638,12 +653,16 @@ import { type DueDateUrgency, getDueDateUrgency } from '../lib/urgency'
 import { createChecklistItem, computeChecklistProgress } from '../lib/checklist'
 import { countFromDurationMinutes } from '../lib/duration'
 import { groupLabel, groupPath } from '@/features/projects/lib/group-tree'
+import { releaseLabel } from '@/features/projects/lib/release'
 import { sprintLabel } from '@/features/projects/lib/sprint'
 import { useGroupStore } from '@/features/projects/model/group-store'
+import { useReleaseStore } from '@/features/projects/model/release-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { useGroupDetail } from '@/features/projects/model/use-group-detail'
 import GroupPicker from '@/features/projects/ui/GroupPicker.vue'
 import GroupPickerContent from '@/features/projects/ui/GroupPickerContent.vue'
+import ReleasePicker from '@/features/projects/ui/ReleasePicker.vue'
+import ReleasePickerContent from '@/features/projects/ui/ReleasePickerContent.vue'
 import SprintPicker from '@/features/projects/ui/SprintPicker.vue'
 import SprintPickerContent from '@/features/projects/ui/SprintPickerContent.vue'
 import { toTimerTask, useTimerStore } from '@/features/task-timer'
@@ -680,7 +699,7 @@ const isDesktop = useMediaQuery('(min-width: 640px)')
 const isMobile = computed(() => !isDesktop.value)
 
 // Drawer state
-type DrawerField = 'project' | 'group' | 'sprint' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
+type DrawerField = 'project' | 'group' | 'sprint' | 'release' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
 const activeDrawer = ref<DrawerField | null>(null)
 const drawerOpen = computed({
   get: () => activeDrawer.value !== null,
@@ -691,6 +710,7 @@ const DRAWER_TITLES: Record<DrawerField, string> = {
   project: 'Проект',
   group: 'Эпик / История',
   sprint: 'Спринт',
+  release: 'Релиз',
   goals: 'Цель',
   dueDate: 'Срок',
   deadline: 'Дедлайн',
@@ -803,11 +823,14 @@ const groupStore = useGroupStore()
 const groupDetail = useGroupDetail()
 const localSprintId = ref<string | null>(null)
 const sprintStore = useSprintStore()
+const localReleaseId = ref<string | null>(null)
+const releaseStore = useReleaseStore()
 
 function onProjectChange(value: string | null) {
   localProjectId.value = value
   localGroupId.value = null
   localSprintId.value = null
+  localReleaseId.value = null
   emitUpdate({ projectId: value })
   activeDrawer.value = null
 }
@@ -847,10 +870,23 @@ function onSprintChange(value: string | null) {
   activeDrawer.value = null
 }
 
+const releaseChipTitle = computed<string | null>(() =>
+  localReleaseId.value && localProjectId.value
+    ? releaseLabel(releaseStore.releasesOf(localProjectId.value), localReleaseId.value)
+    : null,
+)
+
+function onReleaseChange(value: string | null) {
+  localReleaseId.value = value
+  emitUpdate({ releaseId: value })
+  activeDrawer.value = null
+}
+
 watch(localProjectId, (projectId) => {
   if (isAgileProject.value && projectId) {
     groupStore.ensureGroups(projectId)
     sprintStore.ensureSprints(projectId)
+    releaseStore.ensureReleases(projectId)
   }
 }, { immediate: true })
 
@@ -941,6 +977,7 @@ watch(() => props.task, (task) => {
     localProjectId.value = task.projectId ?? null
     localGroupId.value = task.groupId ?? null
     localSprintId.value = task.sprintId ?? null
+    localReleaseId.value = task.releaseId ?? null
     localGoalIds.value = task.goalIds ? [...task.goalIds] : []
     localRecurrence.value = task.recurrence ?? null
     localOnMissed.value = task.onMissed ?? 'shift'

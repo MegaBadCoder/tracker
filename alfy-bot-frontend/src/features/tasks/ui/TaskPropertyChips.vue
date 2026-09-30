@@ -29,6 +29,7 @@ import {
   Repeat,
   Bell,
   BookMarked,
+  Rocket,
   Target,
   Zap,
 } from 'lucide-vue-next'
@@ -63,6 +64,12 @@ const props = defineProps<{
    * скрывает чип для задач обычных проектов и Входящих.
    */
   sprintTitle?: string | null
+  /**
+   * Текст поля «Релиз» (см. `releaseLabel`). Чип рендерится, только когда
+   * проп передан (даже `null` — «загрузка», без значения). `undefined`
+   * скрывает чип для задач обычных проектов и Входящих.
+   */
+  releaseTitle?: string | null
   editable: boolean
 }>()
 
@@ -108,6 +115,14 @@ const chips = computed<ChipDef[]>(() => [
         icon: Zap,
         label: props.sprintTitle ?? 'Бэклог',
         isSet: !!props.sprintTitle,
+      }]),
+  ...(props.releaseTitle === undefined
+    ? []
+    : [{
+        key: 'release',
+        icon: Rocket,
+        label: props.releaseTitle ?? 'Без релиза',
+        isSet: !!props.releaseTitle,
       }]),
   {
     key: 'dueDate',

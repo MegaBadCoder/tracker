@@ -2,8 +2,19 @@ import type { AgileStoryRow } from '@/features/projects/lib/agile-layout'
 import type { BoardGroupNode, ProjectColumn } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AgileEpicBlock from '@/features/projects/ui/AgileEpicBlock.vue'
+
+vi.mock('@/api/client', () => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    put: vi.fn(),
+  },
+}))
 
 function makeColumn(overrides: Partial<ProjectColumn> = {}): ProjectColumn {
   return {
@@ -57,6 +68,10 @@ async function openMenuItem(wrapper: ReturnType<typeof mountBlock>, label: strin
 }
 
 describe('agileEpicBlock', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
   it('клик по названию эпика испускает openGroup', async () => {
     const wrapper = mountBlock(makeEpic())
     await wrapper.find('button.font-semibold').trigger('click')
