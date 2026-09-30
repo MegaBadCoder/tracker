@@ -1,6 +1,6 @@
 # Релизы в agile-проекте
 
-**Status:** planning
+**Status:** executing
 **Branch:** feat/agile-board
 **Worktree:** .worktrees/feat-agile-board
 **Mode:** hands-off
@@ -89,7 +89,78 @@ TDD: yes — бэкенд: правила `releaseId`, переходы стат
 - Переиспользуются паттерны спринтов: стор с кэшем по проектам, `SprintFormDialog`/`SprintCompleteDialog`-подобные диалоги, `SprintPicker`-подобное поле, `InlineTitleInput`, `GroupActionsMenu`.
 
 ## Plan
-<empty — filled by up:uplan>
+
+Approach: зеркало спринтов. Бэкенд (сущность, API, `releaseId` у задачи, `assign-group`), затем слой данных фронта, вкладка «Релизы» с диалогами, и в конце точки назначения — поле задачи и пункт меню группы. Каждая фаза опирается на уже готовые паттерны спринтов, имена файлов и методов повторяют их.
+
+### Phase 1 — бэкенд: релиз, API и `releaseId` у задачи (TDD)
+
+- **1.1** `alfy-bot/src/shared/entities/release.entity.ts` (create) — `Release`: поля из Design (решение 1); `@Check('CHK_release_status', "status IN ('planned','released')")`, `@Check('CHK_release_date_order', 'startDate IS NULL OR releaseDate IS NULL OR startDate <= releaseDate')`. Образец — `sprint.entity.ts`.
+- **1.2** `shared/entities/task.entity.ts` (modify) — `releaseId: string | null` + `@ManyToOne(() => Release, { nullable: true, onDelete: 'SET NULL' })` рядом с `sprintId`.
+- **1.3** `shared/entities/index.ts`, `app.module.ts` (список сущностей), `test/helpers/test-app.ts`, и все спеки со своими `DataSource`, где есть `Task` (как в фазе 1 спринтов: `create-data-source.spec.ts`, `project-type-migration.service.spec.ts`, `board-group-constraints.service.spec.ts`, `typeorm-report-answer.repository.spec.ts`, `typeorm-sprint.repository.spec.ts`) — `Release` в списки.
+- **1.4** `modules/project/domain/release-repository.port.ts` + `infrastructure/typeorm-release.repository.ts` (create) — `findAllByProject`, `findById(id, projectId)`, `create`, `save`, `delete(id, projectId)`, `releaseAndMoveUnfinished(releaseId, moveToReleaseId: string | null)` (транзакция: `status = 'released'`, `releasedAt = now`, незавершённым задачам релиза `releaseId = moveTo`), `assignGroupTasks(releaseId, groupIds: string[]): Promise<number>` (`UPDATE tasks SET releaseId WHERE groupId IN (...)`, число строк). Образец — `typeorm-sprint.repository.ts`.
+- **1.5** `modules/project/dto/create-release.dto.ts`, `update-release.dto.ts`, `release-release.dto.ts`, `assign-group-release.dto.ts` (create) — create: `name` (обязательно, непустое), `description?`, `startDate?`, `releaseDate?`; update: те же, все необязательные, `name` через `@ValidateIf(o => o.name !== undefined)` + `@IsNotEmpty` (урок ревью спринтов: `null` → 400); даты `@Matches(/^\d{4}-\d{2}-\d{2}$/)`, nullable; release: `moveTo` — `'none'` или UUID; assign: `groupId` UUID.
+- **1.6** `modules/project/release.service.ts` (create) — `ReleaseService`: `list`, `create` (`order = max(order planned) + 1`, иначе 0), `update` (у `released` — 400; даты по итоговым значениям), `release(…, { moveTo })` (только `planned`; `moveTo` — `'none'` или `planned`-релиз этого проекта, не сам), `delete`, `assignGroup(…, { groupId })` (группа этого проекта через `BoardGroupRepositoryPort`; для эпика — его id и id всех историй; релиз `planned`; отдаёт `{ updated: number }`). Доступ к проекту — как `SprintService.validateProjectAccess`.
+- **1.7** `modules/project/release.controller.ts` (create) — `@Controller('projects/:projectId/releases')`: `GET /`, `POST /`, `PATCH /:id`, `DELETE /:id`, `POST /:id/release`, `POST /:id/assign-group`.
+- **1.8** `modules/project/project.module.ts` (modify) — `Release` в `forFeature`, порт, сервис, контроллер.
+- **1.9** Задача (как фаза 2 спринтов):
+  - `modules/task/domain/release-query.port.ts` + `infrastructure/typeorm-release-query.adapter.ts` (create) — `getRelease(id): Promise<{ projectId, status } | null>`; `task.module.ts` — `Release` в `forFeature`, биндинг.
+  - `create-task.dto.ts` — `releaseId?: string | null`.
+  - `task.service.ts` — `assertReleaseAssignable(releaseId, projectId)` (без проекта / чужой / нет → 400 «Release does not belong to the task project»; `released` → 400 «Cannot assign a task to a released release»); `create`, `update` (проверка только при реальной смене значения или проекта, как `isChangingSprint`; сброс при смене проекта без `releaseId`), `moveToInbox` → `releaseId = null`.
+  - `project-task.service.ts` `moveTask` + `TaskRepositoryPort.updatePosition`/`typeorm-task.repository.ts` — параметр `releaseId` после `sprintId`, `keepsProject ? task.releaseId : null`.
+  - Invariant: релиз только своего проекта и не выпущенный; во Входящих `releaseId = null`.
+- Commit: `feat(project): releases with release action and group assignment`
+
+### Phase 2 — фронт: слой данных (TDD)
+
+- **2.1** `features/projects/model/types.ts` — `ReleaseStatus`, `Release`, `CreateReleasePayload`, `UpdateReleasePayload`, `ReleaseActionPayload { moveTo: 'none' | string }`; `features/tasks/model/types.ts` — `Task.releaseId?: string | null`.
+- **2.2** `features/projects/api/releases-api.ts` (create) — `fetchReleases`, `createRelease`, `updateRelease`, `deleteRelease`, `releaseRelease`, `assignGroupToRelease`.
+- **2.3** `features/projects/model/release-store.ts` (create) — как `sprint-store.ts`: `releasesOf`, `plannedReleasesOf` (по `order`), `releasedReleasesOf` (по `releasedAt` убыв.), `isLoading`, `fetchReleases`, `ensureReleases`, `createRelease`, `updateRelease`, `deleteRelease` (после успеха задачам локально `releaseId = null`), `releaseRelease(projectId, id, moveTo)` (после успеха незавершённым задачам локально `releaseId` = цель или `null`), `assignGroup(projectId, releaseId, groupId)` (после успеха `useTaskStore().fetchTasks()`).
+- **2.4** `features/projects/lib/release.ts` (create) — `releaseTasks(tasks, releaseId)`, `releaseProgress(tasks, releaseId)`, `isReleaseOverdue(release, today)` (`planned` и `releaseDate` < сегодня, локальные даты через `parseLocalDate` из `lib/sprint.ts`), `defaultReleaseTarget(planned, currentId)` (первый `planned` по `order`, кроме текущего, иначе `'none'`), `releaseDeletionMessage(release, taskCount)` (`pluralRu`), `releaseLabel(releases, releaseId)` («Без релиза» / имя / «<имя> (выпущен)» / `null` если не найден), `groupReleaseTasks(tasks, groups)` → `[{ epic: BoardGroupNode | null, story: BoardGroupNode | null, tasks }]` в порядке эпиков и историй, «Без эпика» последним.
+- Commit: `feat(projects): release store and helpers`
+
+### Phase 3 — фронт: вкладка «Релизы» и диалоги
+
+- **3.1** `router/index.ts` — маршрут `project/:projectId/releases`, `name: 'tasks-project-releases'`, `views/ProjectReleasesView.vue`; `features/projects/ui/ProjectTabs.vue` — третья вкладка «Релизы».
+- **3.2** `views/ProjectReleasesView.vue` (create) — не-agile → `router.replace('tasks-project')`; `AppHeader` + `ProjectTabs`; загрузка задач, групп, релизов (как `ProjectBacklogView`); «+ Релиз» (`InlineTitleInput` → `createRelease`); блок «Запланированные» (`plannedReleasesOf`) и свёрнутый блок «Выпущенные» (`releasedReleasesOf`); `useTaskDetailHandlers` + `TaskDetailDialog`, как в бэклоге.
+- **3.3** `features/projects/ui/ReleaseRow.vue` (create) — props `projectId`, `release`, `tasks`; шапка: название, даты («с 1 окт. по 15 окт.» / «до 15 окт.» / ничего), прогресс «n из m готово» + полоска, метка «Просрочен» (`isReleaseOverdue`), у выпущенного — «Выпущен 15 окт.»; `⋯` только у `planned`: «Изменить», «Выпустить», «Удалить» (emits); клик по шапке раскрывает список `groupReleaseTasks` с подписями «Эпик › История» / «Без эпика»; клик по задаче → emit `openTask`.
+- **3.4** `features/projects/ui/ReleaseFormDialog.vue` (create) — по образцу `SprintFormDialog` (режим `edit`): название, описание (`Textarea`), даты начала и выпуска с `Popover` + `Calendar` (`:locale`/`:week-starts-on` из `useLocale`, `min`/`max`, очистка); `updateRelease`; ошибка сервера в диалоге (`apiErrorMessage`).
+- **3.5** `features/projects/ui/ReleaseActionDialog.vue` (create) — по образцу `SprintCompleteDialog`: «Выполнено N, не выполнено M», выбор «в релиз X» (`plannedReleasesOf` без текущего) / «Снять с релиза», по умолчанию `defaultReleaseTarget`; при M = 0 выбора нет, шлётся `'none'`; `releaseRelease`.
+- **3.6** Удаление — `confirm` с `releaseDeletionMessage`, затем `deleteRelease`. Диалоги монтируются по одному на экран через `v-if` на снимке релиза (как спринтовые).
+- Commit: `feat(projects): releases tab with release, edit and delete`
+
+### Phase 4 — фронт: назначение релиза
+
+- **4.1** `features/projects/ui/ReleasePicker.vue`, `ReleasePickerContent.vue` (create) — по образцу `SprintPicker`/`SprintPickerContent`: «Без релиза» + `planned`; значение через `releaseLabel`.
+- **4.2** `features/tasks/ui/TaskDetailDialog.vue` — `localReleaseId`, `onReleaseChange` → `emitUpdate({ releaseId })`; `<ReleasePicker v-if="isAgileProject && localProjectId">` после `SprintPicker`; `DrawerField` + `'release'`, `DRAWER_TITLES.release = 'Релиз'`; сброс при смене проекта; `ensureReleases`. `TaskPropertyChips.vue` — `releaseTitle?: string | null` по схеме `sprintTitle`.
+- **4.3** `features/projects/ui/GroupActionsMenu.vue` — подменю «В релиз…» с `plannedReleasesOf(group.projectId)`; выбор вызывает `releaseStore.assignGroup(projectId, releaseId, group.id)` прямо из меню (без новых emits — меню используется в `AgileEpicBlock`, `AgileStoryBlock`, `BacklogEpicsPanel`, и все три получат пункт без правок); пункт скрыт, если `planned`-релизов нет; `ensureReleases` при открытии меню.
+- Commit: `feat(projects): assign releases to tasks and whole stories`
+
+### Test strategy
+
+TDD, тесты первыми — фазы 1–2:
+
+- `release.service.spec.ts`: имя обязательно; `order` после максимального `planned`; `update` выпущенного → 400; даты `start > release` → 400 (с учётом сохранённой второй); `release` только из `planned`; `moveTo` на себя / выпущенный / чужой → 400; `'none'` и `planned` → `releaseAndMoveUnfinished` с правильной целью; `assignGroup` для эпика передаёт id эпика и всех его историй, для истории — только её; чужая группа → 400; выпущенный релиз → 400.
+- `typeorm-release.repository.spec.ts` (реальный SQLite): `releaseAndMoveUnfinished` двигает только незавершённые задачи этого релиза; `assignGroupTasks` меняет только задачи перечисленных групп и возвращает их число.
+- `task.service.spec.ts`: `releaseId` своего проекта → ок; чужой, выпущенный, без проекта → 400 без записи; повторная отправка текущего (выпущенного) → ок; смена проекта без `releaseId` → обнулён; `moveToInbox` → `null`. `project-task.service.spec.ts`: переезд в другой проект обнуляет `releaseId`, внутри проекта сохраняет.
+- e2e `test/releases.e2e-spec.ts`: создание → назначение задач (API задач и `assign-group` для эпика с историей) → выпуск с переносом в другой релиз → выполненные в выпущенном, незавершённые в новом → назначение в выпущенный → 400 → удаление → задачи без релиза.
+- Фронт: `release.spec.ts` (все функции 2.4, включая границы «просрочен» и порядок групп); `release-store.spec.ts` (изоляция проектов, откат, локальные эффекты `deleteRelease`/`releaseRelease`, `assignGroup` перечитывает задачи).
+
+После реализации:
+
+- `ProjectReleasesView.spec.ts` — блоки и порядок, «+ Релиз», не-agile → редирект, раскрытие строки и группировка, «Выпустить» открывает диалог, удаление через confirm.
+- `ReleaseRow.spec.ts`, `ReleaseFormDialog.spec.ts` (календарь с `locale`), `ReleaseActionDialog.spec.ts` (цель по умолчанию, M = 0).
+- `TaskDetailDialog.spec.ts` — поле «Релиз» только в agile, выбор шлёт `releaseId`, выпущенный показывается «(выпущен)».
+- `GroupActionsMenu.spec.ts` — «В релиз…» с `planned`-релизами, выбор вызывает `assignGroup`; без `planned` пункта нет.
+- Живой браузер в `up:uverify`: фокус, слои модалок, раскрытие строк.
+
+### Order & dependencies
+
+1 → 2 → 3 → 4. Фаза 4.3 правит общий `GroupActionsMenu` — проверить, что доска, бэклог и панель эпиков не сломались.
+
+### Open questions / risks / rollback
+
+- **Совместимость:** колонка `tasks.releaseId` пересобирает `tasks`, триггеры снимает `initializeWithSchemaSync`; проверить старт на dev-базе с триггерами.
+- **`assign-group` перечитывает все задачи** — при большом числе задач это лишний трафик; для одного пользователя приемлемо.
 
 ## Verify
 <empty — filled by up:uverify>
@@ -107,5 +178,7 @@ TDD: yes — бэкенд: правила `releaseId`, переходы стат
 - udesign: имя релиза обязательно при создании — у релизов нет естественной нумерации, «Релиз N» было бы выдуманным значением по умолчанию.
 - udesign: «В релиз…» для эпика/истории назначает все задачи группы, включая выполненные — «история входит в релиз» целиком; после ответа фронт перечитывает задачи проекта.
 - udesign: цель выпуска по умолчанию — ближайший `planned`-релиз, иначе «снять с релиза» — зеркало решения, которое пользователь принял для спринтов.
+- uplan: plan auto-approved (hands-off).
+- uplan: «В релиз…» вызывает стор прямо из `GroupActionsMenu`, без новых emits — пункт сразу появляется во всех трёх местах использования меню без правки родителей.
 
 ### Deferred (needs user input)
