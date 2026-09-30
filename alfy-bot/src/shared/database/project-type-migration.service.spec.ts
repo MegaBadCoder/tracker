@@ -2,6 +2,7 @@ import { DataSource, Repository } from 'typeorm';
 import {
   BoardGroup,
   Sprint,
+  Release,
   PomodoroConfig,
   Project,
   ProjectColumn,
@@ -29,6 +30,7 @@ describe('ProjectTypeMigrationService (in-memory sqlite)', () => {
         PomodoroConfig,
         BoardGroup,
         Sprint,
+        Release,
       ],
       synchronize: true,
     });

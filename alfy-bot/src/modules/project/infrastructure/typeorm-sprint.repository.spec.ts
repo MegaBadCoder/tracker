@@ -4,6 +4,7 @@ import {
   PomodoroConfig,
   Project,
   ProjectColumn,
+  Release,
   Sprint,
   Task,
   User,
@@ -32,6 +33,7 @@ describe('TypeOrmSprintRepository (in-memory sqlite)', () => {
         PomodoroConfig,
         BoardGroup,
         Sprint,
+        Release,
       ],
       synchronize: true,
     });

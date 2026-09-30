@@ -92,6 +92,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     columnId: null,
     groupId: null,
     sprintId: null,
+    releaseId: null,
     order: 0,
     pomodoroConfig: null,
     createdAt: new Date(),
@@ -152,7 +153,16 @@ describe('ProjectTaskService — move & reorder', () => {
       updatePosition: jest
         .fn()
         .mockImplementation(
-          (taskId, _userId, projectId, columnId, groupId, sprintId, order) =>
+          (
+            taskId,
+            _userId,
+            projectId,
+            columnId,
+            groupId,
+            sprintId,
+            releaseId,
+            order,
+          ) =>
             Promise.resolve(
               makeTask({
                 id: taskId,
@@ -161,6 +171,7 @@ describe('ProjectTaskService — move & reorder', () => {
                 order,
                 groupId,
                 sprintId,
+                releaseId,
               }),
             ),
         ),
@@ -199,6 +210,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         null,
+        null,
         0,
       );
     });
@@ -215,6 +227,7 @@ describe('ProjectTaskService — move & reorder', () => {
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
         'task-1',
         1,
+        null,
         null,
         null,
         null,
@@ -241,6 +254,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'col-1',
         null,
         null,
+        null,
         2,
       );
     });
@@ -265,6 +279,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'col-2',
         null,
         null,
+        null,
         0,
       );
     });
@@ -282,6 +297,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-1',
+        null,
         null,
         null,
         null,
@@ -473,6 +489,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'col-1',
         'group-1',
         null,
+        null,
         0,
       );
     });
@@ -497,6 +514,7 @@ describe('ProjectTaskService — move & reorder', () => {
         null,
         null,
         null,
+        null,
         0,
       );
     });
@@ -516,6 +534,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-2',
+        null,
         null,
         null,
         null,
@@ -547,6 +566,59 @@ describe('ProjectTaskService — move & reorder', () => {
         'col-2',
         null,
         'sprint-1',
+        null,
+        0,
+      );
+    });
+
+    it('обнуляет releaseId при переезде в другой проект', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ id: 'proj-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-2',
+        null,
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('сохраняет releaseId при смене колонки внутри проекта', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          releaseId: 'release-1',
+        }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject());
+      colRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-2',
+        null,
+        null,
+        'release-1',
         0,
       );
     });
@@ -574,6 +646,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'col-1',
         null,
         'sprint-1',
+        null,
         1,
       );
     });
@@ -595,6 +668,7 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         'col-1',
+        null,
         null,
         null,
         0,
@@ -619,6 +693,7 @@ describe('ProjectTaskService — move & reorder', () => {
         'proj-1',
         null,
         'group-1',
+        null,
         null,
         0,
       );

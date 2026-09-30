@@ -28,6 +28,7 @@ import { UserSettingsPort } from './domain/user-settings.port';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { SprintQueryPort } from './domain/sprint-query.port';
+import { ReleaseQueryPort } from './domain/release-query.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
@@ -61,6 +62,7 @@ export class TaskService {
     private readonly projectTypeQuery: ProjectTypeQueryPort,
     private readonly boardGroupQuery: BoardGroupQueryPort,
     private readonly sprintQuery: SprintQueryPort,
+    private readonly releaseQuery: ReleaseQueryPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
@@ -118,6 +120,10 @@ export class TaskService {
       if (!taskData.columnId && dto.projectId) {
         taskData.columnId = await this.sprintQuery.firstColumnId(dto.projectId);
       }
+    }
+
+    if (dto.releaseId) {
+      await this.assertReleaseAssignable(dto.releaseId, dto.projectId ?? null);
     }
 
     const created = await this.taskRepo.create(taskData);
@@ -272,6 +278,17 @@ export class TaskService {
       await this.assertSprintAssignable(dto.sprintId!, targetProjectId);
     }
 
+    const isChangingRelease =
+      dto.releaseId !== undefined &&
+      (dto.releaseId !== task.releaseId || isChangingProject);
+
+    if (isChangingRelease && dto.releaseId !== null) {
+      const targetProjectId = isChangingProject
+        ? (dto.projectId ?? null)
+        : task.projectId;
+      await this.assertReleaseAssignable(dto.releaseId!, targetProjectId);
+    }
+
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),
@@ -282,6 +299,9 @@ export class TaskService {
     }
     if (isChangingProject && dto.sprintId === undefined) {
       task.sprintId = null;
+    }
+    if (isChangingProject && dto.releaseId === undefined) {
+      task.releaseId = null;
     }
     if (isChangingProject && dto.columnId === undefined) {
       task.columnId = null;
@@ -659,6 +679,7 @@ export class TaskService {
     // groupId значит нарваться на trg_task_group_same_project и отдать 500.
     task.groupId = null;
     task.sprintId = null;
+    task.releaseId = null;
     task.order = order;
     return this.attachGoalIdsOne(userId, await this.taskRepo.save(task));
   }
@@ -752,6 +773,24 @@ export class TaskService {
     }
     if (sprint.status === 'closed') {
       throw new BadRequestException('Cannot assign a task to a closed sprint');
+    }
+  }
+
+  private async assertReleaseAssignable(
+    releaseId: string,
+    projectId: string | null,
+  ): Promise<void> {
+    const release =
+      projectId === null ? null : await this.releaseQuery.getRelease(releaseId);
+    if (!release || release.projectId !== projectId) {
+      throw new BadRequestException(
+        'Release does not belong to the task project',
+      );
+    }
+    if (release.status === 'released') {
+      throw new BadRequestException(
+        'Cannot assign a task to a released release',
+      );
     }
   }
 

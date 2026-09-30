@@ -14,6 +14,7 @@ import { Project } from './project.entity';
 import { ProjectColumn } from './project-column.entity';
 import { BoardGroup } from './board-group.entity';
 import { Sprint } from './sprint.entity';
+import { Release } from './release.entity';
 import type { ChecklistData } from '../types/checklist.types';
 import type { RecurrenceRule } from '../types/recurrence.types';
 
@@ -66,6 +67,9 @@ export class Task {
 
   @Column({ type: 'text', nullable: true })
   sprintId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  releaseId: string | null;
 
   @Column({ type: 'integer', default: 0 })
   order: number;
@@ -128,6 +132,13 @@ export class Task {
   })
   @JoinColumn({ name: 'sprintId' })
   sprint: Sprint | null;
+
+  @ManyToOne(() => Release, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'releaseId' })
+  release: Release | null;
 
   @ManyToOne(() => Task, { nullable: true })
   @JoinColumn({ name: 'recurringParentId' })

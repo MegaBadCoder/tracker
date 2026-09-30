@@ -7,6 +7,7 @@ import { UserSettingsPort } from './domain/user-settings.port';
 import { ProjectTypeQueryPort } from './domain/project-type.port';
 import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { SprintQueryPort } from './domain/sprint-query.port';
+import { ReleaseQueryPort } from './domain/release-query.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -63,6 +64,7 @@ describe('TaskService', () => {
   let projectTypeQuery: Record<string, jest.Mock>;
   let boardGroupQuery: Record<string, jest.Mock>;
   let sprintQuery: Record<string, jest.Mock>;
+  let releaseQuery: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -129,6 +131,10 @@ describe('TaskService', () => {
       firstColumnId: jest.fn().mockResolvedValue(null),
     };
 
+    releaseQuery = {
+      getRelease: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
@@ -138,6 +144,7 @@ describe('TaskService', () => {
         { provide: ProjectTypeQueryPort, useValue: projectTypeQuery },
         { provide: BoardGroupQueryPort, useValue: boardGroupQuery },
         { provide: SprintQueryPort, useValue: sprintQuery },
+        { provide: ReleaseQueryPort, useValue: releaseQuery },
       ],
     }).compile();
 
@@ -401,6 +408,79 @@ describe('TaskService', () => {
       ).rejects.toThrow('Cannot assign a sprint to a task without a project');
       expect(repo.create).not.toHaveBeenCalled();
       expect(sprintQuery.getSprint).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create — releaseId', () => {
+    it('создаёт задачу в релизе своего проекта', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+
+      await service.create(1, {
+        title: 'В релизе',
+        projectId: 'proj-1',
+        releaseId: 'release-1',
+      });
+
+      expect(releaseQuery.getRelease).toHaveBeenCalledWith('release-1');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseId: 'release-1' }),
+      );
+    });
+
+    it('бросает BadRequestException при релизе чужого проекта', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Чужой релиз',
+          projectId: 'proj-1',
+          releaseId: 'release-1',
+        }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при несуществующем релизе', async () => {
+      releaseQuery.getRelease.mockResolvedValue(null);
+
+      await expect(
+        service.create(1, {
+          title: 'Нет релиза',
+          projectId: 'proj-1',
+          releaseId: 'release-1',
+        }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при выпущенном релизе', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Выпущенный',
+          projectId: 'proj-1',
+          releaseId: 'release-1',
+        }),
+      ).rejects.toThrow('Cannot assign a task to a released release');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при releaseId без проекта', async () => {
+      await expect(
+        service.create(1, { title: 'Без проекта', releaseId: 'release-1' }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(releaseQuery.getRelease).not.toHaveBeenCalled();
     });
   });
 
@@ -784,6 +864,133 @@ describe('TaskService', () => {
     });
   });
 
+  describe('update — releaseId', () => {
+    it('релиз своего проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        releaseId: 'release-1',
+      });
+
+      expect(releaseQuery.getRelease).toHaveBeenCalledWith('release-1');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseId: 'release-1' }),
+      );
+      expect(result.task.releaseId).toBe('release-1');
+    });
+
+    it('релиз чужого проекта даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('несуществующий релиз даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue(null);
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('выпущенный релиз даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow('Cannot assign a task to a released release');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('releaseId без проекта у задачи даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: null }));
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('повторная отправка текущего выпущенного релиза не отклоняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-done' }),
+      );
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        releaseId: 'release-done',
+        title: 'Новое название',
+      });
+
+      expect(releaseQuery.getRelease).not.toHaveBeenCalled();
+      expect(result.task.releaseId).toBe('release-done');
+    });
+
+    it('releaseId: null снимает релиз без проверок', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', { releaseId: null });
+
+      expect(releaseQuery.getRelease).not.toHaveBeenCalled();
+      expect(result.task.releaseId).toBeNull();
+    });
+
+    it('смена проекта без releaseId — релиз обнуляется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', releaseId: null }),
+      );
+      expect(result.task.releaseId).toBeNull();
+    });
+
+    it('смена проекта с релизом целевого проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-old' }),
+      );
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        releaseId: 'release-2',
+      });
+
+      expect(releaseQuery.getRelease).toHaveBeenCalledWith('release-2');
+      expect(result.task.releaseId).toBe('release-2');
+    });
+  });
+
   describe('moveToInbox', () => {
     // Тот же случай, что и смена projectId в update: задача уезжает из
     // проекта, а groupId указывает на группу этого проекта. Триггер
@@ -817,6 +1024,18 @@ describe('TaskService', () => {
 
       expect(repo.save).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: null, sprintId: null }),
+      );
+    });
+
+    it('обнуляет releaseId вместе с projectId', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+
+      await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, releaseId: null }),
       );
     });
 

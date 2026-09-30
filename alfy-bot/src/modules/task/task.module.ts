@@ -10,6 +10,7 @@ import {
   Project,
   BoardGroup,
   Sprint,
+  Release,
   ProjectColumn,
 } from '../../shared/entities';
 import { AuthModule } from '../auth/auth.module';
@@ -31,6 +32,8 @@ import { BoardGroupQueryPort } from './domain/board-group-query.port';
 import { TypeOrmBoardGroupQueryAdapter } from './infrastructure/typeorm-board-group-query.adapter';
 import { SprintQueryPort } from './domain/sprint-query.port';
 import { TypeOrmSprintQueryAdapter } from './infrastructure/typeorm-sprint-query.adapter';
+import { ReleaseQueryPort } from './domain/release-query.port';
+import { TypeOrmReleaseQueryAdapter } from './infrastructure/typeorm-release-query.adapter';
 import { TypeOrmTimerSessionRepository } from './infrastructure/typeorm-timer-session.repository';
 import { TelegramNotificationAdapter } from './infrastructure/telegram-notification.adapter';
 import { TelegramUserLookupAdapter } from './infrastructure/telegram-user-lookup.adapter';
@@ -64,6 +67,7 @@ const notificationProviders = isTelegramEnabled()
       Project,
       BoardGroup,
       Sprint,
+      Release,
       ProjectColumn,
     ]),
     AuthModule,
@@ -83,6 +87,7 @@ const notificationProviders = isTelegramEnabled()
     { provide: ProjectTypeQueryPort, useClass: TypeOrmProjectTypeAdapter },
     { provide: BoardGroupQueryPort, useClass: TypeOrmBoardGroupQueryAdapter },
     { provide: SprintQueryPort, useClass: TypeOrmSprintQueryAdapter },
+    { provide: ReleaseQueryPort, useClass: TypeOrmReleaseQueryAdapter },
     ...notificationProviders,
     {
       provide: TelegramUserLookupPort,

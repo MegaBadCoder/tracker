@@ -64,6 +64,7 @@ export class ProjectTaskService {
           ? task.groupId
           : null;
     const targetSprintId = keepsProject ? task.sprintId : null;
+    const targetReleaseId = keepsProject ? task.releaseId : null;
 
     // Cannot set column without project
     if (targetColumnId && !targetProjectId) {
@@ -148,6 +149,7 @@ export class ProjectTaskService {
       columnId,
       targetGroupId,
       targetSprintId,
+      targetReleaseId,
       order,
     );
   }

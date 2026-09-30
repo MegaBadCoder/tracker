@@ -5,6 +5,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import {
   BoardGroup,
   Sprint,
+  Release,
   PomodoroConfig,
   Project,
   ProjectColumn,
@@ -29,6 +30,7 @@ const ENTITIES = [
   PomodoroConfig,
   BoardGroup,
   Sprint,
+  Release,
 ];
 
 const LEGACY_BOARD_GROUPS_SQL = `
