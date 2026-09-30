@@ -45,6 +45,13 @@
               </template>
             </template>
           </div>
+          <span
+            v-if="headerTaskKey"
+            data-testid="task-key"
+            class="shrink-0 text-[11px] font-mono text-muted-foreground"
+          >
+            {{ headerTaskKey }}
+          </span>
         </div>
         <div class="flex items-center gap-0.5">
           <DropdownMenu v-if="effectiveEditable">
@@ -655,6 +662,7 @@ import { countFromDurationMinutes } from '../lib/duration'
 import { groupLabel, groupPath } from '@/features/projects/lib/group-tree'
 import { releaseLabel } from '@/features/projects/lib/release'
 import { sprintLabel } from '@/features/projects/lib/sprint'
+import { taskKey } from '@/features/projects/lib/task-key'
 import { useGroupStore } from '@/features/projects/model/group-store'
 import { useReleaseStore } from '@/features/projects/model/release-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
@@ -817,6 +825,13 @@ const isAgileProject = computed(() =>
     ? projectStore.projectMap.get(localProjectId.value)?.type === 'agile'
     : false,
 )
+
+const headerTaskKey = computed(() => {
+  const task = props.task
+  if (!task)
+    return null
+  return taskKey(task.projectId ? projectStore.projectMap.get(task.projectId) : undefined, task)
+})
 
 const localGroupId = ref<string | null>(null)
 const groupStore = useGroupStore()

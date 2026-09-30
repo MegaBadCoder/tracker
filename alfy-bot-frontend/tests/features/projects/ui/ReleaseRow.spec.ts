@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGroupStore } from '@/features/projects/model/group-store'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import ReleaseRow from '@/features/projects/ui/ReleaseRow.vue'
 
 function makeRelease(overrides: Partial<Release> = {}): Release {
@@ -216,6 +217,38 @@ describe('releaseRow', () => {
     await wrapper.get('button[aria-label="Релиз v1.0"]').trigger('click')
 
     expect(wrapper.get('[data-testid="release-tasks"]').text()).toContain('В релизе нет задач')
+    wrapper.unmount()
+  })
+
+  it('в раскрытом списке показывает ключи задач agile-проекта с префиксом', async () => {
+    useProjectStore().projects = [{
+      id: 'proj-1',
+      parentId: null,
+      title: 'Проект',
+      description: null,
+      viewMode: 'board',
+      type: 'agile',
+      icon: null,
+      color: null,
+      order: 0,
+      taskKeyPrefix: 'ALF',
+    }]
+    const wrapper = mountRow(makeRelease(), [
+      makeTask({ id: 'a', number: 4 }),
+      makeTask({ id: 'b', number: null }),
+    ])
+    await wrapper.get('button[aria-label="Релиз v1.0"]').trigger('click')
+
+    const keys = wrapper.findAll('[data-testid="task-key"]')
+    expect(keys.map(k => k.text())).toEqual(['ALF-4'])
+    wrapper.unmount()
+  })
+
+  it('без префикса проекта ключи в списке релиза не рисуются', async () => {
+    const wrapper = mountRow(makeRelease(), [makeTask({ id: 'a', number: 4 })])
+    await wrapper.get('button[aria-label="Релиз v1.0"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="task-key"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })

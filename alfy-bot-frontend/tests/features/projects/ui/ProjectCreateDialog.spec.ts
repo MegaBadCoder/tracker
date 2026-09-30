@@ -17,7 +17,7 @@ const stubs = {
     emits: ['update:modelValue'],
     template: '<input :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
   },
-  Button: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
+  Button: { template: '<button :disabled="$attrs.disabled" @click="$emit(\'click\')"><slot /></button>' },
   IconPicker: true,
   ColorPicker: true,
   ProjectPicker: true,
@@ -101,5 +101,98 @@ describe('ProjectCreateDialog', () => {
     expect(createProject).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'simple' }),
     )
+  })
+
+  it('поле префикса появляется только при выборе Agile', async () => {
+    const wrapper = mount(ProjectCreateDialog, {
+      props: { open: false },
+      global: { stubs },
+    })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="task-key-prefix-input"]').exists()).toBe(false)
+
+    await selectAgileTab(wrapper)
+    await nextTick()
+
+    expect(wrapper.find('[data-testid="task-key-prefix-input"]').exists()).toBe(true)
+  })
+
+  it('отправляет префикс в верхнем регистре для agile', async () => {
+    const wrapper = mount(ProjectCreateDialog, {
+      props: { open: false },
+      global: { stubs },
+    })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    await wrapper.find('input[placeholder="Название проекта"]').setValue('Alfy')
+    await selectAgileTab(wrapper)
+    await nextTick()
+    await wrapper.get('[data-testid="task-key-prefix-input"]').setValue('alf')
+    await wrapper.findAll('button').find(button => button.text() === 'Создать')?.trigger('click')
+    await flushPromises()
+
+    expect(createProject).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'agile', taskKeyPrefix: 'ALF' }),
+    )
+  })
+
+  it('без введённого префикса taskKeyPrefix в payload не передаётся', async () => {
+    const wrapper = mount(ProjectCreateDialog, {
+      props: { open: false },
+      global: { stubs },
+    })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    await wrapper.find('input[placeholder="Название проекта"]').setValue('Alfy')
+    await selectAgileTab(wrapper)
+    await nextTick()
+    await wrapper.findAll('button').find(button => button.text() === 'Создать')?.trigger('click')
+    await flushPromises()
+
+    expect(createProject.mock.calls[0]?.[0]).not.toHaveProperty('taskKeyPrefix')
+  })
+
+  it('заведомо неверный префикс блокирует создание', async () => {
+    const wrapper = mount(ProjectCreateDialog, {
+      props: { open: false },
+      global: { stubs },
+    })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    await wrapper.find('input[placeholder="Название проекта"]').setValue('Alfy')
+    await selectAgileTab(wrapper)
+    await nextTick()
+    await wrapper.get('[data-testid="task-key-prefix-input"]').setValue('ТЕСТ')
+    const submit = wrapper.findAll('button').find(button => button.text() === 'Создать')
+    await submit?.trigger('click')
+    await flushPromises()
+
+    expect(submit?.attributes('disabled')).toBeDefined()
+    expect(createProject).not.toHaveBeenCalled()
+  })
+
+  it('показывает ошибку сервера и не закрывает диалог', async () => {
+    createProject.mockRejectedValue({ response: { data: { message: 'Task key prefix is already used' } } })
+    const wrapper = mount(ProjectCreateDialog, {
+      props: { open: false },
+      global: { stubs },
+    })
+    await wrapper.setProps({ open: true })
+    await nextTick()
+
+    await wrapper.find('input[placeholder="Название проекта"]').setValue('Alfy')
+    await selectAgileTab(wrapper)
+    await nextTick()
+    await wrapper.get('[data-testid="task-key-prefix-input"]').setValue('ALF')
+    await wrapper.findAll('button').find(button => button.text() === 'Создать')?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="project-create-error"]').text()).toBe('Task key prefix is already used')
+    expect(wrapper.emitted('update:open')).toBeUndefined()
   })
 })

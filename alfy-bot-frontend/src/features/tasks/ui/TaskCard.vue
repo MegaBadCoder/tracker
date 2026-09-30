@@ -4,6 +4,8 @@ import { AlertCircle, Calendar as CalendarIcon, CheckSquare, Clock, Flag, Folder
 import { computed, ref, toRef } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
+import { taskKey } from '@/features/projects/lib/task-key'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import { computeChecklistProgress } from '../lib/checklist'
 import { useDragSource } from '../lib/dnd/use-drag-source'
 import { DATE_SHORT, DATE_WITH_TIME, formatDate, formatPomodoro } from '../lib/formatters'
@@ -37,6 +39,11 @@ function onCardClick(event: MouseEvent) {
 }
 
 const isCompact = computed(() => props.variant === 'compact')
+
+const projectStore = useProjectStore()
+const key = computed(() =>
+  taskKey(props.task.projectId ? projectStore.projectMap.get(props.task.projectId) : undefined, props.task),
+)
 
 const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
 const checklistTotal = computed(() => checklistStats.value.total)
@@ -103,6 +110,13 @@ const hasMeta = computed(
     <!-- Content -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
+        <span
+          v-if="key"
+          data-testid="task-key"
+          class="shrink-0 text-[11px] font-mono text-muted-foreground"
+        >
+          {{ key }}
+        </span>
         <span
           :class="[
             'truncate',

@@ -47,6 +47,8 @@ export interface Task {
   sprintId?: string | null
   releaseId?: string | null
   order?: number
+  /** Номер задачи внутри agile-проекта; `null` у задач обычных проектов и Входящих. */
+  number?: number | null
   parentId?: string
   goalIds?: number[]
   subtasks?: Task[]

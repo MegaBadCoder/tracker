@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useGroupStore } from '@/features/projects/model/group-store'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import BacklogTaskRow from '@/features/projects/ui/BacklogTaskRow.vue'
 
 function makeGroup(overrides: Partial<BoardGroupNode> = {}): BoardGroupNode {
@@ -79,6 +80,32 @@ describe('backlogTaskRow', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     document.body.innerHTML = ''
+  })
+
+  it('показывает ключ задачи agile-проекта с префиксом', () => {
+    useProjectStore().projects = [{
+      id: 'proj-1',
+      parentId: null,
+      title: 'Проект',
+      description: null,
+      viewMode: 'board',
+      type: 'agile',
+      icon: null,
+      color: null,
+      order: 0,
+      taskKeyPrefix: 'ALF',
+    }]
+    const wrapper = mountRow(makeTask({ number: 7 }))
+
+    expect(wrapper.get('[data-testid="task-key"]').text()).toBe('ALF-7')
+    wrapper.unmount()
+  })
+
+  it('без префикса проекта ключ не рисуется', () => {
+    const wrapper = mountRow(makeTask({ number: 7 }))
+
+    expect(wrapper.find('[data-testid="task-key"]').exists()).toBe(false)
+    wrapper.unmount()
   })
 
   it('показывает метку эпика с цветной точкой', () => {

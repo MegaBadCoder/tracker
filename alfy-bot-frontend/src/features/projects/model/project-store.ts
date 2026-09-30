@@ -41,6 +41,7 @@ export const useProjectStore = defineStore('projects', () => {
       icon: payload.icon ?? null,
       color: payload.color ?? null,
       order: projects.value.length,
+      taskKeyPrefix: payload.taskKeyPrefix ?? null,
     }
 
     projects.value.push(tempProject)

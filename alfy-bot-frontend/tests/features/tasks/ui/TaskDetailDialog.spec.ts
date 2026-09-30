@@ -39,6 +39,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     icon: null,
     color: null,
     order: 0,
+    taskKeyPrefix: null,
     ...overrides,
   }
 }
@@ -72,6 +73,44 @@ const stubs = {
 describe('taskDetailDialog — блок целей и agile-проекты', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    document.body.innerHTML = ''
+  })
+
+  it('показывает ключ задачи в шапке у agile-проекта с префиксом', async () => {
+    useProjectStore().projects = [makeProject({ id: 'proj-agile', type: 'agile', taskKeyPrefix: 'ALF' })]
+
+    mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile', number: 12 }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+
+    expect(document.querySelector('[data-testid="task-key"]')?.textContent?.trim()).toBe('ALF-12')
+  })
+
+  it('не показывает ключ в шапке без префикса и у обычного проекта', async () => {
+    useProjectStore().projects = [
+      makeProject({ id: 'proj-agile', type: 'agile', taskKeyPrefix: null }),
+      makeProject({ id: 'proj-simple', type: 'simple' }),
+    ]
+
+    const noPrefix = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile', number: 12 }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(document.querySelector('[data-testid="task-key"]')).toBeNull()
+    noPrefix.unmount()
+
+    mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-simple', number: null }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(document.querySelector('[data-testid="task-key"]')).toBeNull()
   })
 
   it('показывает GoalPicker, когда проект задачи в режиме board', async () => {

@@ -12,6 +12,8 @@ export interface Project {
   icon: string | null
   color: string | null
   order: number
+  /** Префикс ключей задач (`ALF` → `ALF-12`), только у agile-проекта; `null` — префикс не задан. */
+  taskKeyPrefix: string | null
 }
 
 export interface ProjectColumn {
@@ -70,6 +72,8 @@ export interface CreateProjectPayload {
   type?: ProjectType
   icon?: string | null
   color?: string | null
+  /** Префикс ключей задач, только для agile; `null` очищает. Формат проверяет сервер. */
+  taskKeyPrefix?: string | null
 }
 
 export type UpdateProjectPayload = Partial<CreateProjectPayload>

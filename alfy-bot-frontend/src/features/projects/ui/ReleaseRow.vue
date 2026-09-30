@@ -15,7 +15,9 @@ import { formatDate } from '@/features/tasks/lib/formatters'
 import { cn } from '@/lib/utils'
 import { groupReleaseTasks, isReleaseOverdue, releaseProgress } from '../lib/release'
 import { parseLocalDate } from '../lib/sprint'
+import { taskKey } from '../lib/task-key'
 import { useGroupStore } from '../model/group-store'
+import { useProjectStore } from '../model/project-store'
 
 /**
  * Строка релиза на вкладке «Релизы»: название, даты, прогресс и метка
@@ -44,6 +46,7 @@ const emit = defineEmits<{
 }>()
 
 const groupStore = useGroupStore()
+const projectStore = useProjectStore()
 
 const expanded = ref(false)
 const keepFocusOnClose = ref(false)
@@ -72,6 +75,10 @@ const dates = computed(() => {
 const releasedText = computed(() =>
   props.release.releasedAt ? `Выпущен ${formatDate(new Date(props.release.releasedAt), 'd MMM')}` : null,
 )
+
+function keyOf(task: Task): string | null {
+  return taskKey(projectStore.projectMap.get(props.projectId), task)
+}
 
 function bucketCaption(epic: BoardGroupNode | null, story: BoardGroupNode | null): string {
   if (!epic)
@@ -174,6 +181,13 @@ function onCloseAutoFocus(event: Event) {
           :class="task.completed ? 'text-muted-foreground line-through' : 'text-foreground'"
           @click="emit('openTask', task)"
         >
+          <span
+            v-if="keyOf(task)"
+            data-testid="task-key"
+            class="mr-2 shrink-0 text-[11px] font-mono text-muted-foreground"
+          >
+            {{ keyOf(task) }}
+          </span>
           <span class="truncate">{{ task.title }}</span>
         </button>
       </div>

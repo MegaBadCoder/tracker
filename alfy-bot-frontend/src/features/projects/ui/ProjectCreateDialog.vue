@@ -53,11 +53,17 @@
           </p>
         </div>
 
+        <TaskKeyPrefixField v-if="type === 'agile'" v-model="taskKeyPrefix" />
+
+        <p v-if="errorMessage" class="text-sm text-destructive" role="alert" data-testid="project-create-error">
+          {{ errorMessage }}
+        </p>
+
         <div class="flex justify-end gap-2 pt-2">
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
           </Button>
-          <Button :disabled="!title.trim()" @click="handleSubmit">
+          <Button :disabled="!canSubmit" @click="handleSubmit">
             Создать
           </Button>
         </div>
@@ -67,16 +73,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import type { ProjectType } from '../model/types'
+import { computed, ref, watch } from 'vue'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { apiErrorMessage } from '../lib/api-error'
+import { isObviouslyInvalidTaskKeyPrefix } from '../lib/task-key'
 import { useProjectStore } from '../model/project-store'
 import ProjectPicker from './ProjectPicker.vue'
 import IconPicker from './IconPicker.vue'
 import ColorPicker from './ColorPicker.vue'
-import type { ProjectType } from '../model/types'
+import TaskKeyPrefixField from './TaskKeyPrefixField.vue'
 
 const props = defineProps<{
   open: boolean
@@ -93,6 +102,13 @@ const icon = ref<string | null>(null)
 const color = ref<string | null>(null)
 const localParentId = ref<string | null>(null)
 const type = ref<ProjectType>('simple')
+const taskKeyPrefix = ref('')
+const errorMessage = ref<string | null>(null)
+
+const canSubmit = computed(() =>
+  title.value.trim().length > 0
+  && !(type.value === 'agile' && isObviouslyInvalidTaskKeyPrefix(taskKeyPrefix.value)),
+)
 
 const store = useProjectStore()
 
@@ -104,12 +120,15 @@ watch(() => props.open, (val) => {
     color.value = null
     localParentId.value = props.parentId ?? null
     type.value = 'simple'
+    taskKeyPrefix.value = ''
+    errorMessage.value = null
   }
 })
 
 async function handleSubmit() {
-  if (!title.value.trim()) return
+  if (!canSubmit.value) return
 
+  errorMessage.value = null
   try {
     await store.createProject({
       title: title.value.trim(),
@@ -118,10 +137,12 @@ async function handleSubmit() {
       icon: icon.value,
       color: color.value,
       type: type.value,
+      ...(type.value === 'agile' && taskKeyPrefix.value.trim() && { taskKeyPrefix: taskKeyPrefix.value.trim() }),
     })
     emit('update:open', false)
   } catch (err) {
     console.error('Ошибка создания проекта:', err)
+    errorMessage.value = apiErrorMessage(err, 'Не удалось создать проект')
   }
 }
 </script>

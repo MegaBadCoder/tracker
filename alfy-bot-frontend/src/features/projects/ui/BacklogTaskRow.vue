@@ -16,8 +16,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
 import { groupPath } from '../lib/group-tree'
+import { taskKey } from '../lib/task-key'
 import { useColumnStore } from '../model/column-store'
 import { useGroupStore } from '../model/group-store'
+import { useProjectStore } from '../model/project-store'
 
 /**
  * Строка задачи на вкладке «Бэклог»: отметка выполнения, название, метка
@@ -40,6 +42,11 @@ const emit = defineEmits<{
 
 const groupStore = useGroupStore()
 const columnStore = useColumnStore()
+const projectStore = useProjectStore()
+
+const key = computed(() =>
+  taskKey(props.task.projectId ? projectStore.projectMap.get(props.task.projectId) : undefined, props.task),
+)
 
 const currentSprintId = computed(() => props.task.sprintId ?? null)
 
@@ -72,6 +79,13 @@ const columnTitle = computed(() => {
       @click.stop
       @update:model-value="emit('toggle', task.id)"
     />
+    <span
+      v-if="key"
+      data-testid="task-key"
+      class="shrink-0 text-[11px] font-mono text-muted-foreground"
+    >
+      {{ key }}
+    </span>
     <span
       class="min-w-0 flex-1 basis-40 truncate text-sm"
       :class="task.completed ? 'text-muted-foreground line-through' : 'text-foreground'"
