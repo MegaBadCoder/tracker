@@ -203,6 +203,19 @@ describe('TypeOrmReleaseRepository (in-memory sqlite)', () => {
       expect(await releaseIdOf('foreign')).toBeNull();
     });
 
+    it('не забирает задачи из выпущенного релиза — его история не переписывается', async () => {
+      await makeRelease('r1');
+      await makeRelease('r-old', { status: 'released', releasedAt: new Date() });
+      await makeTask('shipped', 'r-old', true, { groupId: 'epic-a' });
+      await makeTask('open', null, false, { groupId: 'epic-a' });
+
+      const updated = await repository.assignGroupTasks('r1', ['epic-a']);
+
+      expect(updated).toBe(1);
+      expect(await releaseIdOf('shipped')).toBe('r-old');
+      expect(await releaseIdOf('open')).toBe('r1');
+    });
+
     it('с пустым списком групп ничего не меняет и возвращает 0', async () => {
       await makeRelease('r1');
       await makeTask('t', null, false, { groupId: 'epic-a' });

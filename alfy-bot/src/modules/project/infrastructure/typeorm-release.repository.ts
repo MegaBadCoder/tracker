@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Release, Task } from '../../../shared/entities';
 import { ReleaseRepositoryPort } from '../domain/release-repository.port';
 
@@ -66,11 +66,16 @@ export class TypeOrmReleaseRepository extends ReleaseRepositoryPort {
     if (groupIds.length === 0) return 0;
     const release = await this.repo.findOneByOrFail({ id: releaseId });
     const result = await this.dataSource
-      .getRepository(Task)
-      .update(
-        { groupId: In(groupIds), projectId: release.projectId },
-        { releaseId },
-      );
+      .createQueryBuilder()
+      .update(Task)
+      .set({ releaseId })
+      .where('groupId IN (:...groupIds)', { groupIds })
+      .andWhere('projectId = :projectId', { projectId: release.projectId })
+      .andWhere(
+        '(releaseId IS NULL OR releaseId NOT IN (SELECT id FROM releases WHERE status = :released))',
+        { released: 'released' },
+      )
+      .execute();
     return result.affected ?? 0;
   }
 }
