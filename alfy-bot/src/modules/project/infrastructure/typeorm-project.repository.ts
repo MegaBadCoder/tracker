@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Project } from '../../../shared/entities';
+import { Project, Task } from '../../../shared/entities';
 import { ProjectRepositoryPort } from '../domain/project-repository.port';
 
 @Injectable()
@@ -53,7 +53,10 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
   async delete(id: string, userId: number): Promise<boolean> {
     const project = await this.findById(id, userId);
     if (!project) return false;
-    await this.repo.remove(project);
+    await this.repo.manager.transaction(async (manager) => {
+      await manager.update(Task, { projectId: id }, { number: null });
+      await manager.remove(project);
+    });
     return true;
   }
 

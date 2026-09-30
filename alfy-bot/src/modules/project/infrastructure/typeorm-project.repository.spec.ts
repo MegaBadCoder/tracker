@@ -74,4 +74,21 @@ describe('TypeOrmProjectRepository — префикс ключей задач (i
 
     expect(project.nextTaskNumber).toBe(1);
   });
+
+  it('удаление проекта обнуляет номера его задач — во Входящих номеров нет', async () => {
+    const project = await agile(1, 'Удаляемый', 'DEL');
+    const other = await agile(1, 'Соседний', 'KEEP');
+    const tasks = dataSource.getRepository(Task);
+    await tasks.save([
+      { id: 't-del', userId: 1, title: 'A', projectId: project.id, number: 1 },
+      { id: 't-keep', userId: 1, title: 'B', projectId: other.id, number: 1 },
+    ]);
+
+    await repo.delete(project.id, 1);
+
+    const orphan = await tasks.findOneByOrFail({ id: 't-del' });
+    expect(orphan.projectId).toBeNull();
+    expect(orphan.number).toBeNull();
+    expect((await tasks.findOneByOrFail({ id: 't-keep' })).number).toBe(1);
+  });
 });
