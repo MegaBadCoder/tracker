@@ -67,7 +67,7 @@ const columnTitle = computed(() => {
     :data-task-id="task.id"
     role="button"
     tabindex="0"
-    class="group flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 rounded-md px-3 py-2 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    class="group flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     @click="emit('open', task)"
     @keydown.enter.self="emit('open', task)"
   >
@@ -87,7 +87,7 @@ const columnTitle = computed(() => {
       {{ key }}
     </span>
     <span
-      class="min-w-0 flex-1 basis-40 truncate text-sm"
+      class="min-w-32 flex-1 truncate text-sm"
       :class="task.completed ? 'text-muted-foreground line-through' : 'text-foreground'"
     >
       {{ task.title }}
@@ -95,7 +95,7 @@ const columnTitle = computed(() => {
     <span
       v-if="epicLabel"
       data-testid="epic-label"
-      class="flex min-w-0 max-w-full items-center gap-1.5 text-xs text-muted-foreground"
+      class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
     >
       <span
         v-if="epicLabel.epic.color"
