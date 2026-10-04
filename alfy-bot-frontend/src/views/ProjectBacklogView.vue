@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorMessage } from '@/features/projects/lib/api-error'
 import { matchesEpic } from '@/features/projects/lib/backlog-stories'
+import { findGroup } from '@/features/projects/lib/group-tree'
 import { sprintDeletionMessage, sprintTasks } from '@/features/projects/lib/sprint'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useGroupStore } from '@/features/projects/model/group-store'
@@ -93,7 +94,9 @@ async function handleMoveTask(taskId: string, sprintId: string | null) {
 async function handleCreateTask(sprintId: string | null, title: string, groupId?: string) {
   actionError.value = null
   try {
-    await taskStore.createTask({ title, completed: false, projectId: projectId.value, sprintId, ...(groupId ? { groupId } : {}) })
+    const story = groupId ? findGroup(groupStore.groupsOf(projectId.value), groupId) : null
+    const releasedStory = releaseStore.releasesOf(projectId.value).some(r => r.id === story?.releaseId && r.status === 'released')
+    await taskStore.createTask({ title, completed: false, projectId: projectId.value, sprintId, ...(groupId ? { groupId } : {}), ...(releasedStory ? { releaseId: null } : {}) })
   }
   catch (err) {
     actionError.value = apiErrorMessage(err, 'Не удалось создать задачу')

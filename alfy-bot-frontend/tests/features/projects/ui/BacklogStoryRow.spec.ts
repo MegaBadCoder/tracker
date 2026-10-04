@@ -31,11 +31,23 @@ describe('строка истории', () => {
     row.unmount()
   })
 
-  it('drop изменяет спринт задачи и сохраняет её исходную историю', async () => {
+  it('drop в свою историю изменяет только спринт задачи', async () => {
     const row = mountRow()
     await row.get('button[aria-expanded]').trigger('click')
-    row.getComponent(draggable).vm.$emit('change', { added: { element: { id: 'foreign-task', groupId: 'other-story' } } })
+    row.getComponent(draggable).vm.$emit('change', { added: { element: { id: 'foreign-task', groupId: 'story' } } })
     expect(row.emitted('moveTask')).toEqual([['foreign-task', 's1']])
+    row.unmount()
+  })
+
+  it('отклоняет drop в чужую историю', async () => {
+    const row = mountRow()
+    await row.get('button[aria-expanded]').trigger('click')
+    const list = row.getComponent(draggable)
+    const put = (list.vm.$attrs.group as { put: (target: unknown, source: unknown) => boolean }).put
+    expect(put({}, { el: { closest: () => ({ dataset: { storyId: 'other-story' } }) } })).toBe(false)
+    expect(put({}, { el: { closest: () => ({ dataset: { storyId: 'story' } }) } })).toBe(true)
+    list.vm.$emit('change', { added: { element: { id: 'foreign-task', groupId: 'other-story' } } })
+    expect(row.emitted('moveTask')).toBeUndefined()
     row.unmount()
   })
 

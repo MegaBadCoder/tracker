@@ -63,8 +63,12 @@ async function setRelease(releaseId: string | null) {
   }
 }
 
+function acceptsStoryDrop(_target: unknown, source: { el: HTMLElement }) {
+  return source.el.closest<HTMLElement>('[data-story-id]')?.dataset.storyId === story.value.id
+}
+
 function handleChange(event: { added?: { element: Task } }) {
-  if (event.added)
+  if (event.added?.element.groupId === story.value.id)
     emit('moveTask', event.added.element.id, props.sprintId)
 }
 </script>
@@ -107,12 +111,15 @@ function handleChange(event: { added?: { element: Task } }) {
       {{ errorMessage }}
     </p>
     <div v-if="expanded" class="border-t border-border/50 pl-5">
-      <draggable :model-value="entry.tasks" item-key="id" :group="{ name: 'sprint-backlog' }" :sort="false" :animation="150" ghost-class="opacity-30" class="min-h-8 p-1" @change="handleChange">
+      <draggable :model-value="entry.tasks" item-key="id" :group="{ name: 'sprint-backlog', put: acceptsStoryDrop }" :sort="false" :animation="150" ghost-class="opacity-30" class="min-h-8 p-1" @change="handleChange">
         <template #item="{ element }">
           <BacklogTaskRow :task="element" :sprints="sprints" @open="emit('openTask', $event)" @toggle="emit('toggleTask', $event)" @move="emit('moveTask', element.id, $event)" />
         </template>
       </draggable>
       <div class="px-3 pb-2">
+        <p v-if="addingTask && released" class="py-1 text-xs text-muted-foreground">
+          Новая задача будет без релиза. Релиз можно выбрать в её карточке.
+        </p>
         <InlineTitleInput v-if="addingTask" placeholder="Название задачи в истории" @submit="createTask" @cancel="addingTask = false" />
         <button v-else class="flex cursor-pointer items-center gap-1 py-1 text-xs text-muted-foreground hover:text-foreground" @click="startAddingTask">
           <Plus :size="13" /> Задача в истории

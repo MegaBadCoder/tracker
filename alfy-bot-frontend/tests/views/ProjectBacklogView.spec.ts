@@ -9,6 +9,7 @@ import * as groupsApi from '@/features/projects/api/groups-api'
 import { sprintDeletionMessage } from '@/features/projects/lib/sprint'
 import { useGroupStore } from '@/features/projects/model/group-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useReleaseStore } from '@/features/projects/model/release-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import BacklogEpicsPanel from '@/features/projects/ui/BacklogEpicsPanel.vue'
 import SprintBlock from '@/features/projects/ui/SprintBlock.vue'
@@ -215,6 +216,17 @@ describe('projectBacklogView', () => {
     const payload = vi.mocked(api.post).mock.calls.find(call => call[0] === '/tasks')?.[1] as Record<string, unknown>
     expect(payload).toMatchObject({ groupId: 'story-1', sprintId: 'active', projectId: 'proj-1' })
     expect(Object.hasOwn(payload, 'releaseId')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('новая задача в выпущенной истории создаётся без релиза', async () => {
+    const wrapper = await mountView([makeSprint({ id: 'active' })])
+    useGroupStore().trees['proj-1'] = [{ id: 'story-1', releaseId: 'shipped', children: [] } as unknown as BoardGroupNode]
+    useReleaseStore().lists['proj-1'] = [{ id: 'shipped', status: 'released' } as any]
+    vi.mocked(api.post).mockImplementation(async (_url, body: any) => ({ data: { id: 'new-task', ...body } }))
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('createStoryTask', 'story-1', 'Новая работа')
+    await flushPromises()
+    expect(vi.mocked(api.post).mock.calls.find(call => call[0] === '/tasks')?.[1]).toMatchObject({ groupId: 'story-1', releaseId: null })
     wrapper.unmount()
   })
 
