@@ -12,7 +12,7 @@ export abstract class ReleaseRepositoryPort {
   abstract save(release: Release): Promise<Release>;
 
   /**
-   * Удаляет релиз проекта. Задачи релиза не удаляются: их `releaseId`
+   * Удаляет релиз проекта. Задачи и истории не удаляются: их `releaseId`
    * обнуляется внешним ключом.
    *
    * @returns `false`, если релиза в проекте нет.
@@ -21,9 +21,9 @@ export abstract class ReleaseRepositoryPort {
 
   /**
    * В одной транзакции переводит релиз в `released`, ставит `releasedAt` и
-   * переносит его незавершённые задачи (`completed = false`) в релиз
+   * переносит его незавершённые задачи и открытые истории в релиз
    * `moveToReleaseId` либо снимает с них релиз, если передан `null`.
-   * Выполненные задачи и задачи других релизов не затрагиваются. При ошибке
+   * Выполненные задачи, завершённые истории и другие релизы не затрагиваются. При ошибке
    * ничего не меняется.
    */
   abstract releaseAndMoveUnfinished(
@@ -31,13 +31,6 @@ export abstract class ReleaseRepositoryPort {
     moveToReleaseId: string | null,
   ): Promise<void>;
 
-  /**
-   * Ставит `releaseId` всем задачам, чей `groupId` входит в `groupIds` и чей
-   * проект совпадает с проектом релиза. Задачи, которые уже лежат в выпущенном
-   * релизе, не трогает — история выпуска не переписывается.
-   *
-   * @returns число затронутых задач; для пустого списка групп — 0.
-   */
   /**
    * Атомарно назначает либо снимает релиз историй и задач перечисленных групп
    * проекта. Выпущенные связи сохраняются. Возвращает число изменённых задач.
@@ -48,6 +41,10 @@ export abstract class ReleaseRepositoryPort {
     releaseId: string | null,
   ): Promise<number>;
 
+  /**
+   * Назначает релиз историям и задачам из `groupIds` в проекте релиза.
+   * Выпущенные связи сохраняются. Возвращает число изменённых задач.
+   */
   abstract assignGroupTasks(
     releaseId: string,
     groupIds: string[],
