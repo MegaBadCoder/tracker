@@ -205,7 +205,10 @@ describe('TypeOrmReleaseRepository (in-memory sqlite)', () => {
 
     it('не забирает задачи из выпущенного релиза — его история не переписывается', async () => {
       await makeRelease('r1');
-      await makeRelease('r-old', { status: 'released', releasedAt: new Date() });
+      await makeRelease('r-old', {
+        status: 'released',
+        releasedAt: new Date(),
+      });
       await makeTask('shipped', 'r-old', true, { groupId: 'epic-a' });
       await makeTask('open', null, false, { groupId: 'epic-a' });
 
@@ -222,6 +225,73 @@ describe('TypeOrmReleaseRepository (in-memory sqlite)', () => {
 
       expect(await repository.assignGroupTasks('r1', [])).toBe(0);
       expect(await releaseIdOf('t')).toBeNull();
+    });
+  });
+
+  describe('релиз истории', () => {
+    const storyRelease = async () => {
+      const story = await dataSource
+        .getRepository(BoardGroup)
+        .findOneByOrFail({ id: 'story-a' });
+      return (story as BoardGroup & { releaseId?: string | null }).releaseId;
+    };
+
+    it('назначает релиз истории даже без задач', async () => {
+      await makeRelease('r1');
+      await repository.assignGroupTasks('r1', ['story-a']);
+      expect(await storyRelease()).toBe('r1');
+    });
+
+    it('выпуск переносит открытую историю вместе с её незавершёнными задачами', async () => {
+      await makeRelease('r1');
+      await makeRelease('r2');
+      await repository.assignGroupTasks('r1', ['story-a']);
+      await repository.releaseAndMoveUnfinished('r1', 'r2');
+      expect(await storyRelease()).toBe('r2');
+    });
+
+    it('очистка сохраняет задачи выпущенного релиза', async () => {
+      await makeRelease('r1');
+      await makeRelease('old', { status: 'released', releasedAt: new Date() });
+      await repository.assignGroupTasks('r1', ['story-a']);
+      await makeTask('shipped', 'old', true, { groupId: 'story-a' });
+      await makeTask('current', 'r1', false, { groupId: 'story-a' });
+      await repository.setGroupRelease(PROJECT_A, ['story-a'], null);
+      expect(await storyRelease()).toBeNull();
+      expect(await releaseIdOf('shipped')).toBe('old');
+      expect(await releaseIdOf('current')).toBeNull();
+    });
+
+    it('ошибка обновления задачи откатывает назначение истории', async () => {
+      await makeRelease('r1');
+      await makeTask('current', null, false, { groupId: 'story-a' });
+      await dataSource.query(
+        `CREATE TRIGGER reject_task_release BEFORE UPDATE OF releaseId ON tasks BEGIN SELECT RAISE(ABORT, 'test write failure'); END`,
+      );
+      await expect(
+        repository.setGroupRelease(PROJECT_A, ['story-a'], 'r1'),
+      ).rejects.toThrow('test write failure');
+      expect(await storyRelease()).toBeNull();
+      expect(await releaseIdOf('current')).toBeNull();
+    });
+
+    it('массовое назначение сохраняет релиз завершённой выпущенной истории', async () => {
+      await makeRelease('r1');
+      await makeRelease('r2');
+      await repository.assignGroupTasks('r1', ['story-a']);
+      await dataSource
+        .getRepository(BoardGroup)
+        .update('story-a', { status: 'done' });
+      await repository.releaseAndMoveUnfinished('r1', 'r2');
+      await repository.assignGroupTasks('r2', ['epic-a', 'story-a']);
+      expect(await storyRelease()).toBe('r1');
+    });
+
+    it('удаление релиза очищает связь истории', async () => {
+      await makeRelease('r1');
+      await repository.assignGroupTasks('r1', ['story-a']);
+      await repository.delete('r1', PROJECT_A);
+      expect(await storyRelease()).toBeNull();
     });
   });
 

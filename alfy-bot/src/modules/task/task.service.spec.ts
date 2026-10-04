@@ -126,6 +126,7 @@ describe('TaskService', () => {
 
     boardGroupQuery = {
       getProjectId: jest.fn().mockResolvedValue(null),
+      getStoryRelease: jest.fn().mockResolvedValue(null),
     };
 
     sprintQuery = {
@@ -156,6 +157,64 @@ describe('TaskService', () => {
     }).compile();
 
     service = module.get(TaskService);
+  });
+
+  describe('релиз истории при создании', () => {
+    beforeEach(() => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+      boardGroupQuery.getStoryRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        releaseId: 'r1',
+      });
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+    });
+
+    it('наследует релиз истории при отсутствии явного значения', async () => {
+      const task = await service.create(1, {
+        title: 'Task',
+        projectId: 'proj-1',
+        groupId: 'story',
+      });
+      expect(task.releaseId).toBe('r1');
+    });
+
+    it('явный null отключает наследование', async () => {
+      const task = await service.create(1, {
+        title: 'Task',
+        projectId: 'proj-1',
+        groupId: 'story',
+        releaseId: null,
+      });
+      expect(task.releaseId).toBeNull();
+    });
+
+    it('явный релиз имеет приоритет', async () => {
+      const task = await service.create(1, {
+        title: 'Task',
+        projectId: 'proj-1',
+        groupId: 'story',
+        releaseId: 'r2',
+      });
+      expect(task.releaseId).toBe('r2');
+    });
+
+    it('не наследует выпущенный релиз', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+      await expect(
+        service.create(1, {
+          title: 'Task',
+          projectId: 'proj-1',
+          groupId: 'story',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('create — простая задача', () => {

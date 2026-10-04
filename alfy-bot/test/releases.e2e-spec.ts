@@ -85,6 +85,97 @@ describe('Releases (e2e)', () => {
     return (body as { id: string }).id;
   };
 
+  it('планирует пустую историю, наследует релиз и переносит открытые истории при выпуске', async () => {
+    projectId = await createAgileProject('Story planning');
+    const epic = await createGroup('Epic');
+    const story = await createGroup('Story', epic);
+    const doneStory = await createGroup('Done story', epic);
+    const first = await createRelease('First');
+    const second = await createRelease('Second');
+    const endpoint = (id: string) =>
+      `/api/projects/${projectId}/groups/${id}/release`;
+    const storyRelease = async (id: string): Promise<string | null> => {
+      const { body } = await request(app.getHttpServer())
+        .get(`/api/projects/${projectId}/groups`)
+        .set('Authorization', auth())
+        .expect(200);
+      return body
+        .flatMap(
+          (g: { children: { id: string; releaseId: string | null }[] }) =>
+            g.children,
+        )
+        .find((g: { id: string }) => g.id === id).releaseId;
+    };
+    await request(app.getHttpServer())
+      .patch(endpoint(story))
+      .set('Authorization', auth())
+      .send({ releaseId: first.id })
+      .expect(200);
+    expect(await storyRelease(story)).toBe(first.id);
+    const inherited = await createTaskApi({
+      title: 'Inherited',
+      projectId,
+      groupId: story,
+    });
+    expect(inherited.releaseId).toBe(first.id);
+    const explicit = await createTaskApi({
+      title: 'Explicit',
+      projectId,
+      groupId: story,
+      releaseId: null,
+    });
+    expect(explicit.releaseId).toBeNull();
+    await request(app.getHttpServer())
+      .patch(endpoint(story))
+      .set('Authorization', auth())
+      .send({})
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(endpoint(epic))
+      .set('Authorization', auth())
+      .send({ releaseId: first.id })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(endpoint(doneStory))
+      .set('Authorization', auth())
+      .send({ releaseId: first.id })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/api/projects/${projectId}/groups/${doneStory}`)
+      .set('Authorization', auth())
+      .send({ status: 'done' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`${releasesUrl()}/${first.id}/release`)
+      .set('Authorization', auth())
+      .send({ moveTo: second.id })
+      .expect(201);
+    expect(await storyRelease(story)).toBe(second.id);
+    expect(await storyRelease(doneStory)).toBe(first.id);
+    await request(app.getHttpServer())
+      .post('/api/tasks')
+      .set('Authorization', auth())
+      .send({ title: 'Invalid inheritance', projectId, groupId: doneStory })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(endpoint(story))
+      .set('Authorization', auth())
+      .send({ releaseId: first.id })
+      .expect(400);
+    await request(app.getHttpServer())
+      .patch(endpoint(story))
+      .set('Authorization', auth())
+      .send({ releaseId: null })
+      .expect(200);
+    expect(await storyRelease(story)).toBeNull();
+    expect((await findTask(inherited.id))?.releaseId).toBeNull();
+    await request(app.getHttpServer())
+      .delete(`${releasesUrl()}/${first.id}`)
+      .set('Authorization', auth())
+      .expect(200);
+    expect(await storyRelease(doneStory)).toBeNull();
+  });
+
   it('жизненный цикл релиза: создание, назначение задач, выпуск с переносом, отказ в назначении, удаление', async () => {
     projectId = await createAgileProject('Releases e2e');
 

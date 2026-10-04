@@ -9,10 +9,12 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Project } from './project.entity';
+import { Release } from './release.entity';
 
 @Entity('board_groups')
 @Check('CHK_board_group_type', "type IN ('epic','story')")
 @Check('CHK_board_group_status', "status IN ('open','done')")
+@Check('CHK_board_group_release_story', "type = 'story' OR releaseId IS NULL")
 @Check('CHK_board_group_not_self', 'parentId <> id')
 @Check(
   'CHK_board_group_depth',
@@ -35,6 +37,13 @@ export class BoardGroup {
 
   @Column()
   projectId: string;
+
+  @Column({ type: 'text', nullable: true })
+  releaseId: string | null;
+
+  @ManyToOne(() => Release, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'releaseId' })
+  release: Release | null;
 
   @Column({ type: 'text', nullable: true })
   parentId: string | null;

@@ -166,6 +166,46 @@ export class ReleaseService {
   }
 
   /**
+   * Назначает или снимает плановый релиз истории и её задач. Принимает UUID
+   * релиза этого проекта либо null. Возвращает число изменённых задач;
+   * чужая группа, эпик и выпущенный релиз дают 400.
+   */
+  async setGroupRelease(
+    userId: number,
+    projectId: string,
+    groupId: string,
+    releaseId: string | null,
+  ): Promise<{ updated: number }> {
+    await this.validateProjectAccess(userId, projectId);
+    const group = await this.groupRepo.findById(groupId, projectId);
+    if (!group || group.type !== 'story') {
+      throw new BadRequestException(
+        'Only a story of this project can have a release',
+      );
+    }
+    if (group.releaseId) {
+      const current = await this.getRelease(group.releaseId, projectId);
+      if (current.status === 'released') {
+        throw new BadRequestException('Released story cannot be reassigned');
+      }
+    }
+    if (releaseId !== null) {
+      const release = await this.getRelease(releaseId, projectId);
+      if (release.status !== 'planned') {
+        throw new BadRequestException(
+          'Cannot assign a story to a released release',
+        );
+      }
+    }
+    const updated = await this.releaseRepo.setGroupRelease(
+      projectId,
+      [groupId],
+      releaseId,
+    );
+    return { updated };
+  }
+
+  /**
    * Ставит релиз всем задачам группы проекта: для эпика — задачам самого эпика
    * и всех его историй, для истории — только её задачам. Группа должна быть
    * из этого проекта, а релиз — `planned`, иначе 400. Возвращает число

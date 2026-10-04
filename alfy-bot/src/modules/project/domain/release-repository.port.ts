@@ -38,6 +38,16 @@ export abstract class ReleaseRepositoryPort {
    *
    * @returns число затронутых задач; для пустого списка групп — 0.
    */
+  /**
+   * Атомарно назначает либо снимает релиз историй и задач перечисленных групп
+   * проекта. Выпущенные связи сохраняются. Возвращает число изменённых задач.
+   */
+  abstract setGroupRelease(
+    projectId: string,
+    groupIds: string[],
+    releaseId: string | null,
+  ): Promise<number>;
+
   abstract assignGroupTasks(
     releaseId: string,
     groupIds: string[],

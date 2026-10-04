@@ -12,6 +12,8 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
+import { ReleaseService } from './release.service';
+import { SetGroupReleaseDto } from './dto/set-group-release.dto';
 import { BoardGroupService } from './board-group.service';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
@@ -26,7 +28,10 @@ interface AuthRequest extends Request {
 @UseGuards(JwtAuthGuard)
 @Controller('projects/:projectId/groups')
 export class BoardGroupController {
-  constructor(private readonly groupService: BoardGroupService) {}
+  constructor(
+    private readonly groupService: BoardGroupService,
+    private readonly releaseService: ReleaseService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Дерево эпиков/историй проекта' })
@@ -55,6 +60,22 @@ export class BoardGroupController {
     @Body() dto: ReorderDto,
   ) {
     return this.groupService.reorder(req.user.sub, projectId, dto.orderedIds);
+  }
+
+  @Patch(':id/release')
+  @ApiOperation({ summary: 'Назначить или снять релиз истории' })
+  async setRelease(
+    @Request() req: AuthRequest,
+    @Param('projectId') projectId: string,
+    @Param('id') id: string,
+    @Body() dto: SetGroupReleaseDto,
+  ) {
+    return this.releaseService.setGroupRelease(
+      req.user.sub,
+      projectId,
+      id,
+      dto.releaseId,
+    );
   }
 
   @Patch(':id')

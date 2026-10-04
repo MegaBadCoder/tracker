@@ -115,6 +115,10 @@ export class TaskService {
 
     if (dto.groupId) {
       await this.assertGroupInProject(dto.groupId, dto.projectId ?? null);
+      if (dto.releaseId === undefined) {
+        const story = await this.boardGroupQuery.getStoryRelease(dto.groupId);
+        taskData.releaseId = story?.releaseId ?? null;
+      }
     }
 
     if (dto.sprintId) {
@@ -124,8 +128,11 @@ export class TaskService {
       }
     }
 
-    if (dto.releaseId) {
-      await this.assertReleaseAssignable(dto.releaseId, dto.projectId ?? null);
+    if (taskData.releaseId) {
+      await this.assertReleaseAssignable(
+        taskData.releaseId,
+        dto.projectId ?? null,
+      );
     }
 
     taskData.number = await this.taskNumbers.allocate(dto.projectId ?? null);

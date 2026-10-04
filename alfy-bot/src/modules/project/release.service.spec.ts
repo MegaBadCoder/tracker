@@ -74,6 +74,7 @@ describe('ReleaseService', () => {
       delete: jest.fn().mockResolvedValue(true),
       releaseAndMoveUnfinished: jest.fn().mockResolvedValue(undefined),
       assignGroupTasks: jest.fn().mockResolvedValue(0),
+      setGroupRelease: jest.fn().mockResolvedValue(0),
     };
 
     projRepo = {
@@ -380,6 +381,46 @@ describe('ReleaseService', () => {
       await expect(service.delete(1, 'proj-1', 'x')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('setGroupRelease', () => {
+    beforeEach(() => {
+      groupRepo.findById.mockResolvedValue(
+        makeGroup({ type: 'story', releaseId: null }),
+      );
+      releaseRepo.findById.mockResolvedValue(makeRelease());
+    });
+
+    it('передаёт назначение и очистку в атомарный репозиторий', async () => {
+      await service.setGroupRelease(1, 'proj-1', 'story-1', 'release-1');
+      await service.setGroupRelease(1, 'proj-1', 'story-1', null);
+      expect(releaseRepo.setGroupRelease.mock.calls).toEqual([
+        ['proj-1', ['story-1'], 'release-1'],
+        ['proj-1', ['story-1'], null],
+      ]);
+    });
+
+    it('отвергает эпик и чужую историю', async () => {
+      groupRepo.findById.mockResolvedValue(makeGroup());
+      await expect(
+        service.setGroupRelease(1, 'proj-1', 'epic', null),
+      ).rejects.toThrow(BadRequestException);
+      groupRepo.findById.mockResolvedValue(null);
+      await expect(
+        service.setGroupRelease(1, 'proj-1', 'foreign', null),
+      ).rejects.toThrow(BadRequestException);
+      expect(releaseRepo.setGroupRelease).not.toHaveBeenCalled();
+    });
+
+    it('отвергает назначение выпущенного релиза', async () => {
+      releaseRepo.findById.mockResolvedValue(
+        makeRelease({ status: 'released' }),
+      );
+      await expect(
+        service.setGroupRelease(1, 'proj-1', 'story', 'release-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(releaseRepo.setGroupRelease).not.toHaveBeenCalled();
     });
   });
 

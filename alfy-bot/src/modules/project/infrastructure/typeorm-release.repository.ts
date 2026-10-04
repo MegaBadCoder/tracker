@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { Release, Task } from '../../../shared/entities';
+import { BoardGroup, Release, Task } from '../../../shared/entities';
 import { ReleaseRepositoryPort } from '../domain/release-repository.port';
 
 @Injectable()
@@ -52,6 +52,11 @@ export class TypeOrmReleaseRepository extends ReleaseRepositoryPort {
         releasedAt: new Date(),
       });
       await manager.update(
+        BoardGroup,
+        { releaseId, status: 'open', type: 'story' },
+        { releaseId: moveToReleaseId },
+      );
+      await manager.update(
         Task,
         { releaseId, completed: false },
         { releaseId: moveToReleaseId },
@@ -65,17 +70,38 @@ export class TypeOrmReleaseRepository extends ReleaseRepositoryPort {
   ): Promise<number> {
     if (groupIds.length === 0) return 0;
     const release = await this.repo.findOneByOrFail({ id: releaseId });
-    const result = await this.dataSource
-      .createQueryBuilder()
-      .update(Task)
-      .set({ releaseId })
-      .where('groupId IN (:...groupIds)', { groupIds })
-      .andWhere('projectId = :projectId', { projectId: release.projectId })
-      .andWhere(
-        '(releaseId IS NULL OR releaseId NOT IN (SELECT id FROM releases WHERE status = :released))',
-        { released: 'released' },
-      )
-      .execute();
-    return result.affected ?? 0;
+    return this.setGroupRelease(release.projectId, groupIds, releaseId);
+  }
+
+  async setGroupRelease(
+    projectId: string,
+    groupIds: string[],
+    releaseId: string | null,
+  ): Promise<number> {
+    if (groupIds.length === 0) return 0;
+    return this.dataSource.transaction(async (manager) => {
+      const eligible =
+        '(releaseId IS NULL OR releaseId NOT IN (SELECT id FROM releases WHERE status = :released))';
+      await manager
+        .createQueryBuilder()
+        .update(BoardGroup)
+        .set({ releaseId })
+        .where('id IN (:...groupIds)', { groupIds })
+        .andWhere('projectId = :projectId AND type = :story', {
+          projectId,
+          story: 'story',
+        })
+        .andWhere(eligible, { released: 'released' })
+        .execute();
+      const result = await manager
+        .createQueryBuilder()
+        .update(Task)
+        .set({ releaseId })
+        .where('groupId IN (:...groupIds)', { groupIds })
+        .andWhere('projectId = :projectId', { projectId })
+        .andWhere(eligible, { released: 'released' })
+        .execute();
+      return result.affected ?? 0;
+    });
   }
 }
