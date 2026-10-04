@@ -200,7 +200,7 @@ describe('groupReleaseTasks', () => {
       makeTask({ id: 'e1-t', groupId: 'e1' }),
     ]
 
-    const result = groupReleaseTasks(tasks, [epic2, epic1])
+    const result = groupReleaseTasks(tasks, [epic2, epic1], null)
 
     expect(result.map(g => [g.epic?.id ?? null, g.story?.id ?? null, g.tasks.map(t => t.id)])).toEqual([
       ['e1', null, ['e1-t']],
@@ -212,30 +212,30 @@ describe('groupReleaseTasks', () => {
   })
 
   it('пустые группы не попадают в результат', () => {
-    const result = groupReleaseTasks([makeTask({ id: 's1-t', groupId: 's1' })], [epic1, epic2])
+    const result = groupReleaseTasks([makeTask({ id: 's1-t', groupId: 's1' })], [epic1, epic2], null)
 
     expect(result.map(g => [g.epic?.id, g.story?.id])).toEqual([['e1', 's1']])
   })
 
   it('задача с неизвестным groupId попадает в «Без эпика»', () => {
-    const result = groupReleaseTasks([makeTask({ id: 'lost', groupId: 'ghost' })], [epic1])
+    const result = groupReleaseTasks([makeTask({ id: 'lost', groupId: 'ghost' })], [epic1], null)
 
     expect(result).toEqual([{ epic: null, story: null, tasks: [expect.objectContaining({ id: 'lost' })] }])
   })
 
   it('задача без groupId (undefined) попадает в «Без эпика»', () => {
-    const result = groupReleaseTasks([makeTask({ id: 'plain' })], [epic1])
+    const result = groupReleaseTasks([makeTask({ id: 'plain' })], [epic1], null)
 
     expect(result.map(g => [g.epic, g.story, g.tasks.map(t => t.id)])).toEqual([[null, null, ['plain']]])
   })
 
   it('без задач возвращает пустой список', () => {
-    expect(groupReleaseTasks([], [epic1])).toEqual([])
+    expect(groupReleaseTasks([], [epic1], null)).toEqual([])
   })
 
   it('сохраняет порядок задач внутри группы', () => {
     const tasks = [makeTask({ id: 'b', groupId: 'e2' }), makeTask({ id: 'a', groupId: 'e2' })]
 
-    expect(groupReleaseTasks(tasks, [epic2])[0]!.tasks.map(t => t.id)).toEqual(['b', 'a'])
+    expect(groupReleaseTasks(tasks, [epic2], null)[0]!.tasks.map(t => t.id)).toEqual(['b', 'a'])
   })
 })

@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import draggable from 'vuedraggable'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import SprintBlock from '@/features/projects/ui/SprintBlock.vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -62,6 +63,30 @@ function buttonByText(wrapper: ReturnType<typeof mountBlock>, text: string) {
 describe('sprintBlock', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+  })
+
+  it('показывает историю с задачами и сохраняет общий счётчик спринта', async () => {
+    const story = { id: 'story-1', projectId: 'proj-1', parentId: 'epic-1', type: 'story', title: 'Оплата', status: 'open', order: 0, releaseId: null, children: [] }
+    useGroupStore().trees['proj-1'] = [{ id: 'epic-1', title: 'Платежи', type: 'epic', children: [story] } as any]
+    const task = makeTask({ groupId: 'story-1', title: 'Форма оплаты' })
+    useTaskStore().tasks = [task, makeTask({ id: 'hidden', completed: true })]
+    const wrapper = mountBlock({ sprint: makeSprint(), tasks: [task] })
+    const row = wrapper.get('[data-story-id="story-1"]')
+    expect(row.text()).toContain('Оплата')
+    expect(wrapper.get('[data-testid="sprint-counter"]').text()).toBe('1 из 2 готово')
+    await row.get('button[aria-expanded]').trigger('click')
+    expect(wrapper.findAll('[data-task-id="task-1"]')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('показывает пустую историю в бэклоге, но не в спринте', () => {
+    useGroupStore().trees['proj-1'] = [{ id: 'epic-1', title: 'Эпик', children: [{ id: 'empty', projectId: 'proj-1', parentId: 'epic-1', type: 'story', title: 'Пустая история', status: 'open', order: 0, children: [] }] } as any]
+    const backlog = mountBlock({ sprint: null })
+    expect(backlog.find('[data-story-id="empty"]').exists()).toBe(true)
+    backlog.unmount()
+    const sprint = mountBlock({ sprint: makeSprint() })
+    expect(sprint.find('[data-story-id="empty"]').exists()).toBe(false)
+    sprint.unmount()
   })
 
   it('«+ задача» в блоке спринта эмитит createTask с названием', async () => {

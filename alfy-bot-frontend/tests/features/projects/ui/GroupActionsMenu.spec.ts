@@ -165,12 +165,11 @@ describe('groupActionsMenu', () => {
     wrapper.unmount()
   })
 
-  it('ошибка assignGroup логируется и не ломает меню', async () => {
+  it('ошибка assignGroup видна пользователю и не ломает меню', async () => {
     const store = useReleaseStore()
     store.lists['proj-1'] = [makeRelease()]
     const failure = new Error('400')
     vi.spyOn(store, 'assignGroup').mockRejectedValue(failure)
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     const wrapper = await openMenu(makeGroup())
 
     const releaseTrigger = Array.from(document.querySelectorAll('[data-slot="dropdown-menu-sub-trigger"]'))
@@ -182,7 +181,7 @@ describe('groupActionsMenu', () => {
     item.click()
     await flushPromises()
 
-    expect(consoleError).toHaveBeenCalledWith(expect.any(String), failure)
+    expect(wrapper.get('[role="alert"]').text()).toBe('400')
 
     wrapper.unmount()
   })

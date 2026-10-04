@@ -2,9 +2,13 @@ import type { Release } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as groupsApi from '@/features/projects/api/groups-api'
 import * as releasesApi from '@/features/projects/api/releases-api'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useReleaseStore } from '@/features/projects/model/release-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+
+vi.mock('@/features/projects/api/groups-api', () => ({ setGroupRelease: vi.fn(), fetchGroups: vi.fn() }))
 
 vi.mock('@/features/projects/api/releases-api', () => ({
   fetchReleases: vi.fn(),
@@ -52,6 +56,7 @@ describe('useReleaseStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    vi.mocked(groupsApi.fetchGroups).mockResolvedValue({ data: [] } as any)
   })
 
   it('загрузка проекта B не меняет releasesOf(A)', async () => {
@@ -262,6 +267,24 @@ describe('useReleaseStore', () => {
       expect(releaseIds(taskStore)).toEqual({ open: 'r1', done: 'r1', other: 'r2', free: null })
       expect(store.releasesOf('proj-a').find(r => r.id === 'r1')!.status).toBe('planned')
     })
+  })
+
+  it('сообщает об ошибке перечитывания после успешного сохранения истории', async () => {
+    vi.mocked(groupsApi.setGroupRelease).mockResolvedValue({ data: { updated: 0 } } as any)
+    vi.mocked(groupsApi.fetchGroups).mockRejectedValue(new Error('network'))
+    vi.spyOn(useTaskStore(), 'fetchTasks').mockResolvedValue()
+    await expect(useReleaseStore().setStoryRelease('proj-a', 'story', 'r1')).rejects.toThrow('Изменения сохранены')
+  })
+
+  it('назначение релиза пустой истории сохраняется через API и обновляет дерево и задачи', async () => {
+    const store = useReleaseStore()
+    vi.mocked(groupsApi.setGroupRelease).mockResolvedValue({ data: { updated: 0 } } as any)
+    const tasks = vi.spyOn(useTaskStore(), 'fetchTasks').mockResolvedValue()
+    const groups = vi.spyOn(useGroupStore(), 'fetchGroups')
+    expect(await store.setStoryRelease('proj-a', 'story', 'r1')).toBe(0)
+    expect(groupsApi.setGroupRelease).toHaveBeenCalledWith('proj-a', 'story', 'r1')
+    expect(groups).toHaveBeenCalledWith('proj-a')
+    expect(tasks).toHaveBeenCalledOnce()
   })
 
   describe('assignGroup', () => {

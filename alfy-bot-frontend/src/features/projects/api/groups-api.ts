@@ -20,3 +20,8 @@ export function deleteGroup(projectId: string, id: string) {
 export function reorderGroups(projectId: string, orderedIds: string[]) {
   return api.patch(`/projects/${projectId}/groups/reorder`, { orderedIds })
 }
+
+/** Назначает или снимает релиз истории и её задач; возвращает число изменённых задач. */
+export function setGroupRelease(projectId: string, groupId: string, releaseId: string | null) {
+  return api.patch<{ updated: number }>(`/projects/${projectId}/groups/${groupId}/release`, { releaseId })
+}

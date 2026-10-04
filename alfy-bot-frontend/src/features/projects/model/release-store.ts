@@ -2,7 +2,9 @@ import type { CreateReleasePayload, Release, UpdateReleasePayload } from './type
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import * as groupsApi from '../api/groups-api'
 import * as releasesApi from '../api/releases-api'
+import { useGroupStore } from './group-store'
 
 function byOrder(a: Release, b: Release): number {
   return a.order - b.order
@@ -21,6 +23,21 @@ export const useReleaseStore = defineStore('releases', () => {
   const lists = ref<Record<string, Release[]>>({})
   const loadingProjects = ref<Set<string>>(new Set())
   const error = ref<string | null>(null)
+
+  async function refreshAssignments(projectId: string, includeTasks: boolean): Promise<void> {
+    const groupStore = useGroupStore()
+    const taskStore = useTaskStore()
+    const reads = [groupStore.fetchGroups(projectId)]
+    if (includeTasks)
+      reads.push(taskStore.fetchTasks())
+    await Promise.all(reads)
+    const failure = groupStore.error || (includeTasks ? taskStore.error : null)
+    if (failure) {
+      error.value = `Изменения сохранены, но не удалось обновить данные: ${failure}`
+      throw new Error(error.value)
+    }
+    error.value = null
+  }
 
   /** Все релизы проекта, включая выпущенные, в порядке `order`. Для незагруженного проекта — `[]`. */
   function releasesOf(projectId: string): Release[] {
@@ -139,6 +156,7 @@ export const useReleaseStore = defineStore('releases', () => {
 
     const taskStore = useTaskStore()
     taskStore.tasks = taskStore.tasks.map(t => (t.releaseId === id ? { ...t, releaseId: null } : t))
+    await refreshAssignments(projectId, false)
   }
 
   /**
@@ -168,6 +186,7 @@ export const useReleaseStore = defineStore('releases', () => {
     taskStore.tasks = taskStore.tasks.map(t =>
       (t.releaseId === id && !t.completed) ? { ...t, releaseId: targetId } : t,
     )
+    await refreshAssignments(projectId, false)
     return data
   }
 
@@ -178,11 +197,19 @@ export const useReleaseStore = defineStore('releases', () => {
    */
   const assignGroup = async (projectId: string, releaseId: string, groupId: string) => {
     const { data } = await releasesApi.assignGroupToRelease(projectId, releaseId, { groupId })
-    await useTaskStore().fetchTasks()
+    await refreshAssignments(projectId, true)
+    return data.updated
+  }
+
+  /** Сохраняет плановый релиз истории и обновляет дерево и задачи после успеха API. */
+  async function setStoryRelease(projectId: string, groupId: string, releaseId: string | null): Promise<number> {
+    const { data } = await groupsApi.setGroupRelease(projectId, groupId, releaseId)
+    await refreshAssignments(projectId, true)
     return data.updated
   }
 
   return {
+    setStoryRelease,
     lists,
     error,
     releasesOf,

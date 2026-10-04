@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BoardGroupNode } from '../model/types'
-import { ChevronDown, ChevronRight, Plus } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Plus, SquareArrowOutUpRight } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { groupProgress } from '../lib/group-tree'
@@ -18,7 +18,11 @@ import InlineTitleInput from './InlineTitleInput.vue'
 const props = defineProps<{
   /** Id проекта, эпики которого показываются. */
   projectId: string
+  /** Выбранный эпик или режим all/none. */
+  modelValue?: string
 }>()
+
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
 const groupStore = useGroupStore()
 const taskStore = useTaskStore()
@@ -82,12 +86,25 @@ async function handleDelete(group: BoardGroupNode) {
     </button>
 
     <div class="border-t border-border px-1 py-1 md:block" :class="expanded ? 'block' : 'hidden'">
+      <div class="space-y-0.5 px-1 pb-2">
+        <button
+          v-for="filter in [{ id: 'all', title: 'Все эпики' }, { id: 'none', title: 'Без эпика' }]"
+          :key="filter.id"
+          class="w-full cursor-pointer rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted/50"
+          :class="(modelValue ?? 'all') === filter.id && 'bg-primary/10 text-primary font-medium'"
+          :aria-pressed="(modelValue ?? 'all') === filter.id"
+          :data-epic-filter="filter.id"
+          @click="emit('update:modelValue', filter.id)"
+        >
+          {{ filter.title }}
+        </button>
+      </div>
       <template v-for="epic in epics" :key="epic.id">
         <div
           v-for="group in [epic, ...epic.children]"
           :key="group.id"
           class="flex items-center gap-1.5 rounded-md py-0.5 pr-1 hover:bg-muted/50"
-          :class="group.type === 'story' ? 'pl-6' : 'pl-2'"
+          :class="[group.type === 'story' ? 'pl-6' : 'pl-2', group.type === 'epic' && modelValue === group.id && 'bg-primary/10']"
           :data-group-id="group.id"
         >
           <span
@@ -107,11 +124,20 @@ async function handleDelete(group: BoardGroupNode) {
             v-else
             class="min-w-0 flex-1 cursor-pointer truncate rounded text-left text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             :class="[group.type === 'story' && 'text-xs text-muted-foreground', group.status === 'done' && 'line-through']"
-            @click="handleOpen(group.id)"
+            :aria-pressed="group.type === 'epic' ? modelValue === group.id : undefined"
+            @click="group.type === 'epic' ? emit('update:modelValue', group.id) : handleOpen(group.id)"
           >
             {{ group.title }}
           </button>
           <span class="shrink-0 text-xs text-muted-foreground" data-testid="group-counter">{{ counter(group) }}</span>
+          <button
+            v-if="group.type === 'epic'"
+            class="shrink-0 cursor-pointer rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label="Открыть карточку эпика"
+            @click="handleOpen(group.id)"
+          >
+            <SquareArrowOutUpRight :size="13" />
+          </button>
           <GroupActionsMenu
             :group="group"
             @open="handleOpen(group.id)"

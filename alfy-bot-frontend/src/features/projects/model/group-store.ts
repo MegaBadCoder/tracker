@@ -72,6 +72,7 @@ export const useGroupStore = defineStore('groups', () => {
       description: payload.description ?? null,
       status: 'open',
       completedAt: null,
+      releaseId: null,
       color: payload.color ?? null,
       startDate: payload.startDate ?? null,
       dueDate: payload.dueDate ?? null,

@@ -211,6 +211,15 @@ describe('releaseRow', () => {
     wrapper.unmount()
   })
 
+  it('показывает запланированную историю в релизе даже без задач', async () => {
+    useGroupStore().trees['proj-1'] = [makeGroup({ children: [makeGroup({ id: 'empty', parentId: 'e1', type: 'story', title: 'Пустая история', releaseId: 'rel-1' })] })]
+    const wrapper = mountRow(makeRelease())
+    await wrapper.get('button[aria-label="Релиз v1.0"]').trigger('click')
+    expect(wrapper.get('[data-testid="release-tasks"]').text()).toContain('Пустая история')
+    expect(wrapper.text()).not.toContain('В релизе нет задач.')
+    wrapper.unmount()
+  })
+
   it('раскрытый релиз без задач сообщает, что задач нет', async () => {
     const wrapper = mountRow(makeRelease())
 

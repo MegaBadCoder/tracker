@@ -81,10 +81,11 @@ export function releaseLabel(releases: Release[], releaseId: string | null | und
  * Раскладывает задачи релиза по корзинам (эпик, история). Порядок: эпики по
  * `order`; внутри эпика сначала задачи прямо на эпике (`story = null`), затем
  * истории по `order`; корзина «Без эпика» (`epic = null`) последней. Пустые
- * корзины опускаются, задачи с неизвестным `groupId` попадают в «Без эпика»,
+ * корзины опускаются, кроме историй, чей собственный релиз равен releaseId.
+ * При releaseId = null показываются только корзины задач. Задачи с неизвестным `groupId` попадают в «Без эпика»,
  * порядок задач внутри корзины сохраняется.
  */
-export function groupReleaseTasks(tasks: Task[], groups: BoardGroupNode[]): ReleaseTaskGroup[] {
+export function groupReleaseTasks(tasks: Task[], groups: BoardGroupNode[], releaseId: string | null): ReleaseTaskGroup[] {
   const buckets = new Map<string, Task[]>()
   const withoutEpic: Task[] = []
 
@@ -112,8 +113,8 @@ export function groupReleaseTasks(tasks: Task[], groups: BoardGroupNode[]): Rele
 
     for (const story of [...epic.children].sort(byOrder)) {
       const storyTasks = buckets.get(story.id)
-      if (storyTasks)
-        result.push({ epic, story, tasks: storyTasks })
+      if (storyTasks || (releaseId !== null && story.releaseId === releaseId))
+        result.push({ epic, story, tasks: storyTasks ?? [] })
     }
   }
 

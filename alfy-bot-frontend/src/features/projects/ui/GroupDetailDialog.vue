@@ -30,12 +30,15 @@ import { toCalendarDateValue, toDate } from '@/features/tasks/lib/dateTime'
 import { formatDueDate } from '@/features/tasks/lib/formatters'
 import { openTaskDetail } from '@/features/tasks/lib/task-detail-navigation'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import { apiErrorMessage } from '../lib/api-error'
 import { findGroup, groupPath, groupProgress } from '../lib/group-tree'
 import { useGroupDeletion } from '../lib/use-group-deletion'
 import { useGroupStore } from '../model/group-store'
 import { useProjectStore } from '../model/project-store'
+import { useReleaseStore } from '../model/release-store'
 import { useGroupDetail } from '../model/use-group-detail'
 import ColorPicker from './ColorPicker.vue'
+import ReleasePicker from './ReleasePicker.vue'
 
 function parseGroupDate(value: string | null): Date | undefined {
   if (!value)
@@ -48,6 +51,9 @@ const groupDetail = useGroupDetail()
 const groupStore = useGroupStore()
 const projectStore = useProjectStore()
 const taskStore = useTaskStore()
+const releaseStore = useReleaseStore()
+const releaseError = ref<string | null>(null)
+const savingRelease = ref(false)
 const { tasks } = storeToRefs(taskStore)
 const { deleteGroupWithConfirm } = useGroupDeletion()
 
@@ -64,6 +70,7 @@ const path = computed(() => (groupId.value ? groupPath(tree.value, groupId.value
 const epic = computed(() => path.value?.epic ?? null)
 const story = computed(() => path.value?.story ?? null)
 const group = computed(() => story.value ?? epic.value)
+const storyReleased = computed(() => releaseStore.releasesOf(projectId.value ?? '').some(r => r.id === story.value?.releaseId && r.status === 'released'))
 
 const projectTitle = computed(() =>
   projectId.value ? (projectStore.projectMap.get(projectId.value)?.title ?? 'Проект') : 'Проект',
@@ -72,10 +79,27 @@ const projectTitle = computed(() =>
 watch(target, async (value) => {
   if (!value)
     return
-  await groupStore.ensureGroups(value.projectId)
+  releaseError.value = null
+  await Promise.all([groupStore.ensureGroups(value.projectId), releaseStore.ensureReleases(value.projectId)])
   if (!findGroup(groupStore.groupsOf(value.projectId), value.groupId))
     groupDetail.close()
 }, { immediate: true })
+
+async function handleStoryRelease(releaseId: string | null) {
+  if (!story.value || !projectId.value)
+    return
+  releaseError.value = null
+  savingRelease.value = true
+  try {
+    await releaseStore.setStoryRelease(projectId.value, story.value.id, releaseId)
+  }
+  catch (err) {
+    releaseError.value = apiErrorMessage(err, 'Не удалось назначить релиз истории')
+  }
+  finally {
+    savingRelease.value = false
+  }
+}
 
 function onOpenChange(value: boolean) {
   if (!value)
@@ -337,6 +361,17 @@ const ownTasks = computed(() => {
               />
             </div>
           </div>
+
+          <ReleasePicker
+            v-if="story && projectId"
+            :project-id="projectId"
+            :model-value="story.releaseId"
+            :disabled="savingRelease || storyReleased"
+            @update:model-value="handleStoryRelease"
+          />
+          <p v-if="releaseError" role="alert" class="px-4 py-2 text-xs text-destructive">
+            {{ releaseError }}
+          </p>
 
           <template v-if="!story && epic">
             <div class="flex items-center justify-between px-4 py-2.5 border-b border-border/40">

@@ -13,6 +13,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { apiErrorMessage } from '../lib/api-error'
 import { PROJECT_COLOR_PALETTE } from '../model/project-color-palette'
 import { useReleaseStore } from '../model/release-store'
 
@@ -40,6 +41,7 @@ const triggerLabel = computed(() => (isEpic.value ? 'Действия с эпи�
 const toggleDoneLabel = computed(() => (props.group.status === 'done' ? 'Открыть' : 'Закрыть'))
 
 const releaseStore = useReleaseStore()
+const releaseError = ref<string | null>(null)
 const plannedReleases = computed(() => releaseStore.plannedReleasesOf(props.group.projectId))
 
 function onMenuOpenChange(open: boolean) {
@@ -48,11 +50,12 @@ function onMenuOpenChange(open: boolean) {
 }
 
 async function assignToRelease(releaseId: string) {
+  releaseError.value = null
   try {
     await releaseStore.assignGroup(props.group.projectId, releaseId, props.group.id)
   }
   catch (err) {
-    console.error('Не удалось назначить группу в релиз:', err)
+    releaseError.value = apiErrorMessage(err, 'Не удалось назначить группу в релиз')
   }
 }
 
@@ -143,4 +146,5 @@ function onCloseAutoFocus(event: Event) {
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
+  <span v-if="releaseError" role="alert" class="text-xs text-destructive">{{ releaseError }}</span>
 </template>

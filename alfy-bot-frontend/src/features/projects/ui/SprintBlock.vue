@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { EpicFilter } from '../lib/backlog-stories'
 import type { Sprint } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next'
@@ -13,8 +14,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/features/tasks/lib/formatters'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import { backlogStories, standaloneBacklogTasks } from '../lib/backlog-stories'
 import { parseLocalDate, sprintProgress, sprintTasks } from '../lib/sprint'
+import { useGroupStore } from '../model/group-store'
 import { useSprintStore } from '../model/sprint-store'
+import BacklogStoryRow from './BacklogStoryRow.vue'
 import BacklogTaskRow from './BacklogTaskRow.vue'
 import InlineTitleInput from './InlineTitleInput.vue'
 
@@ -30,6 +34,10 @@ const props = withDefaults(defineProps<{
   sprint: Sprint | null
   /** Задачи, показываемые в блоке (уже отфильтрованные по настройкам проекта). */
   tasks: Task[]
+  /** Выбранный эпик; all показывает всё, none — задачи без эпика. */
+  epicFilter?: EpicFilter
+  /** Показывать завершённые пустые истории. */
+  showCompleted?: boolean
   /** Разрешает кнопку «Начать спринт» (показывается только у запланированного спринта без активного). */
   canStart?: boolean
   /** Разрешает «Завершить» у активного спринта и меню «Изменить»/«Удалить» у запланированного. */
@@ -37,6 +45,8 @@ const props = withDefaults(defineProps<{
   /** В проекте уже есть активный спринт — запускать второй нельзя. */
   hasActiveSprint?: boolean
 }>(), {
+  epicFilter: 'all',
+  showCompleted: false,
   canStart: false,
   canManage: false,
   hasActiveSprint: false,
@@ -55,6 +65,8 @@ const emit = defineEmits<{
   moveTask: [taskId: string, sprintId: string | null]
   /** Введено название новой задачи. */
   createTask: [title: string]
+  /** Создание задачи с группой истории в спринте текущего блока. */
+  createStoryTask: [groupId: string, title: string]
   /** Клик по строке задачи. */
   openTask: [task: Task]
   /** Смена отметки выполнения задачи. */
@@ -63,6 +75,10 @@ const emit = defineEmits<{
 
 const sprintStore = useSprintStore()
 const taskStore = useTaskStore()
+const groupStore = useGroupStore()
+const tree = computed(() => groupStore.groupsOf(props.projectId))
+const stories = computed(() => backlogStories(tree.value, props.tasks, taskStore.tasks.filter(t => t.projectId === props.projectId), props.sprint?.id ?? null, props.epicFilter, props.showCompleted))
+const standaloneTasks = computed(() => standaloneBacklogTasks(props.tasks, tree.value))
 
 const addingTask = ref(false)
 const keepFocusOnClose = ref(false)
@@ -127,6 +143,7 @@ function handleCreateTask(taskTitle: string) {
       <span v-if="dates" class="text-xs text-muted-foreground">{{ dates }}</span>
       <span v-if="sprint?.goal" class="min-w-0 max-w-full truncate text-xs text-muted-foreground">{{ sprint.goal }}</span>
       <span class="text-xs text-muted-foreground" data-testid="sprint-counter">{{ counter }}</span>
+      <span v-if="epicFilter !== 'all'" class="text-xs text-muted-foreground" data-testid="visible-count">Задач по фильтру: {{ tasks.length }}</span>
       <div class="ml-auto flex items-center gap-1">
         <Button v-if="showStart" size="sm" variant="outline" @click="emit('start')">
           Начать спринт
@@ -162,8 +179,22 @@ function handleCreateTask(taskTitle: string) {
       </div>
     </header>
 
+    <div v-if="stories.length > 0" class="space-y-1.5 p-2">
+      <BacklogStoryRow
+        v-for="entry in stories"
+        :key="entry.story.id"
+        :entry="entry"
+        :sprint-id="sprint?.id ?? null"
+        :sprints="moveTargets"
+        @create-task="(groupId, taskTitle) => emit('createStoryTask', groupId, taskTitle)"
+        @open-task="emit('openTask', $event)"
+        @toggle-task="emit('toggleTask', $event)"
+        @move-task="(taskId, sprintId) => emit('moveTask', taskId, sprintId)"
+      />
+    </div>
+
     <draggable
-      :model-value="tasks"
+      :model-value="standaloneTasks"
       item-key="id"
       :group="{ name: 'sprint-backlog' }"
       :sort="false"
@@ -182,7 +213,7 @@ function handleCreateTask(taskTitle: string) {
         />
       </template>
       <template #footer>
-        <p v-if="tasks.length === 0" class="px-3 py-3 text-xs text-muted-foreground">
+        <p v-if="tasks.length === 0 && stories.length === 0" class="px-3 py-3 text-xs text-muted-foreground">
           Нет задач. Перетащите сюда или создайте новую.
         </p>
       </template>

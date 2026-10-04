@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { EpicFilter } from '@/features/projects/lib/backlog-stories'
 import type { Sprint } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { Plus } from 'lucide-vue-next'
@@ -8,10 +9,13 @@ import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/composables/useConfirm'
+import { apiErrorMessage } from '@/features/projects/lib/api-error'
+import { matchesEpic } from '@/features/projects/lib/backlog-stories'
 import { sprintDeletionMessage, sprintTasks } from '@/features/projects/lib/sprint'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useGroupStore } from '@/features/projects/model/group-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
+import { useReleaseStore } from '@/features/projects/model/release-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import BacklogEpicsPanel from '@/features/projects/ui/BacklogEpicsPanel.vue'
 import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
@@ -36,10 +40,13 @@ const isAgileProject = computed(() => project.value?.type === 'agile')
 
 const showCompleted = useShowCompleted(projectId)
 const hideOverdue = useHideOverdue(projectId)
+const epicFilter = ref<EpicFilter>('all')
+const actionError = ref<string | null>(null)
 
 const columnStore = useColumnStore()
 const groupStore = useGroupStore()
 const sprintStore = useSprintStore()
+const releaseStore = useReleaseStore()
 const taskStore = useTaskStore()
 const { tasks, loading, error } = storeToRefs(taskStore)
 
@@ -63,30 +70,33 @@ const sprintsPending = computed(() =>
   || (!(projectId.value in sprintStore.lists) && !sprintStore.error),
 )
 const initialLoading = computed(() => sprintsPending.value || (loading.value && tasks.value.length === 0))
-const loadError = computed(() => error.value || sprintStore.error)
+const loadError = computed(() => actionError.value || error.value || sprintStore.error || groupStore.error || releaseStore.error)
 
 function blockTasks(sprintId: string | null): Task[] {
   return sprintTasks(tasks.value, sprintId, projectId.value)
+    .filter(t => matchesEpic(t, groupStore.groupsOf(projectId.value), epicFilter.value))
     .filter(t => showCompleted.value || !t.completed)
     .filter(t => !hideOverdue.value || !t.isOverdue)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 }
 
 async function handleMoveTask(taskId: string, sprintId: string | null) {
+  actionError.value = null
   try {
     await taskStore.updateTask(taskId, { sprintId })
   }
   catch (err) {
-    console.error('Ошибка переноса задачи:', err)
+    actionError.value = apiErrorMessage(err, 'Не удалось перенести задачу')
   }
 }
 
-async function handleCreateTask(sprintId: string | null, title: string) {
+async function handleCreateTask(sprintId: string | null, title: string, groupId?: string) {
+  actionError.value = null
   try {
-    await taskStore.createTask({ title, completed: false, projectId: projectId.value, sprintId })
+    await taskStore.createTask({ title, completed: false, projectId: projectId.value, sprintId, ...(groupId ? { groupId } : {}) })
   }
   catch (err) {
-    console.error('Ошибка создания задачи:', err)
+    actionError.value = apiErrorMessage(err, 'Не удалось создать задачу')
   }
 }
 
@@ -134,7 +144,13 @@ async function handleDeleteSprint(sprint: Sprint) {
 function loadProjectData(id: string) {
   columnStore.fetchColumns(id)
   groupStore.ensureGroups(id)
+  releaseStore.ensureReleases(id)
 }
+
+watch(() => groupStore.groupsOf(projectId.value), (tree) => {
+  if (epicFilter.value !== 'all' && epicFilter.value !== 'none' && !tree.some(epic => epic.id === epicFilter.value))
+    epicFilter.value = 'all'
+})
 
 onMounted(() => {
   taskStore.fetchTasks()
@@ -142,6 +158,8 @@ onMounted(() => {
 })
 
 watch(projectId, (id) => {
+  epicFilter.value = 'all'
+  actionError.value = null
   if (id)
     loadProjectData(id)
 })
@@ -178,13 +196,13 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
 
     <template v-else>
       <div v-if="loadError" class="mx-4 mb-3 rounded-lg border border-destructive/20 bg-destructive/10 p-4">
-        <p class="text-destructive">
+        <p class="text-destructive" role="alert">
           {{ loadError }}
         </p>
       </div>
 
       <div class="flex flex-col gap-4 px-4 pb-6 md:flex-row md:items-start">
-        <BacklogEpicsPanel :project-id="projectId" />
+        <BacklogEpicsPanel v-model="epicFilter" :project-id="projectId" />
 
         <div class="flex min-w-0 flex-1 flex-col gap-4">
           <SprintBlock
@@ -192,11 +210,14 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             :project-id="projectId"
             :sprint="activeSprint"
             :tasks="blockTasks(activeSprint.id)"
+            :epic-filter="epicFilter"
+            :show-completed="showCompleted"
             can-manage
             :has-active-sprint="true"
             @complete="completeTarget = activeSprint"
             @move-task="handleMoveTask"
             @create-task="handleCreateTask(activeSprint.id, $event)"
+            @create-story-task="(groupId, title) => handleCreateTask(activeSprint!.id, title, groupId)"
             @open-task="handleOpenTask"
             @toggle-task="handleToggleTask"
           />
@@ -206,6 +227,8 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             :project-id="projectId"
             :sprint="sprint"
             :tasks="blockTasks(sprint.id)"
+            :epic-filter="epicFilter"
+            :show-completed="showCompleted"
             can-start
             can-manage
             :has-active-sprint="!!activeSprint"
@@ -214,6 +237,7 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             @delete="handleDeleteSprint(sprint)"
             @move-task="handleMoveTask"
             @create-task="handleCreateTask(sprint.id, $event)"
+            @create-story-task="(groupId, title) => handleCreateTask(sprint.id, title, groupId)"
             @open-task="handleOpenTask"
             @toggle-task="handleToggleTask"
           />
@@ -227,9 +251,12 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             :project-id="projectId"
             :sprint="null"
             :tasks="blockTasks(null)"
+            :epic-filter="epicFilter"
+            :show-completed="showCompleted"
             :has-active-sprint="!!activeSprint"
             @move-task="handleMoveTask"
             @create-task="handleCreateTask(null, $event)"
+            @create-story-task="(groupId, title) => handleCreateTask(null, title, groupId)"
             @open-task="handleOpenTask"
             @toggle-task="handleToggleTask"
           />

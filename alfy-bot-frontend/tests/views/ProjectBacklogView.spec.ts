@@ -7,6 +7,7 @@ import { useConfirm } from '@/composables/useConfirm'
 import * as columnsApi from '@/features/projects/api/columns-api'
 import * as groupsApi from '@/features/projects/api/groups-api'
 import { sprintDeletionMessage } from '@/features/projects/lib/sprint'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import BacklogEpicsPanel from '@/features/projects/ui/BacklogEpicsPanel.vue'
@@ -189,6 +190,31 @@ describe('projectBacklogView', () => {
     const bodies = vi.mocked(api.post).mock.calls.map(c => c[1] as Record<string, unknown>)
     expect(bodies).toContainEqual(expect.objectContaining({ title: 'В спринт', sprintId: 'active', projectId: 'proj-1' }))
     expect(bodies).toContainEqual(expect.objectContaining({ title: 'В бэклог', sprintId: null, projectId: 'proj-1' }))
+    wrapper.unmount()
+  })
+
+  it('фильтрует все блоки по эпику и оставляет полный счётчик спринта', async () => {
+    const wrapper = await mountView([makeSprint({ id: 'active' })], [rawTask({ id: 'a', groupId: 'epic-a', sprintId: 'active' }), rawTask({ id: 'b', groupId: 'epic-b', sprintId: 'active' }), rawTask({ id: 'c', groupId: null, sprintId: null })])
+    useGroupStore().trees['proj-1'] = [{ id: 'epic-a', children: [] }, { id: 'epic-b', children: [] }] as BoardGroupNode[]
+    wrapper.getComponent(BacklogEpicsPanel).vm.$emit('update:modelValue', 'epic-a')
+    await flushPromises()
+    expect(wrapper.findAll('[data-task-id]').map(row => row.attributes('data-task-id'))).toEqual(['a'])
+    expect(wrapper.get('[data-sprint-id="active"] [data-testid="sprint-counter"]').text()).toBe('0 из 2 готово')
+    expect(wrapper.get('[data-sprint-id="active"] [data-testid="visible-count"]').text()).toBe('Задач по фильтру: 1')
+    wrapper.getComponent(BacklogEpicsPanel).vm.$emit('update:modelValue', 'none')
+    await flushPromises()
+    expect(wrapper.findAll('[data-task-id]').map(row => row.attributes('data-task-id'))).toEqual(['c'])
+    wrapper.unmount()
+  })
+
+  it('создание из истории передаёт группу и спринт без явного релиза', async () => {
+    const wrapper = await mountView([makeSprint({ id: 'active' })])
+    vi.mocked(api.post).mockImplementation(async (_url, body: any) => ({ data: { id: 'new-task', ...body } }))
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('createStoryTask', 'story-1', 'Новая в истории')
+    await flushPromises()
+    const payload = vi.mocked(api.post).mock.calls.find(call => call[0] === '/tasks')?.[1] as Record<string, unknown>
+    expect(payload).toMatchObject({ groupId: 'story-1', sprintId: 'active', projectId: 'proj-1' })
+    expect(Object.hasOwn(payload, 'releaseId')).toBe(false)
     wrapper.unmount()
   })
 

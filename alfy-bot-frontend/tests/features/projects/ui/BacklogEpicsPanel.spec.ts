@@ -100,10 +100,13 @@ describe('backlogEpicsPanel', () => {
     wrapper.unmount()
   })
 
-  it('клик по названию открывает карточку группы через useGroupDetail', async () => {
+  it('клик по эпику выбирает фильтр, карточка открывается отдельно', async () => {
     const wrapper = setup()
 
     await wrapper.get('[data-group-id="epic-1"] button.truncate').trigger('click')
+    expect(wrapper.emitted('update:modelValue')).toEqual([['epic-1']])
+    expect(useGroupDetail().current.value).toBeNull()
+    await wrapper.get('[data-group-id="epic-1"] button[aria-label="Открыть карточку эпика"]').trigger('click')
     expect(useGroupDetail().current.value).toEqual({ projectId: 'proj-1', groupId: 'epic-1' })
 
     await wrapper.get('[data-group-id="story-1"] button.truncate').trigger('click')

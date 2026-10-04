@@ -57,7 +57,7 @@ const progressPercent = computed(() =>
   progress.value.total === 0 ? 0 : Math.round((progress.value.done / progress.value.total) * 100),
 )
 const overdue = computed(() => isReleaseOverdue(props.release, new Date()))
-const buckets = computed(() => groupReleaseTasks(props.tasks, groupStore.groupsOf(props.projectId)))
+const buckets = computed(() => groupReleaseTasks(props.tasks, groupStore.groupsOf(props.projectId), props.release.id))
 
 const dates = computed(() => {
   const { startDate, releaseDate } = props.release
