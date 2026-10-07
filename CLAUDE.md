@@ -59,6 +59,8 @@ npm run lint                # eslint .
 
 ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `StreamableHTTPServerTransport`). Auth — API-токены через бот (`/mcp_token <name>`), хранятся как bcrypt-хеш + 10-char prefix-index в БД (`api_token` entity). Tools — тонкая обёртка над REST `alfy-bot` (1 HTTP-вызов на tool, кроме `get_progress` — 3 параллельных). См. `alfy-mcp/README.md` для подключения из клиентов.
 
+**MCP-планирование спринтов.** `tools/sprints.ts` регистрируется в общем `createServer` для обоих транспортов. Контроллеры спринтов и групп используют `JwtOrApiTokenGuard`, иначе MCP API-токен получает 401. `move_story_to_sprint` вызывает атомарный серверный перенос; не заменять его циклом обновления задач. `complete_sprint` требует явный `moveTo`, `delete_sprint` — `confirm: true`. У задач доступны `groupId`/`sprintId` и фильтр `sprint_id`; создание без `sprintId` наследует спринт истории. Контракты проверяются через реальный MCP SDK в `alfy-mcp/tests/tools/sprints.spec.ts` и HTTP-тест API-токена в `alfy-bot/test/story-sprint.e2e-spec.ts`.
+
 ## Dev (Telegram WebApp через публичные URL)
 
 ```bash

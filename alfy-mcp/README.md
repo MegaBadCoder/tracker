@@ -64,17 +64,32 @@ URL: `https://tracker.rocketup.tech/mcp`
 | `complete_task` | Отметить задачу выполненной |
 | `delete_task` | Удалить задачу |
 
-Перенос задачи: `update_task` с `projectId` (UUID) или `null` (Inbox).
+Перенос задачи: `update_task` с `projectId` (UUID) или `null` (Inbox). Для задач Agile-проекта перенос во Входящие запрещён сервером. `create_task` и `update_task` принимают `groupId` и `sprintId`; `sprintId: null` оставляет задачу в бэклоге. При создании без `sprintId` задача наследует спринт истории. `list_tasks` принимает `sprint_id` (UUID либо `null` для бэклога) вместе с `project_id`.
 
 ### Проекты
 
 | Инструмент | Описание |
 |---|---|
-| `list_projects` | Плоский список: `id, title, parentId, description, viewMode, icon, color, order` |
-| `create_project` | Создать проект (`title`, опц. `parentId`, `description`, `viewMode`, `icon`, `color`) |
+| `list_projects` | Плоский список: `id, title, parentId, description, type, viewMode, icon, color, order` |
+| `create_project` | Создать проект (`title`, опц. `type`: simple/agile, `parentId`, `description`, `viewMode`, `icon`, `color`) |
 | `update_project` | Обновить поля; `null` снимает `parentId` / `description` / `icon` / `color` |
 | `delete_project` | Удалить. Нужен `confirm: true`. 409, если есть дочерние проекты или задачи |
 | `reorder_projects` | Порядок: полный массив `orderedIds` |
+
+### Спринты и планирование историй
+
+Все инструменты работают с правами владельца API-токена и требуют `projectId` (UUID). Тип проекта `agile` выбирается при создании и дальше не меняется.
+
+- `list_sprints` — все спринты проекта, включая закрытые, с датами, целью и статусом.
+- `create_sprint` — запланированный спринт; необязательные `name` и `goal`. Без имени сервер назначает «Спринт N».
+- `update_sprint` — `id` и изменяемые `name`, `goal`, `startDate`, `endDate`; `null` очищает цель или дату. Закрытый спринт менять нельзя.
+- `start_sprint` — `id`, обязательные даты `startDate` и `endDate` в формате `YYYY-MM-DD`, необязательная `goal`. В проекте допустим только один активный спринт.
+- `complete_sprint` — `id` и обязательный `moveTo`: `backlog` либо UUID запланированного спринта. Незавершённые задачи и открытые истории переносятся; выполненные задачи остаются в закрытом спринте.
+- `delete_sprint` — `id` и `confirm: true`. Задачи и истории сохраняются, назначение удалённого спринта очищается.
+- `list_project_groups` — дерево эпиков и историй с UUID и назначениями спринтов/релизов.
+- `move_story_to_sprint` — `storyId` и обязательный `sprintId`: UUID незакрытого спринта этого проекта либо `null` для бэклога. Перенос истории и её задач атомарен; задачи закрытых спринтов сохраняются. Ответ `{ updated: number }` содержит число перенесённых задач, включая скрытые выполненные. Пустую историю тоже можно перенести.
+
+Например, после `list_project_groups` перенести выбранную историю и её задачи можно вызовом `move_story_to_sprint({ projectId, storyId, sprintId })`. Отдельную задачу переносят через `update_task({ id, sprintId })`.
 
 ### Привычки / Вопросы (Habits)
 

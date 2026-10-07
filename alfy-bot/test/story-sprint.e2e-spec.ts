@@ -4,18 +4,21 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
 import { createTestApp } from './helpers/test-app';
 import { BoardGroup, Task, User } from '../src/shared/entities';
+import { ApiTokenService } from '../src/modules/auth/application/api-token.service';
 
 describe('Story sprint (e2e)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let token: string;
   let otherToken: string;
+  let apiToken: string;
 
   beforeAll(async () => {
     const context = await createTestApp();
     app = context.app;
     token = context.token;
     dataSource = app.get(DataSource);
+    apiToken = (await app.get(ApiTokenService).generate(context.userId, 'sprint-mcp')).plaintext;
     const other = await dataSource
       .getRepository(User)
       .save({ telegramId: 998, username: 'other' });
@@ -60,6 +63,25 @@ describe('Story sprint (e2e)', () => {
 
   const groupUrl = (projectId: string, groupId: string) =>
     `/api/projects/${projectId}/groups/${groupId}/sprint`;
+
+  it('API-токен управляет спринтами и историями только своего проекта', async () => {
+    const projectId = await createProject();
+    const epicId = await createGroup(projectId);
+    const storyId = await createGroup(projectId, epicId);
+    const url = `/api/projects/${projectId}/sprints`;
+    const created = await request(app.getHttpServer()).post(url).set(auth(apiToken)).send({ name: 'MCP sprint' }).expect(201);
+    const id = created.body.id as string;
+    await request(app.getHttpServer()).get(url).set(auth(apiToken)).expect(200);
+    await request(app.getHttpServer()).get(`/api/projects/${projectId}/groups`).set(auth(apiToken)).expect(200);
+    await request(app.getHttpServer()).patch(groupUrl(projectId, storyId)).set(auth(apiToken)).send({ sprintId: id }).expect(200);
+    await request(app.getHttpServer()).patch(`${url}/${id}`).set(auth(apiToken)).send({ goal: 'Planning' }).expect(200);
+    await request(app.getHttpServer()).post(`${url}/${id}/start`).set(auth(apiToken)).send({ startDate: '2026-10-07', endDate: '2026-10-14' }).expect(201);
+    await request(app.getHttpServer()).post(`${url}/${id}/complete`).set(auth(apiToken)).send({ moveTo: 'backlog' }).expect(201);
+    await request(app.getHttpServer()).delete(`${url}/${id}`).set(auth(apiToken)).expect(200);
+    await request(app.getHttpServer()).get(url).set(auth('0'.repeat(48))).expect(401);
+    const foreign = await request(app.getHttpServer()).post('/api/projects').set(auth(otherToken)).send({ title: 'Foreign', type: 'agile' }).expect(201);
+    await request(app.getHttpServer()).get(`/api/projects/${foreign.body.id}/sprints`).set(auth(apiToken)).expect(404);
+  });
 
   it('переносит пустую историю и сохраняет назначение в дереве', async () => {
     const projectId = await createProject();
