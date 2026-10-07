@@ -73,6 +73,7 @@ export const useGroupStore = defineStore('groups', () => {
       status: 'open',
       completedAt: null,
       releaseId: null,
+      sprintId: null,
       color: payload.color ?? null,
       startDate: payload.startDate ?? null,
       dueDate: payload.dueDate ?? null,

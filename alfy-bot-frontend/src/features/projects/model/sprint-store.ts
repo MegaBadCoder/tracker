@@ -2,7 +2,9 @@ import type { CreateSprintPayload, Sprint, StartSprintPayload, UpdateSprintPaylo
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import * as groupsApi from '../api/groups-api'
 import * as sprintsApi from '../api/sprints-api'
+import { useGroupStore } from './group-store'
 
 function byOrder(a: Sprint, b: Sprint): number {
   return a.order - b.order
@@ -17,6 +19,25 @@ export const useSprintStore = defineStore('sprints', () => {
   const lists = ref<Record<string, Sprint[]>>({})
   const loadingProjects = ref<Set<string>>(new Set())
   const error = ref<string | null>(null)
+
+  async function refreshAssignments(projectId: string): Promise<void> {
+    const groupStore = useGroupStore()
+    const taskStore = useTaskStore()
+    await Promise.all([groupStore.fetchGroups(projectId), taskStore.fetchTasks()])
+    const failure = groupStore.error || taskStore.error
+    if (failure) {
+      error.value = `Изменения сохранены, но не удалось обновить данные: ${failure}`
+      throw new Error(error.value)
+    }
+    error.value = null
+  }
+
+  /** Сохраняет спринт истории и обновляет задачи и дерево после успеха API. */
+  async function setStorySprint(projectId: string, storyId: string, sprintId: string | null): Promise<number> {
+    const { data } = await groupsApi.setGroupSprint(projectId, storyId, sprintId)
+    await refreshAssignments(projectId)
+    return data.updated
+  }
 
   /** Все спринты проекта, включая завершённые, в порядке `order`. Для незагруженного проекта — `[]`. */
   function sprintsOf(projectId: string): Sprint[] {
@@ -135,6 +156,7 @@ export const useSprintStore = defineStore('sprints', () => {
 
     const taskStore = useTaskStore()
     taskStore.tasks = taskStore.tasks.map(t => (t.sprintId === id ? { ...t, sprintId: null } : t))
+    await refreshAssignments(projectId)
   }
 
   /** Запускает запланированный спринт: `active` с датами старта и конца. */
@@ -188,10 +210,12 @@ export const useSprintStore = defineStore('sprints', () => {
     taskStore.tasks = taskStore.tasks.map(t =>
       (t.sprintId === id && !t.completed) ? { ...t, sprintId: targetId } : t,
     )
+    await refreshAssignments(projectId)
     return data
   }
 
   return {
+    setStorySprint,
     lists,
     error,
     sprintsOf,

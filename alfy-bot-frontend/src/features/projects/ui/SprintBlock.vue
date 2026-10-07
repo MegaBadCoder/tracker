@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EpicFilter } from '../lib/backlog-stories'
+import type { BacklogStory, EpicFilter } from '../lib/backlog-stories'
 import type { Sprint } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { Ellipsis, Pencil, Plus, Trash2 } from 'lucide-vue-next'
@@ -63,6 +63,7 @@ const emit = defineEmits<{
   delete: []
   /** Задача перенесена в этот блок или выбрана в меню «В спринт…»: id задачи и id спринта (`null` — бэклог). */
   moveTask: [taskId: string, sprintId: string | null]
+  moveStory: [storyId: string, sprintId: string | null]
   /** Введено название новой задачи. */
   createTask: [title: string]
   /** Создание задачи с группой истории в спринте текущего блока. */
@@ -77,7 +78,9 @@ const sprintStore = useSprintStore()
 const taskStore = useTaskStore()
 const groupStore = useGroupStore()
 const tree = computed(() => groupStore.groupsOf(props.projectId))
-const stories = computed(() => backlogStories(tree.value, props.tasks, taskStore.tasks.filter(t => t.projectId === props.projectId), props.sprint?.id ?? null, props.epicFilter, props.showCompleted))
+const closedSprintIds = computed(() => new Set(sprintStore.sprintsOf(props.projectId).filter(s => s.status === 'closed').map(s => s.id)))
+const planningTasks = computed(() => taskStore.tasks.filter(t => t.projectId === props.projectId && !closedSprintIds.value.has(t.sprintId ?? '')))
+const stories = computed(() => backlogStories(tree.value, props.tasks, planningTasks.value, props.sprint?.id ?? null, props.epicFilter, props.showCompleted))
 const standaloneTasks = computed(() => standaloneBacklogTasks(props.tasks, tree.value))
 
 const addingTask = ref(false)
@@ -114,6 +117,11 @@ const dates = computed(() => {
 function handleChange(event: { added?: { element: Task } }) {
   if (event.added)
     emit('moveTask', event.added.element.id, props.sprint?.id ?? null)
+}
+
+function handleStoryChange(event: { added?: { element: { story: { id: string } } } }) {
+  if (event.added)
+    emit('moveStory', event.added.element.story.id, props.sprint?.id ?? null)
 }
 
 function handleEdit() {
@@ -179,19 +187,36 @@ function handleCreateTask(taskTitle: string) {
       </div>
     </header>
 
-    <div v-if="stories.length > 0" class="space-y-1.5 p-2">
-      <BacklogStoryRow
-        v-for="entry in stories"
-        :key="entry.story.id"
-        :entry="entry"
-        :sprint-id="sprint?.id ?? null"
-        :sprints="moveTargets"
-        @create-task="(groupId, taskTitle) => emit('createStoryTask', groupId, taskTitle)"
-        @open-task="emit('openTask', $event)"
-        @toggle-task="emit('toggleTask', $event)"
-        @move-task="(taskId, sprintId) => emit('moveTask', taskId, sprintId)"
-      />
-    </div>
+    <draggable
+      :model-value="stories"
+      :item-key="(entry: BacklogStory) => entry.story.id"
+      :group="{ name: 'sprint-stories' }"
+      handle=".story-drag-handle"
+      :sort="false"
+      :animation="150"
+      ghost-class="opacity-30"
+      class="flex min-h-16 flex-col gap-1.5 p-2"
+      :class="stories.length === 0 && 'm-2 rounded-md border border-dashed border-border/70'"
+      @change="handleStoryChange"
+    >
+      <template #item="{ element: entry }">
+        <BacklogStoryRow
+          :entry="entry"
+          :sprint-id="sprint?.id ?? null"
+          :sprints="moveTargets"
+          @create-task="(groupId, taskTitle) => emit('createStoryTask', groupId, taskTitle)"
+          @open-task="emit('openTask', $event)"
+          @toggle-task="emit('toggleTask', $event)"
+          @move-task="(taskId, sprintId) => emit('moveTask', taskId, sprintId)"
+          @move-story="(storyId, sprintId) => emit('moveStory', storyId, sprintId)"
+        />
+      </template>
+      <template #footer>
+        <p v-if="stories.length === 0" class="px-2 py-2 text-center text-xs text-muted-foreground">
+          Перетащите историю сюда
+        </p>
+      </template>
+    </draggable>
 
     <draggable
       :model-value="standaloneTasks"
@@ -214,7 +239,7 @@ function handleCreateTask(taskTitle: string) {
       </template>
       <template #footer>
         <p v-if="tasks.length === 0 && stories.length === 0" class="px-3 py-3 text-xs text-muted-foreground">
-          Нет задач. Перетащите сюда или создайте новую.
+          Нет задач. Перетащите задачу сюда или создайте новую.
         </p>
       </template>
     </draggable>

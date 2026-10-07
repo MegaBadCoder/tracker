@@ -31,6 +31,27 @@ describe('планирование историй', () => {
     expect(backlogStories(tree, [], tasks, 's1', 'all', false)).toEqual([])
   })
 
+  it('пустая история показывается только в назначенном спринте', () => {
+    const local = [group('epic', null)]
+    local[0]!.children = [{ ...group('empty', 'epic'), sprintId: 's1' }]
+    expect(backlogStories(local, [], [], 's1', 'all', false).map(row => row.story.id)).toEqual(['empty'])
+    expect(backlogStories(local, [], [], null, 'all', false)).toEqual([])
+  })
+
+  it('история с задачами только в закрытом спринте показывается в назначенном пустом блоке', () => {
+    const local = [group('epic', null)]
+    local[0]!.children = [{ ...group('story', 'epic'), sprintId: 'planned' }]
+    const tasks = [task('closed', 'story', 'closed')]
+    expect(backlogStories(local, [], tasks, 'planned', 'all', false).map(row => row.story.id)).toEqual(['story'])
+  })
+
+  it('скрытая задача назначенного блока не создаёт пустую строку', () => {
+    const local = [group('epic', null)]
+    local[0]!.children = [{ ...group('story', 'epic'), sprintId: 'planned' }]
+    const tasks = [task('hidden', 'story', 'planned', true)]
+    expect(backlogStories(local, [], tasks, 'planned', 'all', false)).toEqual([])
+  })
+
   it('пустые истории подчиняются фильтру эпика и настройке завершённых', () => {
     const local = [group('epic-a', null)]
     local[0]!.children = [{ ...group('done', 'epic-a'), status: 'done' }]

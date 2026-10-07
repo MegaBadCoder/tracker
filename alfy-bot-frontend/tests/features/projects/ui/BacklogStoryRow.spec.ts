@@ -1,4 +1,5 @@
 import type { BacklogStory } from '@/features/projects/lib/backlog-stories'
+import type { Sprint } from '@/features/projects/model/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,6 +17,7 @@ const entry = {
 } as BacklogStory
 
 const mountRow = () => mount(BacklogStoryRow, { props: { entry, sprintId: 's1', sprints: [] }, attachTo: document.body })
+const sprint = { id: 's2', name: 'Спринт 2', status: 'planned' } as Sprint
 
 describe('строка истории', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -61,6 +63,22 @@ describe('строка истории', () => {
     await flushPromises()
     expect(store.setStoryRelease).toHaveBeenCalledWith('project', 'story', 'rel')
     expect(row.get('[role="alert"]').text()).toBe('Не удалось сохранить')
+    row.unmount()
+  })
+
+  it('меню переноса эмитит назначение всей истории в спринт и бэклог', async () => {
+    const row = mount(BacklogStoryRow, { props: { entry, sprintId: 's1', sprints: [sprint] }, attachTo: document.body })
+    await row.get('button[aria-label="Перенести историю Оплата"]').trigger('click')
+    await flushPromises()
+    const items = Array.from(document.querySelectorAll('[data-slot="dropdown-menu-item"]'))
+    items.find(el => el.textContent?.includes('Спринт 2'))!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(row.emitted('moveStory')).toEqual([['story', 's2']])
+    await row.get('button[aria-label="Перенести историю Оплата"]').trigger('click')
+    await flushPromises()
+    const backlogItem = Array.from(document.querySelectorAll('[data-slot="dropdown-menu-item"]')).find(el => el.textContent?.includes('В бэклог'))!
+    backlogItem.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(row.emitted('moveStory')).toEqual([['story', 's2'], ['story', null]])
     row.unmount()
   })
 })

@@ -25,3 +25,8 @@ export function reorderGroups(projectId: string, orderedIds: string[]) {
 export function setGroupRelease(projectId: string, groupId: string, releaseId: string | null) {
   return api.patch<{ updated: number }>(`/projects/${projectId}/groups/${groupId}/release`, { releaseId })
 }
+
+/** Назначает спринт истории и её задач; возвращает число изменённых задач. */
+export function setGroupSprint(projectId: string, groupId: string, sprintId: string | null) {
+  return api.patch<{ updated: number }>(`/projects/${projectId}/groups/${groupId}/sprint`, { sprintId })
+}

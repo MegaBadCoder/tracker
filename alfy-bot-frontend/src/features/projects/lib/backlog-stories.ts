@@ -22,8 +22,8 @@ export function matchesEpic(task: Task, tree: BoardGroupNode[], filter: EpicFilt
 }
 
 /**
- * Группирует видимые задачи по историям. Пустые истории добавляются только
- * в бэклог; скрытые фильтрами и чужими спринтами задачи не делают историю пустой.
+ * Группирует видимые задачи по историям. Истории без задач показываются
+ * в назначенном спринте; скрытые задачи не делают историю пустой.
  * Прогресс считается по полному набору задач блока, независимо от фильтров.
  */
 export function backlogStories(
@@ -38,10 +38,12 @@ export function backlogStories(
     epic.children.flatMap((story) => {
       const all = projectTasks.filter(task => task.groupId === story.id)
       const tasks = visibleTasks.filter(task => task.groupId === story.id)
-      const empty = sprintId === null && all.length === 0 && (showCompleted || story.status !== 'done')
+      const block = all.filter(task => (task.sprintId ?? null) === sprintId)
+      const empty = block.length === 0 && (story.sprintId ?? null) === sprintId
+        && (all.length === 0 || story.sprintId != null)
+        && (showCompleted || story.status !== 'done')
       if (tasks.length === 0 && !empty)
         return []
-      const block = all.filter(task => (task.sprintId ?? null) === sprintId)
       return [{ story, epic, tasks, done: block.filter(task => task.completed).length, total: block.length }]
     }),
   )

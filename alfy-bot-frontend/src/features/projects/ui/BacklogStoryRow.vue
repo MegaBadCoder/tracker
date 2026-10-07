@@ -2,10 +2,10 @@
 import type { BacklogStory } from '../lib/backlog-stories'
 import type { Sprint } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
-import { BookOpen, ChevronDown, ChevronRight, Plus, Rocket, SquareArrowOutUpRight } from 'lucide-vue-next'
+import { BookOpen, ChevronDown, ChevronRight, Ellipsis, GripVertical, Plus, Rocket, SquareArrowOutUpRight } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import draggable from 'vuedraggable'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { apiErrorMessage } from '../lib/api-error'
 import { releaseLabel } from '../lib/release'
 import { useReleaseStore } from '../model/release-store'
@@ -25,6 +25,7 @@ const emit = defineEmits<{
   openTask: [task: Task]
   toggleTask: [id: string]
   moveTask: [taskId: string, sprintId: string | null]
+  moveStory: [storyId: string, sprintId: string | null]
 }>()
 
 const expanded = ref(false)
@@ -76,6 +77,9 @@ function handleChange(event: { added?: { element: Task } }) {
 <template>
   <div :data-story-id="story.id" class="rounded-md border border-border/60 bg-background/40">
     <div class="flex flex-wrap items-center gap-2 px-2 py-2">
+      <button class="story-drag-handle cursor-grab rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing" :aria-label="`Перетащить историю ${story.title}`">
+        <GripVertical :size="15" />
+      </button>
       <button
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-expanded="expanded"
@@ -89,6 +93,21 @@ function handleChange(event: { added?: { element: Task } }) {
       </button>
       <span class="hidden max-w-32 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground sm:inline" :title="entry.epic.title">{{ entry.epic.title }}</span>
       <span class="shrink-0 text-xs tabular-nums text-muted-foreground" data-testid="story-progress">{{ entry.done }}/{{ entry.total }}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <button class="cursor-pointer rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" :aria-label="`Перенести историю ${story.title}`">
+            <Ellipsis :size="15" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem v-for="target in sprints.filter(s => s.id !== sprintId)" :key="target.id" @click="emit('moveStory', story.id, target.id)">
+            {{ target.name }}
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="sprintId !== null" @click="emit('moveStory', story.id, null)">
+            В бэклог
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <DropdownMenu v-model:open="releaseOpen">
         <DropdownMenuTrigger as-child>
           <button :disabled="savingRelease || released" class="flex max-w-36 cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted disabled:cursor-default" :aria-label="`Релиз истории ${story.title}`">

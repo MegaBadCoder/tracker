@@ -91,6 +91,16 @@ async function handleMoveTask(taskId: string, sprintId: string | null) {
   }
 }
 
+async function handleMoveStory(storyId: string, sprintId: string | null) {
+  actionError.value = null
+  try {
+    await sprintStore.setStorySprint(projectId.value, storyId, sprintId)
+  }
+  catch (err) {
+    actionError.value = apiErrorMessage(err, 'Не удалось перенести историю')
+  }
+}
+
 async function handleCreateTask(sprintId: string | null, title: string, groupId?: string) {
   actionError.value = null
   try {
@@ -219,6 +229,7 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             :has-active-sprint="true"
             @complete="completeTarget = activeSprint"
             @move-task="handleMoveTask"
+            @move-story="handleMoveStory"
             @create-task="handleCreateTask(activeSprint.id, $event)"
             @create-story-task="(groupId, title) => handleCreateTask(activeSprint!.id, title, groupId)"
             @open-task="handleOpenTask"
@@ -239,6 +250,7 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             @edit="formTarget = { mode: 'edit', sprint }"
             @delete="handleDeleteSprint(sprint)"
             @move-task="handleMoveTask"
+            @move-story="handleMoveStory"
             @create-task="handleCreateTask(sprint.id, $event)"
             @create-story-task="(groupId, title) => handleCreateTask(sprint.id, title, groupId)"
             @open-task="handleOpenTask"
@@ -258,6 +270,7 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             :show-completed="showCompleted"
             :has-active-sprint="!!activeSprint"
             @move-task="handleMoveTask"
+            @move-story="handleMoveStory"
             @create-task="handleCreateTask(null, $event)"
             @create-story-task="(groupId, title) => handleCreateTask(null, title, groupId)"
             @open-task="handleOpenTask"

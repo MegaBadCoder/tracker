@@ -31,6 +31,8 @@ export type GroupStatus = 'open' | 'done'
 export interface BoardGroup {
   /** Плановый релиз истории; у эпика и незапланированной истории — null. */
   releaseId: string | null
+  /** Назначенный спринт истории; у эпика и истории в бэклоге — null. */
+  sprintId: string | null
   id: string
   projectId: string
   parentId: string | null

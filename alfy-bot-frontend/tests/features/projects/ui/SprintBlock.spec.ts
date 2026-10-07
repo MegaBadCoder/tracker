@@ -89,6 +89,15 @@ describe('sprintBlock', () => {
     sprint.unmount()
   })
 
+  it('показывает в бэклоге историю, у которой остались только задачи закрытого спринта', () => {
+    useSprintStore().lists['proj-1'] = [makeSprint({ id: 'closed', status: 'closed' })]
+    useGroupStore().trees['proj-1'] = [{ id: 'epic', children: [{ id: 'story', projectId: 'proj-1', parentId: 'epic', type: 'story', title: 'История', status: 'open', sprintId: null, children: [] }] } as any]
+    useTaskStore().tasks = [makeTask({ groupId: 'story', sprintId: 'closed', completed: true })]
+    const backlog = mountBlock({ sprint: null })
+    expect(backlog.find('[data-story-id="story"]').exists()).toBe(true)
+    backlog.unmount()
+  })
+
   it('«+ задача» в блоке спринта эмитит createTask с названием', async () => {
     const wrapper = mountBlock({ sprint: makeSprint() })
 
@@ -184,19 +193,31 @@ describe('sprintBlock', () => {
     const task = makeTask({ id: 'moved' })
 
     const sprintBlock = mountBlock({ sprint: makeSprint({ id: 'sprint-7' }) })
-    sprintBlock.findComponent(draggable).vm.$emit('change', { added: { element: task, newIndex: 0 } })
+    sprintBlock.findAllComponents(draggable).find(list => (list.vm.$attrs.group as { name: string }).name === 'sprint-backlog')!.vm.$emit('change', { added: { element: task, newIndex: 0 } })
     expect(sprintBlock.emitted('moveTask')).toEqual([['moved', 'sprint-7']])
     sprintBlock.unmount()
 
     const backlog = mountBlock({ sprint: null })
-    backlog.findComponent(draggable).vm.$emit('change', { added: { element: task, newIndex: 0 } })
+    backlog.findAllComponents(draggable).find(list => (list.vm.$attrs.group as { name: string }).name === 'sprint-backlog')!.vm.$emit('change', { added: { element: task, newIndex: 0 } })
     expect(backlog.emitted('moveTask')).toEqual([['moved', null]])
     backlog.unmount()
   })
 
+  it('истории перетаскиваются отдельной группой за ручку', () => {
+    const wrapper = mountBlock({ sprint: makeSprint() })
+    const lists = wrapper.findAllComponents(draggable)
+    const storyList = lists.find(list => (list.vm.$attrs.group as { name: string }).name === 'sprint-stories')!
+    expect(storyList.vm.$attrs.handle).toBe('.story-drag-handle')
+    expect(wrapper.text()).toContain('Перетащите историю сюда')
+    storyList.vm.$emit('change', { added: { element: { story: { id: 'story-7' } } } })
+    expect(wrapper.emitted('moveStory')).toEqual([['story-7', 'sprint-1']])
+    expect(wrapper.emitted('moveTask')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('change без added (moved) не эмитит moveTask', () => {
     const wrapper = mountBlock({ sprint: makeSprint() })
-    wrapper.findComponent(draggable).vm.$emit('change', { moved: { element: makeTask(), newIndex: 1, oldIndex: 0 } })
+    wrapper.findAllComponents(draggable).find(list => (list.vm.$attrs.group as { name: string }).name === 'sprint-backlog')!.vm.$emit('change', { moved: { element: makeTask(), newIndex: 1, oldIndex: 0 } })
 
     expect(wrapper.emitted('moveTask')).toBeUndefined()
     wrapper.unmount()
@@ -204,7 +225,7 @@ describe('sprintBlock', () => {
 
   it('список настроен как sprint-backlog без сортировки', () => {
     const wrapper = mountBlock({ sprint: makeSprint() })
-    const list = wrapper.findComponent(draggable)
+    const list = wrapper.findAllComponents(draggable).find(list => (list.vm.$attrs.group as { name: string }).name === 'sprint-backlog')!
 
     expect(list.vm.$attrs.group).toEqual({ name: 'sprint-backlog' })
     expect(list.vm.$attrs.sort).toBe(false)

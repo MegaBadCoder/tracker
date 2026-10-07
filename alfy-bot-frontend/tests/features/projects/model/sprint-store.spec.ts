@@ -2,7 +2,9 @@ import type { Sprint } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as groupsApi from '@/features/projects/api/groups-api'
 import * as sprintsApi from '@/features/projects/api/sprints-api'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 
@@ -14,6 +16,7 @@ vi.mock('@/features/projects/api/sprints-api', () => ({
   startSprint: vi.fn(),
   completeSprint: vi.fn(),
 }))
+vi.mock('@/features/projects/api/groups-api', () => ({ setGroupSprint: vi.fn(), fetchGroups: vi.fn() }))
 
 function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
   return {
@@ -52,6 +55,34 @@ describe('useSprintStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    vi.spyOn(useTaskStore(), 'fetchTasks').mockResolvedValue(undefined)
+    vi.spyOn(useGroupStore(), 'fetchGroups').mockResolvedValue(undefined)
+  })
+
+  it('перенос истории перечитывает все задачи и дерево', async () => {
+    const store = useSprintStore()
+    const taskStore = useTaskStore()
+    const groupStore = useGroupStore()
+    vi.mocked(groupsApi.setGroupSprint).mockResolvedValueOnce({ data: { updated: 2 } } as any)
+    vi.spyOn(taskStore, 'fetchTasks').mockResolvedValueOnce(undefined)
+    vi.spyOn(groupStore, 'fetchGroups').mockResolvedValueOnce(undefined)
+
+    await expect(store.setStorySprint('proj-a', 'story', 's1')).resolves.toBe(2)
+    expect(groupsApi.setGroupSprint).toHaveBeenCalledWith('proj-a', 'story', 's1')
+    expect(taskStore.fetchTasks).toHaveBeenCalledOnce()
+    expect(groupStore.fetchGroups).toHaveBeenCalledWith('proj-a')
+  })
+
+  it('ошибку перечитывания показывает после сохранённого переноса', async () => {
+    const store = useSprintStore()
+    vi.mocked(groupsApi.setGroupSprint).mockResolvedValueOnce({ data: { updated: 0 } } as any)
+    vi.spyOn(useTaskStore(), 'fetchTasks').mockImplementationOnce(async () => {
+      useTaskStore().error = 'Сеть недоступна'
+    })
+    vi.spyOn(useGroupStore(), 'fetchGroups').mockResolvedValueOnce(undefined)
+
+    await expect(store.setStorySprint('proj-a', 'empty', null)).rejects.toThrow('Изменения сохранены')
+    expect(store.error).toContain('Сеть недоступна')
   })
 
   it('загрузка проекта B не меняет sprintsOf(A)', async () => {
@@ -174,6 +205,8 @@ describe('useSprintStore', () => {
 
       expect(store.sprintsOf('proj-a').map(s => s.id)).toEqual(['s2'])
       expect(taskStore.tasks.map(t => [t.id, t.sprintId])).toEqual([['t1', null], ['t2', 's2'], ['t3', null]])
+      expect(useGroupStore().fetchGroups).toHaveBeenCalledWith('proj-a')
+      expect(taskStore.fetchTasks).toHaveBeenCalledOnce()
     })
 
     it('при ошибке API возвращает спринт и не меняет задачи', async () => {
@@ -223,6 +256,8 @@ describe('useSprintStore', () => {
       expect(sprintsApi.completeSprint).toHaveBeenCalledWith('proj-a', 's1', { moveTo: 'backlog' })
       expect(store.sprintsOf('proj-a').find(s => s.id === 's1')!.status).toBe('closed')
       expect(store.activeSprintOf('proj-a')).toBeNull()
+      expect(useGroupStore().fetchGroups).toHaveBeenCalledWith('proj-a')
+      expect(taskStore.fetchTasks).toHaveBeenCalledOnce()
     })
 
     it('в другой спринт переносит незавершённые задачи с id цели', async () => {

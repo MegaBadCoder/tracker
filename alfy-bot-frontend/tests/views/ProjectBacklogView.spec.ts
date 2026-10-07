@@ -42,6 +42,7 @@ vi.mock('@/features/projects/api/groups-api', () => ({
   updateGroup: vi.fn(),
   deleteGroup: vi.fn(),
   reorderGroups: vi.fn(),
+  setGroupSprint: vi.fn(),
 }))
 
 const routerReplace = vi.fn()
@@ -241,6 +242,16 @@ describe('projectBacklogView', () => {
     await flushPromises()
 
     expect(api.patch).toHaveBeenCalledWith('/tasks/b', { sprintId: 'active' })
+    wrapper.unmount()
+  })
+
+  it('перенос истории шлёт один запрос и показывает ошибку сохранения', async () => {
+    const wrapper = await mountView([makeSprint({ id: 'active' })])
+    vi.mocked(groupsApi.setGroupSprint).mockRejectedValueOnce(new Error('Сервер недоступен'))
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('moveStory', 'story-1', 'active')
+    await flushPromises()
+    expect(groupsApi.setGroupSprint).toHaveBeenCalledExactlyOnceWith('proj-1', 'story-1', 'active')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Сервер недоступен')
     wrapper.unmount()
   })
 
