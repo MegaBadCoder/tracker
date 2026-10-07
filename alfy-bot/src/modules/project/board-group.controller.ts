@@ -13,6 +13,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { ReleaseService } from './release.service';
+import { SprintService } from './sprint.service';
+import { SetGroupSprintDto } from './dto/set-group-sprint.dto';
 import { SetGroupReleaseDto } from './dto/set-group-release.dto';
 import { BoardGroupService } from './board-group.service';
 import { CreateGroupDto } from './dto/create-group.dto';
@@ -31,6 +33,7 @@ export class BoardGroupController {
   constructor(
     private readonly groupService: BoardGroupService,
     private readonly releaseService: ReleaseService,
+    private readonly sprintService: SprintService,
   ) {}
 
   @Get()
@@ -75,6 +78,22 @@ export class BoardGroupController {
       projectId,
       id,
       dto.releaseId,
+    );
+  }
+
+  @Patch(':id/sprint')
+  @ApiOperation({ summary: 'Назначить или снять спринт истории' })
+  async setSprint(
+    @Request() req: AuthRequest,
+    @Param('projectId') projectId: string,
+    @Param('id') id: string,
+    @Body() dto: SetGroupSprintDto,
+  ) {
+    return this.sprintService.setGroupSprint(
+      req.user.sub,
+      projectId,
+      id,
+      dto.sprintId,
     );
   }
 

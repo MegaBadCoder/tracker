@@ -127,6 +127,7 @@ describe('TaskService', () => {
     boardGroupQuery = {
       getProjectId: jest.fn().mockResolvedValue(null),
       getStoryRelease: jest.fn().mockResolvedValue(null),
+      getStorySprint: jest.fn().mockResolvedValue(null),
     };
 
     sprintQuery = {
@@ -364,6 +365,45 @@ describe('TaskService', () => {
   });
 
   describe('create — sprintId', () => {
+    it('наследует спринт истории и первую колонку без явного sprintId', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+      boardGroupQuery.getStorySprint.mockResolvedValue({
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-first');
+
+      const task = await service.create(1, {
+        title: 'Новая',
+        projectId: 'proj-1',
+        groupId: 'story',
+      });
+
+      expect(task.sprintId).toBe('sprint-1');
+      expect(task.columnId).toBe('col-first');
+    });
+
+    it('явный null отменяет наследование спринта истории', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+      boardGroupQuery.getStorySprint.mockResolvedValue({
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+
+      const task = await service.create(1, {
+        title: 'В бэклог',
+        projectId: 'proj-1',
+        groupId: 'story',
+        sprintId: null,
+      });
+
+      expect(task.sprintId).toBeNull();
+      expect(boardGroupQuery.getStorySprint).not.toHaveBeenCalled();
+    });
     it('создаёт задачу в спринте своего проекта и проставляет первую колонку', async () => {
       sprintQuery.getSprint.mockResolvedValue({
         projectId: 'proj-1',

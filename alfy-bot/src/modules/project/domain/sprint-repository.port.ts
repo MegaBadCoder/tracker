@@ -32,4 +32,11 @@ export abstract class SprintRepositoryPort {
     sprintId: string,
     moveToSprintId: string | null,
   ): Promise<void>;
+
+  /** Атомарно назначает спринт истории проекта и её задачам вне закрытых спринтов; возвращает число обновлённых задач. */
+  abstract setGroupSprint(
+    projectId: string,
+    groupId: string,
+    sprintId: string | null,
+  ): Promise<number>;
 }

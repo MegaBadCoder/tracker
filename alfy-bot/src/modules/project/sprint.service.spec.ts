@@ -7,6 +7,7 @@ import {
 import { SprintService } from './sprint.service';
 import { SprintRepositoryPort } from './domain/sprint-repository.port';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
+import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { Project, Sprint } from '../../shared/entities';
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -46,6 +47,7 @@ describe('SprintService', () => {
   let service: SprintService;
   let sprintRepo: Record<string, jest.Mock>;
   let projRepo: Record<string, jest.Mock>;
+  let groupRepo: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     sprintRepo = {
@@ -58,6 +60,7 @@ describe('SprintService', () => {
       save: jest.fn().mockImplementation((sprint) => Promise.resolve(sprint)),
       delete: jest.fn().mockResolvedValue(true),
       closeAndMoveUnfinished: jest.fn().mockResolvedValue(undefined),
+      setGroupSprint: jest.fn().mockResolvedValue(0),
     };
 
     projRepo = {
@@ -69,11 +72,16 @@ describe('SprintService', () => {
       delete: jest.fn(),
     };
 
+    groupRepo = {
+      findById: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SprintService,
         { provide: SprintRepositoryPort, useValue: sprintRepo },
         { provide: ProjectRepositoryPort, useValue: projRepo },
+        { provide: BoardGroupRepositoryPort, useValue: groupRepo },
       ],
     }).compile();
 

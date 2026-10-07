@@ -15,6 +15,7 @@ describe('TypeOrmSprintRepository (in-memory sqlite)', () => {
   let dataSource: DataSource;
   let sprintRepo: Repository<Sprint>;
   let taskRepo: Repository<Task>;
+  let groupRepo: Repository<BoardGroup>;
   let repository: TypeOrmSprintRepository;
 
   const USER_ID = 1;
@@ -44,9 +45,16 @@ describe('TypeOrmSprintRepository (in-memory sqlite)', () => {
       { id: PROJECT_A, userId: USER_ID, title: 'Project A' },
       { id: PROJECT_B, userId: USER_ID, title: 'Project B' },
     ]);
+    await dataSource.getRepository(ProjectColumn).save({
+      id: 'first-column',
+      projectId: PROJECT_A,
+      title: 'First',
+      order: 0,
+    });
 
     sprintRepo = dataSource.getRepository(Sprint);
     taskRepo = dataSource.getRepository(Task);
+    groupRepo = dataSource.getRepository(BoardGroup);
     repository = new TypeOrmSprintRepository(sprintRepo, dataSource);
   });
 
@@ -81,6 +89,142 @@ describe('TypeOrmSprintRepository (in-memory sqlite)', () => {
       completed,
     });
   }
+
+  async function makeStory(id: string, sprintId: string | null = null) {
+    const epic = await groupRepo.save({
+      id: `${id}-epic`,
+      userId: USER_ID,
+      projectId: PROJECT_A,
+      type: 'epic',
+      title: 'Epic',
+      parentId: null,
+    });
+    return groupRepo.save({
+      id,
+      userId: USER_ID,
+      projectId: PROJECT_A,
+      type: 'story',
+      title: 'Story',
+      parentId: epic.id,
+      sprintId,
+    });
+  }
+
+  describe('setGroupSprint', () => {
+    it('переназначает историю из закрытого спринта, сохраняя его задачи', async () => {
+      await makeSprint('closed', { status: 'closed' });
+      await makeSprint('target');
+      await makeStory('story', 'closed');
+      await makeTask('history', 'closed', true);
+      await taskRepo.update('history', { groupId: 'story' });
+
+      expect(
+        await repository.setGroupSprint(PROJECT_A, 'story', 'target'),
+      ).toBe(0);
+      expect((await groupRepo.findOneByOrFail({ id: 'story' })).sprintId).toBe(
+        'target',
+      );
+      expect((await taskRepo.findOneByOrFail({ id: 'history' })).sprintId).toBe(
+        'closed',
+      );
+    });
+
+    it('откатывает историю, если задаче нельзя назначить колонку', async () => {
+      await makeSprint('target');
+      await makeStory('story');
+      await dataSource.getRepository(ProjectColumn).delete('first-column');
+      await taskRepo.save({
+        id: 'task',
+        userId: USER_ID,
+        projectId: PROJECT_A,
+        groupId: 'story',
+        title: 'Task',
+      });
+
+      await expect(
+        repository.setGroupSprint(PROJECT_A, 'story', 'target'),
+      ).rejects.toThrow('Sprint tasks require a project column');
+      expect(
+        (await groupRepo.findOneByOrFail({ id: 'story' })).sprintId,
+      ).toBeNull();
+    });
+    it('переносит историю и все задачи вне закрытого спринта, включая выполненные', async () => {
+      await makeSprint('target');
+      await makeSprint('closed', { status: 'closed' });
+      await makeStory('story');
+      await taskRepo.save([
+        {
+          id: 'backlog',
+          userId: USER_ID,
+          projectId: PROJECT_A,
+          groupId: 'story',
+          title: 'Backlog',
+          completed: false,
+        },
+        {
+          id: 'done',
+          userId: USER_ID,
+          projectId: PROJECT_A,
+          groupId: 'story',
+          title: 'Done',
+          completed: true,
+        },
+        {
+          id: 'history',
+          userId: USER_ID,
+          projectId: PROJECT_A,
+          groupId: 'story',
+          title: 'History',
+          sprintId: 'closed',
+          completed: true,
+        },
+      ]);
+
+      expect(
+        await repository.setGroupSprint(PROJECT_A, 'story', 'target'),
+      ).toBe(2);
+      expect((await groupRepo.findOneByOrFail({ id: 'story' })).sprintId).toBe(
+        'target',
+      );
+      expect((await taskRepo.findOneByOrFail({ id: 'backlog' })).sprintId).toBe(
+        'target',
+      );
+      expect((await taskRepo.findOneByOrFail({ id: 'done' })).sprintId).toBe(
+        'target',
+      );
+      expect((await taskRepo.findOneByOrFail({ id: 'history' })).sprintId).toBe(
+        'closed',
+      );
+      expect(
+        (await taskRepo.findOneByOrFail({ id: 'backlog' })).columnId,
+      ).not.toBeNull();
+    });
+
+    it('откатывает назначение пустой истории при ошибке обновления задачи', async () => {
+      await makeSprint('target');
+      await makeStory('story');
+      await taskRepo.save({
+        id: 'task',
+        userId: USER_ID,
+        projectId: PROJECT_A,
+        groupId: 'story',
+        title: 'Task',
+      });
+      await dataSource.query(
+        "CREATE TRIGGER reject_sprint_move BEFORE UPDATE OF sprintId ON tasks BEGIN SELECT RAISE(ABORT, 'rejected'); END",
+      );
+
+      await expect(
+        repository.setGroupSprint(PROJECT_A, 'story', 'target'),
+      ).rejects.toThrow();
+      expect(
+        (await groupRepo.findOneByOrFail({ id: 'story' })).sprintId,
+      ).toBeNull();
+      expect(
+        (await taskRepo.findOneByOrFail({ id: 'task' })).sprintId,
+      ).toBeNull();
+    });
+  });
 
   describe('closeAndMoveUnfinished', () => {
     it('переносит только незавершённые задачи этого спринта, закрывает спринт и ставит completedAt', async () => {

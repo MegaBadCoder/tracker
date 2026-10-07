@@ -31,4 +31,16 @@ export class TypeOrmBoardGroupQueryAdapter extends BoardGroupQueryPort {
     const group = await this.boardGroupRepo.findOneBy({ id: groupId });
     return group?.projectId ?? null;
   }
+
+  async getStorySprint(
+    groupId: string,
+  ): Promise<{ projectId: string; sprintId: string | null } | null> {
+    const group = await this.boardGroupRepo.findOneBy({
+      id: groupId,
+      type: 'story',
+    });
+    return group
+      ? { projectId: group.projectId, sprintId: group.sprintId }
+      : null;
+  }
 }

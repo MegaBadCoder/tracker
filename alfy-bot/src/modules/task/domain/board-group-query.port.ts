@@ -4,6 +4,11 @@ export abstract class BoardGroupQueryPort {
     groupId: string,
   ): Promise<{ projectId: string; releaseId: string | null } | null>;
 
+  /** Возвращает проект и спринт истории; для эпика или отсутствующей группы — null. */
+  abstract getStorySprint(
+    groupId: string,
+  ): Promise<{ projectId: string; sprintId: string | null } | null>;
+
   /**
    * Возвращает id проекта, которому принадлежит группа (эпик/история).
    * Если группы с таким id нет, возвращает `null`.

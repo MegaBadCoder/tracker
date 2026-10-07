@@ -119,10 +119,17 @@ export class TaskService {
         const story = await this.boardGroupQuery.getStoryRelease(dto.groupId);
         taskData.releaseId = story?.releaseId ?? null;
       }
+      if (dto.sprintId === undefined) {
+        const story = await this.boardGroupQuery.getStorySprint(dto.groupId);
+        taskData.sprintId = story?.sprintId ?? null;
+      }
     }
 
-    if (dto.sprintId) {
-      await this.assertSprintAssignable(dto.sprintId, dto.projectId ?? null);
+    if (taskData.sprintId) {
+      await this.assertSprintAssignable(
+        taskData.sprintId,
+        dto.projectId ?? null,
+      );
       if (!taskData.columnId && dto.projectId) {
         taskData.columnId = await this.sprintQuery.firstColumnId(dto.projectId);
       }

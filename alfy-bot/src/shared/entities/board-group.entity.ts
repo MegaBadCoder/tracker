@@ -10,11 +10,13 @@ import {
 } from 'typeorm';
 import { Project } from './project.entity';
 import { Release } from './release.entity';
+import { Sprint } from './sprint.entity';
 
 @Entity('board_groups')
 @Check('CHK_board_group_type', "type IN ('epic','story')")
 @Check('CHK_board_group_status', "status IN ('open','done')")
 @Check('CHK_board_group_release_story', "type = 'story' OR releaseId IS NULL")
+@Check('CHK_board_group_sprint_story', "type = 'story' OR sprintId IS NULL")
 @Check('CHK_board_group_not_self', 'parentId <> id')
 @Check(
   'CHK_board_group_depth',
@@ -44,6 +46,13 @@ export class BoardGroup {
   @ManyToOne(() => Release, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'releaseId' })
   release: Release | null;
+
+  @Column({ type: 'text', nullable: true })
+  sprintId: string | null;
+
+  @ManyToOne(() => Sprint, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'sprintId' })
+  sprint: Sprint | null;
 
   @Column({ type: 'text', nullable: true })
   parentId: string | null;

@@ -7,6 +7,7 @@ import {
 import { Sprint } from '../../shared/entities';
 import { SprintRepositoryPort } from './domain/sprint-repository.port';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
+import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
 import { StartSprintDto } from './dto/start-sprint.dto';
@@ -17,6 +18,7 @@ export class SprintService {
   constructor(
     private readonly sprintRepo: SprintRepositoryPort,
     private readonly projectRepo: ProjectRepositoryPort,
+    private readonly groupRepo: BoardGroupRepositoryPort,
   ) {}
 
   private assertDateOrder(
@@ -182,5 +184,38 @@ export class SprintService {
 
     const deleted = await this.sprintRepo.delete(id, projectId);
     if (!deleted) throw new NotFoundException(`Sprint #${id} not found`);
+  }
+
+  /** Назначает истории Agile-проекта и её задачам UUID незакрытого спринта либо null; возвращает число перенесённых задач. */
+  async setGroupSprint(
+    userId: number,
+    projectId: string,
+    groupId: string,
+    sprintId: string | null,
+  ): Promise<{ updated: number }> {
+    const project = await this.validateProjectAccess(userId, projectId);
+    if (project.type !== 'agile') {
+      throw new BadRequestException(
+        'Sprint planning requires an Agile project',
+      );
+    }
+    const group = await this.groupRepo.findById(groupId, projectId);
+    if (!group || group.type !== 'story') {
+      throw new BadRequestException(
+        'Only a story of this project can have a sprint',
+      );
+    }
+    if (sprintId !== null) {
+      const target = await this.getSprint(sprintId, projectId);
+      if (target.status === 'closed') {
+        throw new BadRequestException('Closed sprint cannot receive a story');
+      }
+    }
+    const updated = await this.sprintRepo.setGroupSprint(
+      projectId,
+      groupId,
+      sprintId,
+    );
+    return { updated };
   }
 }
