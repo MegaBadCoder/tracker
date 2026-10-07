@@ -39,6 +39,42 @@ describe('TaskForm', () => {
     expect(submitBtn(wrapper)?.element.hasAttribute('disabled')).toBe(true)
   })
 
+  it('без defaultDueDate дата пустая — поведение Входящих не меняется', async () => {
+    const wrapper = mount(TaskForm)
+    await setTitle(wrapper, 'Без даты')
+
+    await submitBtn(wrapper)?.trigger('click')
+
+    const payload = wrapper.emitted('submit')![0][0] as Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>
+    expect(payload.dueDate).toBeUndefined()
+  })
+
+  it('defaultDueDate предзаполняет дату и попадает в submit', async () => {
+    const defaultDueDate = new Date('2026-08-25T00:00:00')
+    const wrapper = mount(TaskForm, { props: { defaultDueDate } })
+    await setTitle(wrapper, 'Сегодняшняя задача')
+
+    await submitBtn(wrapper)?.trigger('click')
+
+    const payload = wrapper.emitted('submit')![0][0] as Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>
+    expect(payload.dueDate).toEqual(defaultDueDate)
+  })
+
+  it('resetForm возвращает дату к defaultDueDate, а не к пустой', async () => {
+    const defaultDueDate = new Date('2026-08-25T00:00:00')
+    const wrapper = mount(TaskForm, { props: { defaultDueDate } })
+    await setTitle(wrapper, 'Первая')
+
+    await submitBtn(wrapper)?.trigger('click')
+    ;(wrapper.vm as unknown as { resetForm: () => void }).resetForm()
+    await setTitle(wrapper, 'Вторая')
+    await submitBtn(wrapper)?.trigger('click')
+
+    const second = wrapper.emitted('submit')![1][0] as Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>
+    expect(second.title).toBe('Вторая')
+    expect(second.dueDate).toEqual(defaultDueDate)
+  })
+
   it('эмитит submit с корректным payload при клике Добавить', async () => {
     const wrapper = mount(TaskForm)
     await setTitle(wrapper, 'Новая задача')

@@ -116,7 +116,6 @@ describe('currentTaskWidget', () => {
     const wrapper = mountWith([activeTask()])
     const timer = useTimerStore()
     timer.startTask(toTimerTask(activeTask()))
-    timer.isActive = true
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('идёт')
@@ -124,12 +123,11 @@ describe('currentTaskWidget', () => {
     expect(wrapper.find('button').exists()).toBe(false)
   })
 
-  // startTask только взводит сессию, тикать она начинает отдельно — поэтому
-  // сразу после клика строка оказывается именно в этом состоянии.
-  it('взведённая, но не тикающая сессия показывается как пауза и сохраняет кнопку', async () => {
+  it('пауза сохраняет кнопку «Продолжить»', async () => {
     const wrapper = mountWith([activeTask()])
     const timer = useTimerStore()
     timer.startTask(toTimerTask(activeTask()))
+    timer.pauseTimer()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('пауза')
@@ -141,6 +139,7 @@ describe('currentTaskWidget', () => {
     const wrapper = mountWith([activeTask()])
     const timer = useTimerStore()
     timer.startTask(toTimerTask(activeTask()))
+    timer.pauseTimer()
     await wrapper.vm.$nextTick()
 
     const resume = vi.spyOn(timer, 'toggleTimer').mockImplementation(() => {})

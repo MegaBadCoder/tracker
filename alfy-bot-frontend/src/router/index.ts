@@ -39,6 +39,11 @@ const router = createRouter({
               component: () => import('../views/TasksView.vue'),
             },
             {
+              path: 'today',
+              name: 'tasks-today',
+              component: () => import('../views/TodayView.vue'),
+            },
+            {
               path: 'calendar',
               name: 'tasks-calendar',
               component: () => import('../views/CalendarView.vue'),

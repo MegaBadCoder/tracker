@@ -38,3 +38,16 @@ export const formatPomodoro = (value: number): string => {
   const rounded = Math.round(value * 100) / 100
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }
+
+/** «1 задача», «2 задачи», «5 задач» — склонение по русским правилам. */
+export function formatTaskCount(count: number): string {
+  const abs = Math.abs(count)
+  const mod10 = abs % 10
+  const mod100 = abs % 100
+
+  if (mod10 === 1 && mod100 !== 11)
+    return `${count} задача`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+    return `${count} задачи`
+  return `${count} задач`
+}

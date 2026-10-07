@@ -154,14 +154,27 @@
               >
                 {{ formatPomodoro(task.pomodoroCompleted || 0) }}/{{ localPomodoroCount }}
               </span>
+              <span
+                v-if="timerState !== 'idle'"
+                class="shrink-0 flex items-center gap-1 text-[11px]"
+                :class="timerState === 'running' ? 'text-red-500' : 'text-muted-foreground'"
+              >
+                <span
+                  class="size-1.5 rounded-full bg-current"
+                  :class="timerState === 'running' && 'animate-pulse motion-reduce:animate-none'"
+                />
+                {{ timerState === 'running' ? 'идёт' : 'пауза' }}
+              </span>
               <Button
                 v-if="task.isPomodoroTask"
                 variant="ghost"
                 size="icon"
                 class="h-7 w-7 shrink-0"
-                @click="handleStartTimer"
+                :aria-label="timerActionLabel"
+                @click="handleToggleTimer"
               >
-                <Play :size="14" class="text-red-500" />
+                <Pause v-if="timerState === 'running'" :size="14" class="text-red-500" />
+                <Play v-else :size="14" class="text-red-500" />
               </Button>
               <Switch
                 v-if="effectiveEditable"
@@ -616,6 +629,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useMediaQuery } from '@vueuse/core'
 import {
   X,
@@ -633,6 +647,7 @@ import {
   Bell,
   Repeat,
   Play,
+  Pause,
 } from 'lucide-vue-next'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
@@ -673,7 +688,7 @@ import ReleasePicker from '@/features/projects/ui/ReleasePicker.vue'
 import ReleasePickerContent from '@/features/projects/ui/ReleasePickerContent.vue'
 import SprintPicker from '@/features/projects/ui/SprintPicker.vue'
 import SprintPickerContent from '@/features/projects/ui/SprintPickerContent.vue'
-import { toTimerTask, useTimerStore } from '@/features/task-timer'
+import { getTaskTimerState, toTimerTask, useTimerStore } from '@/features/task-timer'
 
 const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
   overdue: 'text-red-500',
@@ -801,10 +816,30 @@ const localOnMissed = ref<'shift' | 'freeze'>('shift')
 
 // Timer
 const timerStore = useTimerStore()
+const { activeTaskId, phase, isActive } = storeToRefs(timerStore)
 
-function handleStartTimer() {
+const timerState = computed(() => {
+  if (!props.task?.isPomodoroTask) return 'idle' as const
+  return getTaskTimerState(props.task.id, {
+    activeTaskId: activeTaskId.value,
+    phase: phase.value,
+    isActive: isActive.value,
+  })
+})
+
+const timerActionLabel = computed(() => {
+  if (timerState.value === 'running') return 'Пауза помодоро'
+  if (timerState.value === 'paused') return 'Продолжить помодоро'
+  return 'Запустить помодоро'
+})
+
+function handleToggleTimer() {
   if (!props.task?.isPomodoroTask) return
-  timerStore.startTask(toTimerTask(props.task))
+  if (timerState.value === 'idle') {
+    timerStore.startTask(toTimerTask(props.task))
+    return
+  }
+  timerStore.toggleTimer()
 }
 
 // Project

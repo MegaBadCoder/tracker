@@ -374,6 +374,8 @@ export const useTimerStore = defineStore('timer', () => {
     })
 
     nextPhase()
+    startTimer()
+    syncToBackend()
   }
 
   function registerSWListener(): void {
