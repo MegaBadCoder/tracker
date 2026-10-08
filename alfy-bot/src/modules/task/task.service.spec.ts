@@ -4,6 +4,11 @@ import { TaskService } from './task.service';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { TaskLinkPort } from './domain/task-link.port';
 import { UserSettingsPort } from './domain/user-settings.port';
+import { ProjectTypeQueryPort } from './domain/project-type.port';
+import { BoardGroupQueryPort } from './domain/board-group-query.port';
+import { SprintQueryPort } from './domain/sprint-query.port';
+import { ReleaseQueryPort } from './domain/release-query.port';
+import { TaskNumberPort } from './domain/task-number.port';
 import { Task, PomodoroConfig } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -57,6 +62,11 @@ describe('TaskService', () => {
   let service: TaskService;
   let repo: Record<string, jest.Mock>;
   let linkPort: Record<string, jest.Mock>;
+  let projectTypeQuery: Record<string, jest.Mock>;
+  let boardGroupQuery: Record<string, jest.Mock>;
+  let sprintQuery: Record<string, jest.Mock>;
+  let releaseQuery: Record<string, jest.Mock>;
+  let taskNumbers: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -110,16 +120,102 @@ describe('TaskService', () => {
       getTimezone: jest.fn().mockResolvedValue('UTC'),
     };
 
+    projectTypeQuery = {
+      getType: jest.fn().mockResolvedValue('simple'),
+    };
+
+    boardGroupQuery = {
+      getProjectId: jest.fn().mockResolvedValue(null),
+      getStoryRelease: jest.fn().mockResolvedValue(null),
+      getStorySprint: jest.fn().mockResolvedValue(null),
+    };
+
+    sprintQuery = {
+      getSprint: jest.fn().mockResolvedValue(null),
+      firstColumnId: jest.fn().mockResolvedValue(null),
+    };
+
+    releaseQuery = {
+      getRelease: jest.fn().mockResolvedValue(null),
+    };
+
+    taskNumbers = {
+      allocate: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaskService,
         { provide: TaskRepositoryPort, useValue: repo },
         { provide: TaskLinkPort, useValue: linkPort },
         { provide: UserSettingsPort, useValue: userSettings },
+        { provide: ProjectTypeQueryPort, useValue: projectTypeQuery },
+        { provide: BoardGroupQueryPort, useValue: boardGroupQuery },
+        { provide: SprintQueryPort, useValue: sprintQuery },
+        { provide: ReleaseQueryPort, useValue: releaseQuery },
+        { provide: TaskNumberPort, useValue: taskNumbers },
       ],
     }).compile();
 
     service = module.get(TaskService);
+  });
+
+  describe('релиз истории при создании', () => {
+    beforeEach(() => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+      boardGroupQuery.getStoryRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        releaseId: 'r1',
+      });
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+    });
+
+    it('наследует релиз истории при отсутствии явного значения', async () => {
+      const task = await service.create(1, {
+        title: 'Task',
+        projectId: 'proj-1',
+        groupId: 'story',
+      });
+      expect(task.releaseId).toBe('r1');
+    });
+
+    it('явный null отключает наследование', async () => {
+      const task = await service.create(1, {
+        title: 'Task',
+        projectId: 'proj-1',
+        groupId: 'story',
+        releaseId: null,
+      });
+      expect(task.releaseId).toBeNull();
+    });
+
+    it('явный релиз имеет приоритет', async () => {
+      const task = await service.create(1, {
+        title: 'Task',
+        projectId: 'proj-1',
+        groupId: 'story',
+        releaseId: 'r2',
+      });
+      expect(task.releaseId).toBe('r2');
+    });
+
+    it('не наследует выпущенный релиз', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+      await expect(
+        service.create(1, {
+          title: 'Task',
+          projectId: 'proj-1',
+          groupId: 'story',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('create — простая задача', () => {
@@ -226,6 +322,274 @@ describe('TaskService', () => {
     });
   });
 
+  describe('create — groupId', () => {
+    it('создаёт задачу с группой своего проекта', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+
+      const result = await service.create(1, {
+        title: 'В эпике',
+        projectId: 'proj-1',
+        groupId: 'group-1',
+      });
+
+      expect(boardGroupQuery.getProjectId).toHaveBeenCalledWith('group-1');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ groupId: 'group-1', projectId: 'proj-1' }),
+      );
+      expect(result.groupId).toBe('group-1');
+    });
+
+    it('бросает BadRequestException при группе чужого проекта', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-2');
+
+      await expect(
+        service.create(1, {
+          title: 'Чужая группа',
+          projectId: 'proj-1',
+          groupId: 'group-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при groupId без проекта', async () => {
+      await expect(
+        service.create(1, {
+          title: 'Без проекта',
+          groupId: 'group-1',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create — sprintId', () => {
+    it('наследует спринт истории и первую колонку без явного sprintId', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+      boardGroupQuery.getStorySprint.mockResolvedValue({
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-first');
+
+      const task = await service.create(1, {
+        title: 'Новая',
+        projectId: 'proj-1',
+        groupId: 'story',
+      });
+
+      expect(task.sprintId).toBe('sprint-1');
+      expect(task.columnId).toBe('col-first');
+    });
+
+    it('явный null отменяет наследование спринта истории', async () => {
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+      boardGroupQuery.getStorySprint.mockResolvedValue({
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+
+      const task = await service.create(1, {
+        title: 'В бэклог',
+        projectId: 'proj-1',
+        groupId: 'story',
+        sprintId: null,
+      });
+
+      expect(task.sprintId).toBeNull();
+      expect(boardGroupQuery.getStorySprint).not.toHaveBeenCalled();
+    });
+    it('создаёт задачу в спринте своего проекта и проставляет первую колонку', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-first');
+
+      const result = await service.create(1, {
+        title: 'В спринте',
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+
+      expect(sprintQuery.getSprint).toHaveBeenCalledWith('sprint-1');
+      expect(sprintQuery.firstColumnId).toHaveBeenCalledWith('proj-1');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sprintId: 'sprint-1',
+          columnId: 'col-first',
+        }),
+      );
+      expect(result.columnId).toBe('col-first');
+    });
+
+    it('не трогает заданный columnId', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'active',
+      });
+
+      await service.create(1, {
+        title: 'В спринте',
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+        columnId: 'col-2',
+      });
+
+      expect(sprintQuery.firstColumnId).not.toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ sprintId: 'sprint-1', columnId: 'col-2' }),
+      );
+    });
+
+    it('оставляет columnId пустым, если у проекта нет колонок', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue(null);
+
+      const result = await service.create(1, {
+        title: 'Без колонок',
+        projectId: 'proj-1',
+        sprintId: 'sprint-1',
+      });
+
+      expect(result.columnId ?? null).toBeNull();
+    });
+
+    it('бросает BadRequestException при спринте чужого проекта', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Чужой спринт',
+          projectId: 'proj-1',
+          sprintId: 'sprint-1',
+        }),
+      ).rejects.toThrow('Sprint does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при несуществующем спринте', async () => {
+      sprintQuery.getSprint.mockResolvedValue(null);
+
+      await expect(
+        service.create(1, {
+          title: 'Нет спринта',
+          projectId: 'proj-1',
+          sprintId: 'sprint-1',
+        }),
+      ).rejects.toThrow('Sprint does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при закрытом спринте', async () => {
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'closed',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Закрытый',
+          projectId: 'proj-1',
+          sprintId: 'sprint-1',
+        }),
+      ).rejects.toThrow('Cannot assign a task to a closed sprint');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при sprintId без проекта', async () => {
+      await expect(
+        service.create(1, { title: 'Без проекта', sprintId: 'sprint-1' }),
+      ).rejects.toThrow('Cannot assign a sprint to a task without a project');
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(sprintQuery.getSprint).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('create — releaseId', () => {
+    it('создаёт задачу в релизе своего проекта', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+
+      await service.create(1, {
+        title: 'В релизе',
+        projectId: 'proj-1',
+        releaseId: 'release-1',
+      });
+
+      expect(releaseQuery.getRelease).toHaveBeenCalledWith('release-1');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseId: 'release-1' }),
+      );
+    });
+
+    it('бросает BadRequestException при релизе чужого проекта', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Чужой релиз',
+          projectId: 'proj-1',
+          releaseId: 'release-1',
+        }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при несуществующем релизе', async () => {
+      releaseQuery.getRelease.mockResolvedValue(null);
+
+      await expect(
+        service.create(1, {
+          title: 'Нет релиза',
+          projectId: 'proj-1',
+          releaseId: 'release-1',
+        }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при выпущенном релизе', async () => {
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+
+      await expect(
+        service.create(1, {
+          title: 'Выпущенный',
+          projectId: 'proj-1',
+          releaseId: 'release-1',
+        }),
+      ).rejects.toThrow('Cannot assign a task to a released release');
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при releaseId без проекта', async () => {
+      await expect(
+        service.create(1, { title: 'Без проекта', releaseId: 'release-1' }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(releaseQuery.getRelease).not.toHaveBeenCalled();
+    });
+  });
+
   describe('update', () => {
     it('обновляет поля задачи', async () => {
       repo.findById.mockResolvedValue(makeTask());
@@ -268,6 +632,536 @@ describe('TaskService', () => {
         service.update(1, 'task-1', { title: 'Новое' }),
       ).rejects.toThrow(BadRequestException);
       expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('смена projectId обнуляет groupId в той же записи', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', groupId: null }),
+      );
+      expect(result.task.groupId).toBeNull();
+    });
+
+    it('бросает BadRequestException при переносе задачи из agile-проекта в обычный', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockImplementation((id: string) =>
+        Promise.resolve(id === 'proj-agile' ? 'agile' : 'simple'),
+      );
+
+      await expect(
+        service.update(1, 'task-1', { projectId: 'proj-simple' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('бросает BadRequestException при переносе задачи из agile-проекта в null (Входящие)', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      await expect(
+        service.update(1, 'task-1', { projectId: null }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('разрешает перенос задачи из agile-проекта в другой agile-проект', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile-1' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-agile-2',
+      });
+
+      expect(result.task.projectId).toBe('proj-agile-2');
+    });
+
+    it('разрешает перенос задачи из обычного проекта в agile-проект', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-simple' }));
+      projectTypeQuery.getType.mockImplementation((id: string) =>
+        Promise.resolve(id === 'proj-agile' ? 'agile' : 'simple'),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-agile',
+      });
+
+      expect(result.task.projectId).toBe('proj-agile');
+    });
+
+    it('не проверяет тип проекта, если projectId не меняется', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      const result = await service.update(1, 'task-1', {
+        title: 'Новое название',
+      });
+
+      expect(projectTypeQuery.getType).not.toHaveBeenCalled();
+      expect(result.task.title).toBe('Новое название');
+    });
+
+    it('groupId своей группы — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: null }),
+      );
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-1');
+
+      const result = await service.update(1, 'task-1', {
+        groupId: 'group-1',
+      });
+
+      expect(boardGroupQuery.getProjectId).toHaveBeenCalledWith('group-1');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ groupId: 'group-1' }),
+      );
+      expect(result.task.groupId).toBe('group-1');
+    });
+
+    it('бросает BadRequestException при группе чужого проекта', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: null }),
+      );
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-2');
+
+      await expect(
+        service.update(1, 'task-1', { groupId: 'group-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('groupId: null — группа снята', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', { groupId: null });
+
+      expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ groupId: null }),
+      );
+      expect(result.task.groupId).toBeNull();
+    });
+
+    it('смена проекта без groupId — группа обнуляется (как раньше)', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(boardGroupQuery.getProjectId).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', groupId: null }),
+      );
+      expect(result.task.groupId).toBeNull();
+    });
+
+    it('смена проекта с groupId группы целевого проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-old' }),
+      );
+      boardGroupQuery.getProjectId.mockResolvedValue('proj-2');
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        groupId: 'group-2',
+      });
+
+      expect(boardGroupQuery.getProjectId).toHaveBeenCalledWith('group-2');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', groupId: 'group-2' }),
+      );
+      expect(result.task.groupId).toBe('group-2');
+    });
+  });
+
+  describe('update — sprintId', () => {
+    it('спринт своего проекта — сохраняется, колонка берётся первая', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', columnId: null }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-first');
+
+      const result = await service.update(1, 'task-1', {
+        sprintId: 'sprint-1',
+      });
+
+      expect(sprintQuery.firstColumnId).toHaveBeenCalledWith('proj-1');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sprintId: 'sprint-1',
+          columnId: 'col-first',
+        }),
+      );
+      expect(result.task.sprintId).toBe('sprint-1');
+    });
+
+    it('заданная колонка задачи не трогается', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', columnId: 'col-2' }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'active',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        sprintId: 'sprint-1',
+      });
+
+      expect(sprintQuery.firstColumnId).not.toHaveBeenCalled();
+      expect(result.task.columnId).toBe('col-2');
+    });
+
+    it('повторная отправка текущего закрытого спринта не отклоняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          sprintId: 'sprint-closed',
+        }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'closed',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        sprintId: 'sprint-closed',
+        title: 'Новое название',
+      });
+
+      expect(sprintQuery.getSprint).not.toHaveBeenCalled();
+      expect(result.task.sprintId).toBe('sprint-closed');
+    });
+
+    it('при смене проекта колонка старого проекта сбрасывается и берётся первая колонка нового', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', columnId: 'col-old', sprintId: null }),
+      );
+      projectTypeQuery.getType.mockResolvedValue('agile');
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'active',
+      });
+      sprintQuery.firstColumnId.mockResolvedValue('col-new-first');
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        sprintId: 'sprint-2',
+      });
+
+      expect(sprintQuery.firstColumnId).toHaveBeenCalledWith('proj-2');
+      expect(result.task.columnId).toBe('col-new-first');
+    });
+
+    it('спринт чужого проекта даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('несуществующий спринт даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      sprintQuery.getSprint.mockResolvedValue(null);
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('закрытый спринт даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'closed',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow('Cannot assign a task to a closed sprint');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('sprintId без проекта у задачи даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: null }));
+
+      await expect(
+        service.update(1, 'task-1', { sprintId: 'sprint-1' }),
+      ).rejects.toThrow('Cannot assign a sprint to a task without a project');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('sprintId: null — задача уходит в бэклог, колонка сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          sprintId: 'sprint-1',
+        }),
+      );
+
+      const result = await service.update(1, 'task-1', { sprintId: null });
+
+      expect(sprintQuery.getSprint).not.toHaveBeenCalled();
+      expect(sprintQuery.firstColumnId).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ sprintId: null, columnId: 'col-2' }),
+      );
+      expect(result.task.sprintId).toBeNull();
+    });
+
+    it('смена проекта без sprintId — спринт обнуляется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', sprintId: null }),
+      );
+      expect(result.task.sprintId).toBeNull();
+    });
+
+    it('смена проекта со спринтом целевого проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-old' }),
+      );
+      sprintQuery.getSprint.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        sprintId: 'sprint-2',
+      });
+
+      expect(sprintQuery.getSprint).toHaveBeenCalledWith('sprint-2');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', sprintId: 'sprint-2' }),
+      );
+      expect(result.task.sprintId).toBe('sprint-2');
+    });
+  });
+
+  describe('update — releaseId', () => {
+    it('релиз своего проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'planned',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        releaseId: 'release-1',
+      });
+
+      expect(releaseQuery.getRelease).toHaveBeenCalledWith('release-1');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseId: 'release-1' }),
+      );
+      expect(result.task.releaseId).toBe('release-1');
+    });
+
+    it('релиз чужого проекта даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('несуществующий релиз даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue(null);
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('выпущенный релиз даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow('Cannot assign a task to a released release');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('releaseId без проекта у задачи даёт 400 без записи', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: null }));
+
+      await expect(
+        service.update(1, 'task-1', { releaseId: 'release-1' }),
+      ).rejects.toThrow('Release does not belong to the task project');
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('повторная отправка текущего выпущенного релиза не отклоняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-done' }),
+      );
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-1',
+        status: 'released',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        releaseId: 'release-done',
+        title: 'Новое название',
+      });
+
+      expect(releaseQuery.getRelease).not.toHaveBeenCalled();
+      expect(result.task.releaseId).toBe('release-done');
+    });
+
+    it('releaseId: null снимает релиз без проверок', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', { releaseId: null });
+
+      expect(releaseQuery.getRelease).not.toHaveBeenCalled();
+      expect(result.task.releaseId).toBeNull();
+    });
+
+    it('смена проекта без releaseId — релиз обнуляется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+      });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-2', releaseId: null }),
+      );
+      expect(result.task.releaseId).toBeNull();
+    });
+
+    it('смена проекта с релизом целевого проекта — сохраняется', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-old' }),
+      );
+      releaseQuery.getRelease.mockResolvedValue({
+        projectId: 'proj-2',
+        status: 'planned',
+      });
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-2',
+        releaseId: 'release-2',
+      });
+
+      expect(releaseQuery.getRelease).toHaveBeenCalledWith('release-2');
+      expect(result.task.releaseId).toBe('release-2');
+    });
+  });
+
+  describe('moveToInbox', () => {
+    // Тот же случай, что и смена projectId в update: задача уезжает из
+    // проекта, а groupId указывает на группу этого проекта. Триггер
+    // trg_task_group_same_project отклонит такую запись, и клиент получит
+    // 500 вместо переноса в Inbox.
+    it('обнуляет groupId вместе с projectId и columnId', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          groupId: 'group-1',
+        }),
+      );
+      await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: null,
+          columnId: null,
+          groupId: null,
+        }),
+      );
+    });
+
+    it('обнуляет sprintId вместе с projectId', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-1' }),
+      );
+
+      await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, sprintId: null }),
+      );
+    });
+
+    it('обнуляет releaseId вместе с projectId', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+
+      await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, releaseId: null }),
+      );
+    });
+
+    it('бросает BadRequestException при переносе задачи из agile-проекта', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-agile' }));
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      await expect(
+        service.moveToInbox(1, 'task-1', { order: 0 }),
+      ).rejects.toThrow(BadRequestException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('разрешает перенос во Входящие из обычного проекта', async () => {
+      repo.findById.mockResolvedValue(makeTask({ projectId: 'proj-simple' }));
+      projectTypeQuery.getType.mockResolvedValue('simple');
+
+      const result = await service.moveToInbox(1, 'task-1', { order: 0 });
+
+      expect(result.projectId).toBeNull();
     });
   });
 
@@ -904,9 +1798,7 @@ describe('TaskService', () => {
         completed: true,
         recurringCompletedCount: 1,
       });
-      repo.findById
-        .mockResolvedValueOnce(task)
-        .mockResolvedValueOnce(root);
+      repo.findById.mockResolvedValueOnce(task).mockResolvedValueOnce(root);
       repo.findByParentId.mockResolvedValue([task]);
 
       await service.update(1, 'inst-1', { completed: true });
@@ -1363,8 +2255,8 @@ describe('TaskService', () => {
       const result = await service.getAll(1);
 
       expect(result).toHaveLength(2);
-      expect(result[0]!.goalIds).toEqual([1, 2, 3]);
-      expect(result[1]!.goalIds).toEqual([]);
+      expect(result[0].goalIds).toEqual([1, 2, 3]);
+      expect(result[1].goalIds).toEqual([]);
       expect(linkPort.findGoalIdsByTaskIds).toHaveBeenCalledWith(1, ['a', 'b']);
     });
 
@@ -1374,9 +2266,11 @@ describe('TaskService', () => {
       const result = await service.replaceGoalLinks(1, 'task-1', [2, 1, 2]);
 
       expect(linkPort.filterOwnedGoalIds).toHaveBeenCalledWith(1, [2, 1]);
-      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, 'task-1', [
-        2, 1,
-      ]);
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(
+        1,
+        'task-1',
+        [2, 1],
+      );
       expect(result).toEqual({ goalIds: [2, 1] });
     });
 
@@ -1414,9 +2308,11 @@ describe('TaskService', () => {
 
       const arg = repo.create.mock.calls[0][0] as Partial<Task>;
       expect(arg).not.toHaveProperty('goalIds');
-      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(1, created.id, [
-        7,
-      ]);
+      expect(linkPort.replaceGoalLinks).toHaveBeenCalledWith(
+        1,
+        created.id,
+        [7],
+      );
     });
 
     it('create с чужой целью не создаёт задачу', async () => {
@@ -1466,6 +2362,128 @@ describe('TaskService', () => {
       const result = await service.replaceTaskLinksForGoal(1, 5, []);
       expect(linkPort.replaceTaskLinksForGoal).toHaveBeenCalledWith(1, 5, []);
       expect(result).toEqual({ taskIds: [] });
+    });
+  });
+
+  describe('номера задач', () => {
+    it('create в agile-проекте получает выданный номер', async () => {
+      taskNumbers.allocate.mockResolvedValue(7);
+
+      await service.create(1, { title: 'Задача', projectId: 'proj-agile' });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBe(7);
+    });
+
+    it('create в обычном проекте получает number = null', async () => {
+      taskNumbers.allocate.mockResolvedValue(null);
+
+      await service.create(1, { title: 'Задача', projectId: 'proj-simple' });
+
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBeNull();
+    });
+
+    it('create во Входящих запрашивает номер для null-проекта и получает null', async () => {
+      await service.create(1, { title: 'Задача' });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith(null);
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBeNull();
+    });
+
+    it('materializeOccurrence выдаёт экземпляру свой номер в проекте источника', async () => {
+      const weekly: RecurrenceRule = { frequency: 'weekly', interval: 1 };
+      const source = makeTask({
+        id: 'root-1',
+        projectId: 'proj-agile',
+        number: 1,
+        recurrence: weekly,
+        dueDate: new Date('2026-04-06T10:00:00.000Z'),
+      });
+      repo.findById.mockResolvedValue(source);
+      repo.findByParentId.mockResolvedValue([source]);
+      taskNumbers.allocate.mockResolvedValue(5);
+
+      await service.materializeOccurrence(1, 'root-1', {
+        occurrenceDate: '2026-04-13T10:00:00.000Z',
+      });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+      expect(arg.number).toBe(5);
+    });
+
+    it('завершение повторяющейся задачи создаёт следующий экземпляр со своим номером', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-04-05T10:00:00.000Z'));
+      try {
+        const task = makeTask({
+          id: 'root-1',
+          projectId: 'proj-agile',
+          number: 1,
+          recurrence: { frequency: 'daily', interval: 1 },
+          dueDate: new Date('2026-04-05T10:00:00.000Z'),
+        });
+        repo.findById.mockResolvedValue(task);
+        repo.findByParentId.mockResolvedValue([task]);
+        taskNumbers.allocate.mockResolvedValue(2);
+
+        await service.update(1, 'root-1', { completed: true });
+
+        expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+        const arg = repo.create.mock.calls[0][0] as Partial<Task>;
+        expect(arg.number).toBe(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('update со сменой проекта выдаёт новый номер в целевом проекте до сохранения', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', number: null }),
+      );
+      taskNumbers.allocate.mockResolvedValue(3);
+
+      const result = await service.update(1, 'task-1', {
+        projectId: 'proj-agile',
+      });
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'proj-agile', number: 3 }),
+      );
+      expect(result.task.number).toBe(3);
+    });
+
+    it('update с уходом из проекта во Входящие обнуляет номер', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', number: 4 }),
+      );
+
+      await service.update(1, 'task-1', { projectId: null });
+
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: null, number: null }),
+      );
+    });
+
+    it('update без смены проекта сохраняет номер и не выдаёт новый', async () => {
+      repo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-agile', number: 4 }),
+      );
+      projectTypeQuery.getType.mockResolvedValue('agile');
+
+      await service.update(1, 'task-1', {
+        title: 'Новое',
+        projectId: 'proj-agile',
+      });
+
+      expect(taskNumbers.allocate).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ number: 4 }),
+      );
     });
   });
 });

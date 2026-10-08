@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToOne,
@@ -12,10 +13,17 @@ import { User } from './user.entity';
 import { PomodoroConfig } from './pomodoro-config.entity';
 import { Project } from './project.entity';
 import { ProjectColumn } from './project-column.entity';
+import { BoardGroup } from './board-group.entity';
+import { Sprint } from './sprint.entity';
+import { Release } from './release.entity';
 import type { ChecklistData } from '../types/checklist.types';
 import type { RecurrenceRule } from '../types/recurrence.types';
 
 @Entity('tasks')
+@Index('IDX_task_project_number', ['projectId', 'number'], {
+  unique: true,
+  where: 'number IS NOT NULL',
+})
 export class Task {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -58,6 +66,18 @@ export class Task {
 
   @Column({ type: 'text', nullable: true })
   columnId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  groupId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  sprintId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  releaseId: string | null;
+
+  @Column({ type: 'integer', nullable: true })
+  number: number | null;
 
   @Column({ type: 'integer', default: 0 })
   order: number;
@@ -106,6 +126,27 @@ export class Task {
   })
   @JoinColumn({ name: 'columnId' })
   column: ProjectColumn | null;
+
+  @ManyToOne(() => BoardGroup, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'groupId' })
+  group: BoardGroup | null;
+
+  @ManyToOne(() => Sprint, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'sprintId' })
+  sprint: Sprint | null;
+
+  @ManyToOne(() => Release, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'releaseId' })
+  release: Release | null;
 
   @ManyToOne(() => Task, { nullable: true })
   @JoinColumn({ name: 'recurringParentId' })

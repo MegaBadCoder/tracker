@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 
-describe('ViewModeToggle', () => {
+describe('viewModeToggle', () => {
   it('рендерит две кнопки', () => {
     const wrapper = mount(ViewModeToggle, {
       props: { modelValue: 'list' },

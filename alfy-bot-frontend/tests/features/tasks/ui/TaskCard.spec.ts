@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import type { Project } from '@/features/projects/model/types'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import TaskCard from '@/features/tasks/ui/TaskCard.vue'
 import type { Task } from '@/features/tasks/model/types'
 import { PRIORITY_LABELS } from '@/features/tasks/model/constants'
@@ -21,7 +24,70 @@ const apiPayloadToTask = (overrides: Partial<Task> = {}): Task => ({
   ...overrides,
 })
 
+function makeProject(overrides: Partial<Project> = {}): Project {
+  return {
+    id: 'proj-1',
+    parentId: null,
+    title: 'Проект',
+    description: null,
+    viewMode: 'list',
+    type: 'agile',
+    icon: null,
+    color: null,
+    order: 0,
+    taskKeyPrefix: 'ALF',
+    ...overrides,
+  }
+}
+
 describe('TaskCard', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('показывает ключ задачи у agile-проекта с префиксом', () => {
+    useProjectStore().projects = [makeProject()]
+    const wrapper = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ projectId: 'proj-1', number: 12 }) },
+    })
+
+    const key = wrapper.get('[data-testid="task-key"]')
+    expect(key.text()).toBe('ALF-12')
+    expect(key.classes()).toContain('shrink-0')
+  })
+
+  it('не показывает ключ у обычного проекта', () => {
+    useProjectStore().projects = [makeProject({ type: 'simple' })]
+    const wrapper = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ projectId: 'proj-1', number: 12 }) },
+    })
+
+    expect(wrapper.find('[data-testid="task-key"]').exists()).toBe(false)
+  })
+
+  it('не показывает ключ у agile-проекта без префикса и у задачи без проекта', () => {
+    useProjectStore().projects = [makeProject({ taskKeyPrefix: null })]
+    const withoutPrefix = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ projectId: 'proj-1', number: 12 }) },
+    })
+    const inbox = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ projectId: null, number: null }) },
+    })
+
+    expect(withoutPrefix.find('[data-testid="task-key"]').exists()).toBe(false)
+    expect(inbox.find('[data-testid="task-key"]').exists()).toBe(false)
+  })
+
+  it('ключ показывается и в compact-варианте, название остаётся обрезаемым', () => {
+    useProjectStore().projects = [makeProject()]
+    const wrapper = mount(TaskCard, {
+      props: { task: apiPayloadToTask({ projectId: 'proj-1', number: 3 }), variant: 'compact' },
+    })
+
+    expect(wrapper.get('[data-testid="task-key"]').text()).toBe('ALF-3')
+    expect(wrapper.findAll('span.truncate').some(el => el.text() === 'Тестовая задача')).toBe(true)
+  })
+
   it('рендерит title из payload API', () => {
     const task = apiPayloadToTask()
     const wrapper = mount(TaskCard, { props: { task } })

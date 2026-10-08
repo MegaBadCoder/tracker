@@ -15,6 +15,13 @@ import {
   ReportAnswer,
   Project,
   ProjectColumn,
+  BoardGroup,
+  Sprint,
+  Release,
+  AuthMethod,
+  PushSubscription,
+  ApiToken,
+  Link,
 } from '../../src/shared/entities';
 
 export interface TestContext {
@@ -42,6 +49,13 @@ export async function createTestApp(): Promise<TestContext> {
       ReportAnswer,
       Project,
       ProjectColumn,
+      BoardGroup,
+      Sprint,
+      Release,
+      AuthMethod,
+      PushSubscription,
+      ApiToken,
+      Link,
     ],
     synchronize: true,
   });

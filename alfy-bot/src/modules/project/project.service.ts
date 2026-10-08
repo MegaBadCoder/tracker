@@ -6,12 +6,18 @@ import {
 } from '@nestjs/common';
 import { Project } from '../../shared/entities';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
+import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+const AGILE_DEFAULT_COLUMNS = ['К выполнению', 'В работе', 'Готово'];
+
 @Injectable()
 export class ProjectService {
-  constructor(private readonly projectRepo: ProjectRepositoryPort) {}
+  constructor(
+    private readonly projectRepo: ProjectRepositoryPort,
+    private readonly columnRepo: ProjectColumnRepositoryPort,
+  ) {}
 
   async getAll(userId: number): Promise<Project[]> {
     return this.projectRepo.findAllByUser(userId);
@@ -34,15 +40,54 @@ export class ProjectService {
         throw new ForbiddenException('Parent project belongs to another user');
     }
 
-    return this.projectRepo.create({
+    const type = dto.type ?? 'simple';
+    const taskKeyPrefix = dto.taskKeyPrefix ?? null;
+    await this.assertTaskKeyPrefixAllowed(userId, type, taskKeyPrefix, null);
+
+    const created = await this.projectRepo.create({
       userId,
       title: dto.title,
       description: dto.description,
       parentId: dto.parentId ?? null,
       viewMode: dto.viewMode ?? 'list',
+      type,
+      taskKeyPrefix,
       icon: dto.icon,
       color: dto.color,
     });
+
+    if (created.type === 'agile') {
+      await this.seedAgileColumns(created.id);
+    }
+
+    return created;
+  }
+
+  private async assertTaskKeyPrefixAllowed(
+    userId: number,
+    type: Project['type'],
+    taskKeyPrefix: string | null,
+    projectId: string | null,
+  ): Promise<void> {
+    if (taskKeyPrefix === null) return;
+    if (type !== 'agile') {
+      throw new BadRequestException(
+        'Task key prefix is only for agile projects',
+      );
+    }
+    const holder = await this.projectRepo.findByTaskKeyPrefix(
+      userId,
+      taskKeyPrefix,
+    );
+    if (holder && holder.id !== projectId) {
+      throw new BadRequestException('Task key prefix is already used');
+    }
+  }
+
+  private async seedAgileColumns(projectId: string): Promise<void> {
+    for (const [order, title] of AGILE_DEFAULT_COLUMNS.entries()) {
+      await this.columnRepo.create({ projectId, title, order });
+    }
   }
 
   async update(
@@ -65,6 +110,13 @@ export class ProjectService {
       if (parent.userId !== userId)
         throw new ForbiddenException('Parent project belongs to another user');
     }
+
+    await this.assertTaskKeyPrefixAllowed(
+      userId,
+      project.type,
+      dto.taskKeyPrefix ?? null,
+      project.id,
+    );
 
     Object.assign(project, dto);
     return this.projectRepo.save(project);

@@ -7,6 +7,14 @@ export abstract class ProjectRepositoryPort {
     id: string,
     userId: number,
   ): Promise<Project | null>;
+  /**
+   * Возвращает проект пользователя с таким префиксом ключей задач
+   * или `null`, если префикс свободен.
+   */
+  abstract findByTaskKeyPrefix(
+    userId: number,
+    taskKeyPrefix: string,
+  ): Promise<Project | null>;
   abstract create(data: Partial<Project>): Promise<Project>;
   abstract save(project: Project): Promise<Project>;
   abstract delete(id: string, userId: number): Promise<boolean>;

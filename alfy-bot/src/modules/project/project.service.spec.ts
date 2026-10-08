@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
+import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
 import { Project } from '../../shared/entities';
 
 function makeProject(overrides: Partial<Project> = {}): Project {
@@ -32,12 +33,14 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 describe('ProjectService', () => {
   let service: ProjectService;
   let repo: Record<string, jest.Mock>;
+  let columnRepo: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
       findByIdWithRelations: jest.fn().mockResolvedValue(null),
+      findByTaskKeyPrefix: jest.fn().mockResolvedValue(null),
       create: jest
         .fn()
         .mockImplementation((data) => Promise.resolve(makeProject(data))),
@@ -46,10 +49,20 @@ describe('ProjectService', () => {
       reorder: jest.fn().mockResolvedValue(undefined),
     };
 
+    columnRepo = {
+      findAllByProject: jest.fn().mockResolvedValue([]),
+      findById: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue(undefined),
+      save: jest.fn(),
+      delete: jest.fn(),
+      reorder: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ProjectService,
         { provide: ProjectRepositoryPort, useValue: repo },
+        { provide: ProjectColumnRepositoryPort, useValue: columnRepo },
       ],
     }).compile();
 
@@ -180,12 +193,178 @@ describe('ProjectService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('создание проекта с type=agile сохраняет type', async () => {
+      const result = await service.create(1, {
+        title: 'Спринт',
+        type: 'agile',
+      });
+
+      expect(result.type).toBe('agile');
+    });
+
+    it('type по умолчанию — simple', async () => {
+      const result = await service.create(1, { title: 'Обычный' });
+
+      expect(result.type).toBe('simple');
+    });
+
+    it('создание list-проекта не засевает колонки', async () => {
+      await service.create(1, { title: 'Список' });
+      expect(columnRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('создание board-проекта не засевает колонки', async () => {
+      await service.create(1, { title: 'Доска', viewMode: 'board' });
+      expect(columnRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('создание agile-проекта засевает три колонки', async () => {
+      const result = await service.create(1, {
+        title: 'Спринт',
+        type: 'agile',
+      });
+
+      expect(columnRepo.create).toHaveBeenCalledTimes(3);
+      expect(columnRepo.create).toHaveBeenNthCalledWith(1, {
+        projectId: result.id,
+        title: 'К выполнению',
+        order: 0,
+      });
+      expect(columnRepo.create).toHaveBeenNthCalledWith(2, {
+        projectId: result.id,
+        title: 'В работе',
+        order: 1,
+      });
+      expect(columnRepo.create).toHaveBeenNthCalledWith(3, {
+        projectId: result.id,
+        title: 'Готово',
+        order: 2,
+      });
+    });
+
     it('бросает ForbiddenException если parentId указывает на проект другого пользователя', async () => {
       repo.findById.mockResolvedValue(makeProject({ userId: 999 }));
 
       await expect(
         service.create(1, { title: 'X', parentId: 'proj-1' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('create — префикс ключей задач', () => {
+    it('agile-проект сохраняет префикс', async () => {
+      await service.create(1, {
+        title: 'Спринт',
+        type: 'agile',
+        taskKeyPrefix: 'ALF',
+      });
+
+      expect(repo.findByTaskKeyPrefix).toHaveBeenCalledWith(1, 'ALF');
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ taskKeyPrefix: 'ALF' }),
+      );
+    });
+
+    it('agile-проект без префикса создаётся с taskKeyPrefix = null', async () => {
+      await service.create(1, { title: 'Спринт', type: 'agile' });
+
+      expect(repo.findByTaskKeyPrefix).not.toHaveBeenCalled();
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ taskKeyPrefix: null }),
+      );
+    });
+
+    it('обычный проект с префиксом — 400', async () => {
+      await expect(
+        service.create(1, { title: 'Простой', taskKeyPrefix: 'ALF' }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is only for agile projects'),
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('занятый пользователем префикс — 400', async () => {
+      repo.findByTaskKeyPrefix.mockResolvedValue(
+        makeProject({ id: 'other', taskKeyPrefix: 'ALF' }),
+      );
+
+      await expect(
+        service.create(1, {
+          title: 'Спринт',
+          type: 'agile',
+          taskKeyPrefix: 'ALF',
+        }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is already used'),
+      );
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('update — префикс ключей задач', () => {
+    it('agile-проект принимает префикс', async () => {
+      repo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+
+      const result = await service.update(1, 'proj-1', {
+        taskKeyPrefix: 'ALF',
+      });
+
+      expect(repo.findByTaskKeyPrefix).toHaveBeenCalledWith(1, 'ALF');
+      expect(result.taskKeyPrefix).toBe('ALF');
+    });
+
+    it('обычный проект с префиксом — 400', async () => {
+      repo.findById.mockResolvedValue(makeProject({ type: 'simple' }));
+
+      await expect(
+        service.update(1, 'proj-1', { taskKeyPrefix: 'ALF' }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is only for agile projects'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('префикс другого проекта пользователя — 400', async () => {
+      repo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+      repo.findByTaskKeyPrefix.mockResolvedValue(
+        makeProject({ id: 'other', taskKeyPrefix: 'ALF' }),
+      );
+
+      await expect(
+        service.update(1, 'proj-1', { taskKeyPrefix: 'ALF' }),
+      ).rejects.toThrow(
+        new BadRequestException('Task key prefix is already used'),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('повторная установка собственного префикса — не конфликт', async () => {
+      repo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }),
+      );
+      repo.findByTaskKeyPrefix.mockResolvedValue(
+        makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }),
+      );
+
+      const result = await service.update(1, 'proj-1', {
+        taskKeyPrefix: 'ALF',
+        title: 'Новое',
+      });
+
+      expect(result.taskKeyPrefix).toBe('ALF');
+    });
+
+    it('null очищает префикс', async () => {
+      repo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }),
+      );
+
+      const result = await service.update(1, 'proj-1', {
+        taskKeyPrefix: null,
+      });
+
+      expect(repo.findByTaskKeyPrefix).not.toHaveBeenCalled();
+      expect(result.taskKeyPrefix).toBeNull();
     });
   });
 
@@ -320,6 +499,24 @@ describe('ProjectService', () => {
       await expect(
         service.update(1, 'proj-1', { parentId: 'proj-2' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('обновление viewMode на board не засевает колонки', async () => {
+      repo.findById.mockResolvedValue(makeProject({ viewMode: 'list' }));
+
+      await service.update(1, 'proj-1', { viewMode: 'board' });
+
+      expect(columnRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('обновление не меняет type проекта (type в UpdateProjectDto нет)', async () => {
+      const project = makeProject({ type: 'simple' });
+      repo.findById.mockResolvedValue(project);
+
+      const saved = await service.update(1, 'proj-1', { title: 'Новый' });
+
+      expect(saved.type).toBe('simple');
+      expect(columnRepo.create).not.toHaveBeenCalled();
     });
   });
 

@@ -25,6 +25,11 @@ import {
 } from './domain/recurrence.utils';
 import { hasCrossedPomodoroTarget } from './domain/pomodoro.utils';
 import { UserSettingsPort } from './domain/user-settings.port';
+import { ProjectTypeQueryPort } from './domain/project-type.port';
+import { BoardGroupQueryPort } from './domain/board-group-query.port';
+import { SprintQueryPort } from './domain/sprint-query.port';
+import { ReleaseQueryPort } from './domain/release-query.port';
+import { TaskNumberPort } from './domain/task-number.port';
 import { shiftToUserWallClock, shiftBackToUtc } from './lib/timezone';
 
 function clonePomodoroConfig(src: PomodoroConfig): PomodoroConfig {
@@ -55,6 +60,11 @@ export class TaskService {
     private readonly taskRepo: TaskRepositoryPort,
     private readonly userSettings: UserSettingsPort,
     private readonly linkPort: TaskLinkPort,
+    private readonly projectTypeQuery: ProjectTypeQueryPort,
+    private readonly boardGroupQuery: BoardGroupQueryPort,
+    private readonly sprintQuery: SprintQueryPort,
+    private readonly releaseQuery: ReleaseQueryPort,
+    private readonly taskNumbers: TaskNumberPort,
   ) {}
 
   async getAll(userId: number): Promise<Task[]> {
@@ -102,6 +112,37 @@ export class TaskService {
     const uniqueGoalIds = goalIds?.length
       ? await this.assertOwnedGoals(userId, goalIds)
       : [];
+
+    if (dto.groupId) {
+      await this.assertGroupInProject(dto.groupId, dto.projectId ?? null);
+      if (dto.releaseId === undefined) {
+        const story = await this.boardGroupQuery.getStoryRelease(dto.groupId);
+        taskData.releaseId = story?.releaseId ?? null;
+      }
+      if (dto.sprintId === undefined) {
+        const story = await this.boardGroupQuery.getStorySprint(dto.groupId);
+        taskData.sprintId = story?.sprintId ?? null;
+      }
+    }
+
+    if (taskData.sprintId) {
+      await this.assertSprintAssignable(
+        taskData.sprintId,
+        dto.projectId ?? null,
+      );
+      if (!taskData.columnId && dto.projectId) {
+        taskData.columnId = await this.sprintQuery.firstColumnId(dto.projectId);
+      }
+    }
+
+    if (taskData.releaseId) {
+      await this.assertReleaseAssignable(
+        taskData.releaseId,
+        dto.projectId ?? null,
+      );
+    }
+
+    taskData.number = await this.taskNumbers.allocate(dto.projectId ?? null);
 
     const created = await this.taskRepo.create(taskData);
     if (uniqueGoalIds.length) {
@@ -158,12 +199,7 @@ export class TaskService {
     const completedCount = rootTask?.recurringCompletedCount ?? 0;
 
     if (
-      !isOccurrenceOnSeries(
-        originZoned,
-        rule,
-        occurrenceZoned,
-        completedCount,
-      )
+      !isOccurrenceOnSeries(originZoned, rule, occurrenceZoned, completedCount)
     ) {
       throw new BadRequestException(
         'occurrenceDate is not on the series schedule.',
@@ -188,7 +224,10 @@ export class TaskService {
       );
     }
 
-    const created = await this.taskRepo.create(instanceData);
+    const created = await this.taskRepo.create({
+      ...instanceData,
+      number: await this.taskNumbers.allocate(instanceData.projectId),
+    });
     await this.linkPort.copyGoalLinks(userId, source.id, created.id);
     return this.attachGoalIdsOne(userId, created);
   }
@@ -220,11 +259,80 @@ export class TaskService {
     const isUncompletingRecurring =
       dto.completed === false && task.completed && task.recurrence;
 
+    // Moving a task to a different project detaches it from its board group —
+    // the trg_task_group_same_project trigger rejects a groupId that no
+    // longer matches the task's projectId.
+    const isChangingProject =
+      dto.projectId !== undefined && dto.projectId !== task.projectId;
+
+    if (isChangingProject && task.projectId) {
+      const sourceProjectType = await this.projectTypeQuery.getType(
+        task.projectId,
+      );
+      if (sourceProjectType === 'agile') {
+        const targetProjectType = dto.projectId
+          ? await this.projectTypeQuery.getType(dto.projectId)
+          : null;
+        if (targetProjectType !== 'agile') {
+          throw new BadRequestException(
+            'Cannot move a task out of an agile project',
+          );
+        }
+      }
+    }
+
+    if (dto.groupId !== undefined && dto.groupId !== null) {
+      const targetProjectId = isChangingProject
+        ? (dto.projectId ?? null)
+        : task.projectId;
+      await this.assertGroupInProject(dto.groupId, targetProjectId);
+    }
+
+    const isChangingSprint =
+      dto.sprintId !== undefined &&
+      (dto.sprintId !== task.sprintId || isChangingProject);
+
+    if (isChangingSprint && dto.sprintId !== null) {
+      const targetProjectId = isChangingProject
+        ? (dto.projectId ?? null)
+        : task.projectId;
+      await this.assertSprintAssignable(dto.sprintId!, targetProjectId);
+    }
+
+    const isChangingRelease =
+      dto.releaseId !== undefined &&
+      (dto.releaseId !== task.releaseId || isChangingProject);
+
+    if (isChangingRelease && dto.releaseId !== null) {
+      const targetProjectId = isChangingProject
+        ? (dto.projectId ?? null)
+        : task.projectId;
+      await this.assertReleaseAssignable(dto.releaseId!, targetProjectId);
+    }
+
     // Apply only defined scalar fields (skip undefined to avoid clobbering existing values)
     const defined = Object.fromEntries(
       Object.entries(rest).filter(([, v]) => v !== undefined),
     );
     Object.assign(task, defined);
+    if (isChangingProject && dto.groupId === undefined) {
+      task.groupId = null;
+    }
+    if (isChangingProject && dto.sprintId === undefined) {
+      task.sprintId = null;
+    }
+    if (isChangingProject && dto.releaseId === undefined) {
+      task.releaseId = null;
+    }
+    if (isChangingProject && dto.columnId === undefined) {
+      task.columnId = null;
+    }
+    if (isChangingProject) {
+      task.number = await this.taskNumbers.allocate(dto.projectId ?? null);
+    }
+    if (task.sprintId && task.projectId && !task.columnId) {
+      task.columnId = await this.sprintQuery.firstColumnId(task.projectId);
+    }
     if (dueDate !== undefined) {
       const newDue = dueDate ? new Date(dueDate) : null;
       if ((rescheduleScope ?? 'this') === 'subsequent') {
@@ -342,8 +450,7 @@ export class TaskService {
       );
       const nextDate = nextZoned ? shiftBackToUtc(nextZoned, timezone) : null;
       const occupying =
-        nextZoned &&
-        this.findOccupyingMember(siblings, nextZoned, timezone);
+        nextZoned && this.findOccupyingMember(siblings, nextZoned, timezone);
 
       if (occupying) {
         nextInstance = occupying;
@@ -363,7 +470,10 @@ export class TaskService {
               task.pomodoroConfig,
             );
           }
-          nextInstance = await this.taskRepo.create(instanceData);
+          nextInstance = await this.taskRepo.create({
+            ...instanceData,
+            number: await this.taskNumbers.allocate(instanceData.projectId),
+          });
           await this.linkPort.copyGoalLinks(userId, task.id, nextInstance.id);
         }
 
@@ -535,8 +645,7 @@ export class TaskService {
       await this.taskRepo.clearParentId(parentId);
     }
 
-    const alreadyDeleted =
-      Boolean(task.recurringParentId) && !task.completed;
+    const alreadyDeleted = Boolean(task.recurringParentId) && !task.completed;
     if (!alreadyDeleted) {
       const deleted = await this.taskRepo.delete(task.id, userId);
       if (!deleted) throw new NotFoundException(`Task #${task.id} not found`);
@@ -570,6 +679,15 @@ export class TaskService {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
 
+    if (task.projectId) {
+      const projectType = await this.projectTypeQuery.getType(task.projectId);
+      if (projectType === 'agile') {
+        throw new BadRequestException(
+          'Cannot move a task from an agile project to the inbox',
+        );
+      }
+    }
+
     let order: number;
     if (dto.order !== undefined) {
       order = dto.order;
@@ -584,6 +702,11 @@ export class TaskService {
 
     task.projectId = null;
     task.columnId = null;
+    // Группа принадлежит проекту, из которого задача уезжает — оставить
+    // groupId значит нарваться на trg_task_group_same_project и отдать 500.
+    task.groupId = null;
+    task.sprintId = null;
+    task.releaseId = null;
     task.order = order;
     return this.attachGoalIdsOne(userId, await this.taskRepo.save(task));
   }
@@ -639,6 +762,61 @@ export class TaskService {
     if (id.includes('__virtual__')) {
       throw new BadRequestException(
         'Virtual task instances cannot be modified directly.',
+      );
+    }
+  }
+
+  private async assertGroupInProject(
+    groupId: string,
+    projectId: string | null,
+  ): Promise<void> {
+    if (projectId === null) {
+      throw new BadRequestException(
+        'Cannot assign a group to a task without a project',
+      );
+    }
+    const groupProjectId = await this.boardGroupQuery.getProjectId(groupId);
+    if (groupProjectId !== projectId) {
+      throw new BadRequestException(
+        'Group does not belong to the task project',
+      );
+    }
+  }
+
+  private async assertSprintAssignable(
+    sprintId: string,
+    projectId: string | null,
+  ): Promise<void> {
+    if (projectId === null) {
+      throw new BadRequestException(
+        'Cannot assign a sprint to a task without a project',
+      );
+    }
+    const sprint = await this.sprintQuery.getSprint(sprintId);
+    if (!sprint || sprint.projectId !== projectId) {
+      throw new BadRequestException(
+        'Sprint does not belong to the task project',
+      );
+    }
+    if (sprint.status === 'closed') {
+      throw new BadRequestException('Cannot assign a task to a closed sprint');
+    }
+  }
+
+  private async assertReleaseAssignable(
+    releaseId: string,
+    projectId: string | null,
+  ): Promise<void> {
+    const release =
+      projectId === null ? null : await this.releaseQuery.getRelease(releaseId);
+    if (!release || release.projectId !== projectId) {
+      throw new BadRequestException(
+        'Release does not belong to the task project',
+      );
+    }
+    if (release.status === 'released') {
+      throw new BadRequestException(
+        'Cannot assign a task to a released release',
       );
     }
   }

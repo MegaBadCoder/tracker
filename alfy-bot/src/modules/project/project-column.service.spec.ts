@@ -18,6 +18,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     title: 'Проект',
     description: null,
     viewMode: 'board' as const,
+    type: 'simple' as const,
     icon: null,
     color: null,
     order: 0,
@@ -158,6 +159,26 @@ describe('ProjectColumnService', () => {
       await expect(service.create(1, 'proj-1', { title: 'X' })).rejects.toThrow(
         BadRequestException,
       );
+    });
+
+    it('позволяет создать колонку в board-проекте', async () => {
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
+      colRepo.findAllByProject.mockResolvedValue([]);
+
+      await expect(
+        service.create(1, 'proj-1', { title: 'X' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('позволяет создать колонку в agile-проекте с viewMode=list', async () => {
+      projRepo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', viewMode: 'list' }),
+      );
+      colRepo.findAllByProject.mockResolvedValue([]);
+
+      await expect(
+        service.create(1, 'proj-1', { title: 'X' }),
+      ).resolves.toBeDefined();
     });
   });
 

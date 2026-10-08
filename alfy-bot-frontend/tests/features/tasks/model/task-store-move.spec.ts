@@ -79,6 +79,38 @@ describe('task store move actions', () => {
       expect(store.tasks[0].columnId).toBe('col-1')
       expect(store.tasks[0].order).toBe(0)
     })
+
+    it('при переезде в другой проект сбрасывает номер, спринт и релиз, затем берёт их из ответа сервера', async () => {
+      const store = await seedTasks([makeTask({ number: 14, sprintId: 's-1', releaseId: 'r-1' })])
+      let resolveMove!: (value: unknown) => void
+      vi.mocked(api.patch).mockImplementation(() => new Promise((resolve) => { resolveMove = resolve }))
+
+      const promise = store.moveTask('task-1', 'proj-2', {})
+
+      expect(store.tasks[0].number).toBeNull()
+      expect(store.tasks[0].sprintId).toBeNull()
+      expect(store.tasks[0].releaseId).toBeNull()
+
+      resolveMove({
+        data: makeTask({ projectId: 'proj-2', columnId: 'col-9', number: 1, sprintId: null, releaseId: null }),
+      })
+      await promise
+
+      expect(store.tasks[0].number).toBe(1)
+      expect(store.tasks[0].columnId).toBe('col-9')
+    })
+
+    it('при ошибке переезда возвращает номер, спринт и релиз', async () => {
+      const store = await seedTasks([makeTask({ number: 14, sprintId: 's-1', releaseId: 'r-1' })])
+      vi.mocked(api.patch).mockRejectedValue(new Error('Ошибка'))
+
+      await expect(store.moveTask('task-1', 'proj-2', {})).rejects.toThrow()
+
+      expect(store.tasks[0].number).toBe(14)
+      expect(store.tasks[0].sprintId).toBe('s-1')
+      expect(store.tasks[0].releaseId).toBe('r-1')
+      expect(store.tasks[0].projectId).toBe('proj-1')
+    })
   })
 
   // ── moveTask (inbox) ────────────────────────────────────────────

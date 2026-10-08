@@ -1,5 +1,14 @@
-import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+const TASK_KEY_PREFIX_PATTERN = /^[A-Z][A-Z0-9]{1,9}$/;
 
 export class CreateProjectDto {
   @ApiProperty({ example: 'Мой проект' })
@@ -21,6 +30,11 @@ export class CreateProjectDto {
   @IsIn(['list', 'board'])
   viewMode?: 'list' | 'board';
 
+  @ApiPropertyOptional({ example: 'simple', enum: ['simple', 'agile'] })
+  @IsOptional()
+  @IsIn(['simple', 'agile'])
+  type?: 'simple' | 'agile';
+
   @ApiPropertyOptional({ example: 'star' })
   @IsOptional()
   @IsString()
@@ -30,4 +44,16 @@ export class CreateProjectDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @ApiPropertyOptional({
+    example: 'ALF',
+    description:
+      'Префикс ключей задач agile-проекта: 2-10 символов, A-Z и цифры, первая буква',
+  })
+  @ValidateIf(
+    (o: CreateProjectDto) =>
+      o.taskKeyPrefix !== undefined && o.taskKeyPrefix !== null,
+  )
+  @Matches(TASK_KEY_PREFIX_PATTERN)
+  taskKeyPrefix?: string | null;
 }

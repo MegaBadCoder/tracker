@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -12,6 +13,10 @@ import { User } from './user.entity';
 import { ProjectColumn } from './project-column.entity';
 
 @Entity('projects')
+@Index('IDX_project_task_key_prefix', ['userId', 'taskKeyPrefix'], {
+  unique: true,
+  where: 'taskKeyPrefix IS NOT NULL',
+})
 export class Project {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -30,6 +35,15 @@ export class Project {
 
   @Column({ type: 'text', default: 'list' })
   viewMode: 'list' | 'board';
+
+  @Column({ type: 'text', default: 'simple' })
+  type: 'simple' | 'agile';
+
+  @Column({ type: 'text', nullable: true })
+  taskKeyPrefix: string | null;
+
+  @Column({ type: 'integer', default: 1 })
+  nextTaskNumber: number;
 
   @Column({ type: 'text', nullable: true })
   icon: string | null;

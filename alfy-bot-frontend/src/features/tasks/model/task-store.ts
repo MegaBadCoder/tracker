@@ -286,28 +286,48 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
-  const moveTask = async (taskId: string, projectId: string | null, payload: { columnId?: string | null; order?: number }) => {
+  const moveTask = async (taskId: string, projectId: string | null, payload: { columnId?: string | null; groupId?: string | null; order?: number }) => {
     const task = tasks.value.find(t => t.id === taskId)
     if (!task) return
 
-    const previous = { projectId: task.projectId, columnId: task.columnId, order: task.order }
+    const previous = {
+      projectId: task.projectId,
+      columnId: task.columnId,
+      groupId: task.groupId,
+      order: task.order,
+      number: task.number,
+      sprintId: task.sprintId,
+      releaseId: task.releaseId,
+    }
+    const changesProject = projectId !== task.projectId
 
     task.projectId = projectId
     if (payload.columnId !== undefined) task.columnId = payload.columnId
+    if (payload.groupId !== undefined) task.groupId = payload.groupId
     if (payload.order !== undefined) task.order = payload.order
+    if (changesProject) {
+      task.number = null
+      task.sprintId = null
+      task.releaseId = null
+    }
 
     try {
+      let response: { data: Record<string, unknown> }
       if (projectId === null) {
         const body: { order?: number } = {}
         if (payload.order !== undefined) body.order = payload.order
-        await api.patch(`/tasks/${taskId}/move-to-inbox`, body)
+        response = await api.patch(`/tasks/${taskId}/move-to-inbox`, body)
       } else {
-        await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
+        response = await api.patch(`/projects/${projectId}/tasks/${taskId}/move`, payload)
       }
+      const saved = parseTask(response.data)
+      task.columnId = saved.columnId
+      task.groupId = saved.groupId
+      task.number = saved.number
+      task.sprintId = saved.sprintId
+      task.releaseId = saved.releaseId
     } catch (err) {
-      task.projectId = previous.projectId
-      task.columnId = previous.columnId
-      task.order = previous.order
+      Object.assign(task, previous)
       throw err
     }
   }
