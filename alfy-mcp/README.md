@@ -49,11 +49,28 @@ url = "https://tracker.rocketup.tech/mcp"
 bearer_token_env_var = "ALFY_MCP_TOKEN"
 ```
 
-Перед запуском Codex задайте `ALFY_MCP_TOKEN` выданным токеном в окружении. В Claude Code подключите сервер командой, заменив `YOUR_ALFY_TOKEN` на выданный токен:
+В Claude Code добавьте запись `alfy` в `mcpServers` файла `.mcp.json` в корне проекта, сохранив существующие серверы:
+
+```json
+{
+  "mcpServers": {
+    "alfy": {
+      "type": "http",
+      "url": "https://tracker.rocketup.tech/mcp",
+      "headers": { "Authorization": "Bearer ${ALFY_MCP_TOKEN}" }
+    }
+  }
+}
+```
+
+Перед запуском Codex или Claude Code выполните в Bash/Zsh команды ниже, затем вставьте токен и нажмите Enter. Ввод скрыт и не записывается в историю команд. Запустите агент из этого же терминала; в Claude Code проверьте подключение через `/mcp`.
 
 ```bash
-claude mcp add --transport http alfy 'https://tracker.rocketup.tech/mcp' --header 'Authorization: Bearer YOUR_ALFY_TOKEN'
+export ALFY_MCP_TOKEN
+read -rs ALFY_MCP_TOKEN
 ```
+
+Ссылка на переменную в заголовке поддерживается [Claude Code](https://code.claude.com/docs/en/mcp#environment-variable-expansion-in-mcp-json).
 
 Актуальные примеры с адресом текущего окружения доступны в настройках веб-приложения.
 

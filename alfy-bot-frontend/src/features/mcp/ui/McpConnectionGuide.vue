@@ -20,7 +20,7 @@ const examples = computed(() => {
   const guide = buildConnectionGuide(url)
   return [
     { title: 'Codex · ~/.codex/config.toml', code: guide.codex },
-    { title: 'Claude Code · терминал', code: guide.claudeCode },
+    { title: 'Claude Code · .mcp.json', code: guide.claudeCode },
     { title: 'Другой HTTP-клиент', code: guide.generic },
   ]
 })
@@ -51,9 +51,10 @@ async function copy(value: string): Promise<void> {
     </p>
     <template v-else>
       <p class="text-sm text-muted-foreground">
-        Для Codex сохраните пример в ~/.codex/config.toml, задайте переменную окружения перед запуском и проверьте список MCP-инструментов после перезапуска. Для Claude Code замените placeholder токена и выполните команду. Примеры не содержат выданный секрет.
+        Добавьте секцию Codex в ~/.codex/config.toml или запись alfy в mcpServers файла .mcp.json в корне проекта Claude Code. Существующие настройки сохраните. Выполните команды ниже в Bash или Zsh, затем вставьте токен и нажмите Enter: ввод скрыт и не попадает в историю команд. Запустите агента из этого же терминала; в Claude Code проверьте подключение командой /mcp. Конфигурации используют переменную ALFY_MCP_TOKEN.
       </p>
-      <pre class="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>export ALFY_MCP_TOKEN='YOUR_ALFY_TOKEN'</code></pre>
+      <pre class="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>export ALFY_MCP_TOKEN
+read -rs ALFY_MCP_TOKEN</code></pre>
       <div v-for="item in examples" :key="item.title" class="space-y-2">
         <div class="flex items-center justify-between gap-2">
           <h4 class="text-sm font-medium">
