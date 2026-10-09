@@ -2,6 +2,10 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import SettingsView from '@/views/SettingsView.vue'
 
+vi.mock('@/features/mcp/ui/McpSettings.vue', () => ({
+  default: { template: '<section aria-label="MCP и агенты">MCP и агенты</section>' },
+}))
+
 vi.mock('@/stores/user-store', () => ({
   useUserStore: () => ({
     timezone: 'Europe/Moscow',
@@ -34,6 +38,9 @@ function timezoneInput(wrapper: ReturnType<typeof mountView>) {
 }
 
 describe('settingsView — выбор часового пояса', () => {
+  it('содержит раздел MCP и агенты', () => {
+    expect(mountView().text()).toContain('MCP и агенты')
+  })
   it('по умолчанию показывает популярные зоны (Москва)', async () => {
     const wrapper = mountView()
     await timezoneInput(wrapper).trigger('focus')

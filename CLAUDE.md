@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `alfy-bot/` — NestJS-бэкенд (порт 3002): REST API под `/api`, Swagger на `/api/docs`, Telegram-бот (telegraf), TypeORM + SQLite (`data/database.sqlite`, `synchronize: true`), JWT + API-token auth (`JwtOrApiTokenGuard`), web-push.
 - `alfy-bot-frontend/` — Vue 3 + Vite + TS + Tailwind v4 + Pinia + vue-router. PWA (`vite-plugin-pwa`, кастомный `sw.ts`). Запускается как обычный SPA и как Telegram WebApp.
-- `alfy-mcp/` — MCP-сервер (порт 3003, ESM, Node 22+): тонкая обёртка над REST `alfy-bot` для Claude Desktop/Code и удалённых MCP-клиентов. Транспорты: stdio + Streamable HTTP (endpoint `/mcp`). Auth — API-токены, выдаваемые ботом (`/mcp_token <name>`). Не ходит в БД напрямую.
+- `alfy-mcp/` — MCP-сервер (порт 3003, ESM, Node 22+): тонкая обёртка над REST `alfy-bot` для Claude Desktop/Code и удалённых MCP-клиентов. Транспорты: stdio + Streamable HTTP (endpoint `/mcp`). Auth — API-токены, выдаваемые в настройках веб-приложения или ботом (`/mcp_token <name>`). Не ходит в БД напрямую.
 - `docker-compose.yml` + `Caddyfile` — прод: Caddy на 80/443 раздаёт `tracker.rocketup.tech`, проксирует `/api/*` на backend, `/mcp` + `/mcp/*` на alfy-mcp, остальное на frontend (nginx).
 - `scripts/tunnels.sh` — Cloudflare Quick Tunnels для dev (см. README).
 
@@ -57,7 +57,7 @@ npm run test                # vitest run
 npm run lint                # eslint .
 ```
 
-ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `StreamableHTTPServerTransport`). Auth — API-токены через бот (`/mcp_token <name>`), хранятся как bcrypt-хеш + 10-char prefix-index в БД (`api_token` entity). Tools — тонкая обёртка над REST `alfy-bot` (1 HTTP-вызов на tool, кроме `get_progress` — 3 параллельных). См. `alfy-mcp/README.md` для подключения из клиентов.
+ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `StreamableHTTPServerTransport`). Auth — API-токены из настроек профиля или Telegram-команды `/mcp_token <name>`, хранятся как bcrypt-хеш + 10-char prefix-index в БД (`api_token` entity). В настройках токен показывается только при выдаче, затем доступен только его префикс; отзыв прекращает доступ. Управление токенами через `/api/auth/api-tokens` доступно только с JWT, не с API-токеном. Для HTTP-клиентов адрес в production — `https://tracker.rocketup.tech/mcp`, локально — `http://localhost:3003/mcp`; `VITE_MCP_URL` задаёт адрес в инструкции фронта, без неё используется `/mcp` текущего origin. Tools — тонкая обёртка над REST `alfy-bot` (1 HTTP-вызов на tool, кроме `get_progress` — 3 параллельных). См. `alfy-mcp/README.md` для подключения из клиентов.
 
 **MCP-планирование спринтов.** `tools/sprints.ts` регистрируется в общем `createServer` для обоих транспортов. Контроллеры спринтов и групп используют `JwtOrApiTokenGuard`, иначе MCP API-токен получает 401. `move_story_to_sprint` вызывает атомарный серверный перенос; не заменять его циклом обновления задач. `complete_sprint` требует явный `moveTo`, `delete_sprint` — `confirm: true`. У задач доступны `groupId`/`sprintId` и фильтр `sprint_id`; создание без `sprintId` наследует спринт истории. Контракты проверяются через реальный MCP SDK в `alfy-mcp/tests/tools/sprints.spec.ts` и HTTP-тест API-токена в `alfy-bot/test/story-sprint.e2e-spec.ts`.
 
