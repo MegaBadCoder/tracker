@@ -163,6 +163,8 @@
         С какого дня начинается неделя в календарях.
       </p>
     </div>
+
+    <McpSettings />
   </div>
 </template>
 
@@ -173,6 +175,7 @@ import { useUserStore } from '@/stores/user-store'
 import { linkEmail, changePassword } from '@/api/auth'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import McpSettings from '@/features/mcp/ui/McpSettings.vue'
 
 const userStore = useUserStore()
 const router = useRouter()

@@ -6,13 +6,15 @@ ESM-пакет, Node 22+. Тонкая обёртка над REST API [`alfy-bot
 
 ## Получить токен
 
-В Telegram-боте выполни команду:
+Откройте «Настройки» → «MCP и агенты» в веб-приложении, задайте имя токена и нажмите «Создать токен». Скопируйте секрет сразу: после закрытия страницы он больше не показывается. Там же можно посмотреть список своих токенов и отозвать любой из них. Отзыв сразу прекращает доступ агента с этим токеном.
+
+Также токен можно получить в Telegram-боте командой:
 
 ```
 /mcp_token <название>
 ```
 
-Название — произвольная метка токена (например `claude-desktop`).
+Название — произвольная метка токена (например `claude-desktop`). Токен даёт доступ к данным владельца, включая изменение задач.
 
 ## Подключить из Claude Desktop
 
@@ -25,7 +27,7 @@ ESM-пакет, Node 22+. Тонкая обёртка над REST API [`alfy-bot
       "command": "npx",
       "args": ["-y", "alfy-mcp", "--stdio"],
       "env": {
-        "ALFY_API_TOKEN": "<токен из бота>",
+        "ALFY_API_TOKEN": "YOUR_ALFY_TOKEN",
         "ALFY_API_BASE": "https://tracker.rocketup.tech/api"
       }
     }
@@ -37,7 +39,23 @@ ESM-пакет, Node 22+. Тонкая обёртка над REST API [`alfy-bot
 
 URL: `https://tracker.rocketup.tech/mcp`
 
-Заголовок авторизации: `Authorization: Bearer <токен>`
+Заголовок авторизации: `Authorization: Bearer YOUR_ALFY_TOKEN`. Для локального сервера адрес обычно `http://localhost:3003/mcp`.
+
+В Codex добавьте в `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.alfy]
+url = "https://tracker.rocketup.tech/mcp"
+bearer_token_env_var = "ALFY_MCP_TOKEN"
+```
+
+Перед запуском Codex задайте `ALFY_MCP_TOKEN` выданным токеном в окружении. В Claude Code подключите сервер командой, заменив `YOUR_ALFY_TOKEN` на выданный токен:
+
+```bash
+claude mcp add --transport http alfy 'https://tracker.rocketup.tech/mcp' --header 'Authorization: Bearer YOUR_ALFY_TOKEN'
+```
+
+Актуальные примеры с адресом текущего окружения доступны в настройках веб-приложения.
 
 Протокол: [MCP Streamable HTTP](https://spec.modelcontextprotocol.io/specification/2025-03-26/basic/transports/#streamable-http-transport)
 
