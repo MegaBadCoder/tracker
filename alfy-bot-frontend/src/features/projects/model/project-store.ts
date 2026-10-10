@@ -6,6 +6,12 @@ import type { Project, ProjectTreeNode, CreateProjectPayload, UpdateProjectPaylo
 
 export const useProjectStore = defineStore('projects', () => {
   const projects = ref<Project[]>([])
+  const collapsedIds = ref(new Set<string>())
+  const treeBusy = ref(false)
+  const toggleExpanded = (id: string) => {
+    if (collapsedIds.value.has(id)) collapsedIds.value.delete(id)
+    else collapsedIds.value.add(id)
+  }
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -101,22 +107,18 @@ export const useProjectStore = defineStore('projects', () => {
   }
 
   const deleteProject = async (id: string) => {
-    const index = projects.value.findIndex(p => p.id === id)
-    if (index === -1) return
-
-    const removed = projects.value.splice(index, 1)[0]
-    if (!removed) return
-
-    try {
-      await api.delete(`/projects/${id}`)
-    } catch (err) {
-      projects.value.splice(index, 0, removed)
-      throw err
-    }
+    await api.delete(`/projects/${id}`)
+    projects.value = projects.value
+      .filter(project => project.id !== id)
+      .map(project => project.parentId === id ? { ...project, parentId: null } : project)
+    collapsedIds.value.delete(id)
   }
 
   return {
     projects,
+    collapsedIds,
+    treeBusy,
+    toggleExpanded,
     loading,
     error,
     projectTree,

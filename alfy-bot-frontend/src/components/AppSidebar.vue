@@ -117,12 +117,14 @@ function resetDrag() {
 
 <template>
   <!-- Desktop sidebar -->
-  <aside class="hidden sm:flex flex-col w-64 flex-shrink-0 border-r border-sidebar-border bg-sidebar h-screen sticky top-0">
-    <div class="p-4 pt-5">
+  <aside class="hidden sm:flex flex-col w-64 flex-shrink-0 border-r border-sidebar-border bg-sidebar h-dvh sticky top-0 overflow-hidden">
+    <div class="shrink-0 p-4 pt-5">
       <UserSection :links="navLinks" />
     </div>
-    <SidebarNav v-if="links?.length" :links="links" />
-    <slot name="section-extra" />
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-sidebar-scroll>
+      <SidebarNav v-if="links?.length" :links="links" />
+      <slot name="section-extra" />
+    </div>
   </aside>
 
   <!-- Mobile: edge detector for swipe-to-open + sliding panel -->
@@ -147,18 +149,20 @@ function resetDrag() {
         @click="emit('close')"
       />
       <aside
-        class="absolute left-0 top-0 h-full w-72 bg-sidebar border-r border-sidebar-border shadow-lg"
+        class="absolute left-0 top-0 h-full w-72 flex flex-col overflow-hidden bg-sidebar border-r border-sidebar-border shadow-lg"
         :style="[panelStyle, { touchAction: 'pan-y' }]"
         @touchstart.passive="onTouchStart($event, 'close')"
         @touchmove.passive="onTouchMove"
         @touchend="onTouchEnd"
         @touchcancel="resetDrag"
       >
-        <div class="p-4 pt-5">
+        <div class="shrink-0 p-4 pt-5">
           <UserSection :links="navLinks" />
         </div>
-        <SidebarNav v-if="links?.length" :links="links" />
-        <slot name="section-extra" />
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-sidebar-scroll>
+          <SidebarNav v-if="links?.length" :links="links" />
+          <slot name="section-extra" />
+        </div>
       </aside>
     </div>
   </Teleport>

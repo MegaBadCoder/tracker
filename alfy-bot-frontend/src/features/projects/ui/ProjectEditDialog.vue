@@ -35,11 +35,13 @@
           />
         </div>
 
+        <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+
         <div class="flex justify-end gap-2 pt-2">
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
           </Button>
-          <Button :disabled="!localTitle.trim()" @click="handleSave">
+          <Button :disabled="saving || !localTitle.trim()" @click="handleSave">
             Сохранить
           </Button>
         </div>
@@ -69,6 +71,8 @@ const emit = defineEmits<{
 }>()
 
 const store = useProjectStore()
+const saving = ref(false)
+const error = ref('')
 
 const localTitle = ref('')
 const localDescription = ref('')
@@ -92,6 +96,7 @@ const excludedIds = computed(() => {
 })
 
 watch(() => props.open, (val) => {
+  error.value = ''
   if (val && props.project) {
     localTitle.value = props.project.title
     localDescription.value = props.project.description ?? ''
@@ -102,8 +107,10 @@ watch(() => props.open, (val) => {
 })
 
 async function handleSave() {
-  if (!props.project || !localTitle.value.trim()) return
+  if (saving.value || !props.project || !localTitle.value.trim()) return
 
+  saving.value = true
+  error.value = ''
   try {
     await store.updateProject(props.project.id, {
       title: localTitle.value.trim(),
@@ -113,8 +120,10 @@ async function handleSave() {
       color: localColor.value,
     })
     emit('update:open', false)
-  } catch (err) {
-    console.error('Ошибка обновления проекта:', err)
+  } catch {
+    error.value = 'Не удалось сохранить проект. Попробуйте ещё раз.'
+  } finally {
+    saving.value = false
   }
 }
 </script>

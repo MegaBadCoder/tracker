@@ -36,11 +36,13 @@
           />
         </div>
 
+        <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+
         <div class="flex justify-end gap-2 pt-2">
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
           </Button>
-          <Button :disabled="!title.trim()" @click="handleSubmit">
+          <Button :disabled="saving || !title.trim()" @click="handleSubmit">
             Создать
           </Button>
         </div>
@@ -75,8 +77,11 @@ const color = ref<string | null>(null)
 const localParentId = ref<string | null>(null)
 
 const store = useProjectStore()
+const saving = ref(false)
+const error = ref('')
 
 watch(() => props.open, (val) => {
+  error.value = ''
   if (val) {
     title.value = ''
     description.value = ''
@@ -87,8 +92,10 @@ watch(() => props.open, (val) => {
 })
 
 async function handleSubmit() {
-  if (!title.value.trim()) return
+  if (saving.value || !title.value.trim()) return
 
+  saving.value = true
+  error.value = ''
   try {
     await store.createProject({
       title: title.value.trim(),
@@ -98,8 +105,10 @@ async function handleSubmit() {
       color: color.value,
     })
     emit('update:open', false)
-  } catch (err) {
-    console.error('Ошибка создания проекта:', err)
+  } catch {
+    error.value = 'Не удалось создать проект. Попробуйте ещё раз.'
+  } finally {
+    saving.value = false
   }
 }
 </script>
