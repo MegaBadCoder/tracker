@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import type { Project, ProjectTreeNode } from '../model/types'
 import { Plus } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
+import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useProjectStore } from '../model/project-store'
-import ProjectTreeList from './ProjectTreeList.vue'
 import ProjectCreateDialog from './ProjectCreateDialog.vue'
 import ProjectEditDialog from './ProjectEditDialog.vue'
-import type { Project, ProjectTreeNode } from '../model/types'
+import ProjectTreeList from './ProjectTreeList.vue'
 
 const showCreate = ref(false)
 const showEdit = ref(false)
@@ -25,7 +25,8 @@ const { confirm } = useConfirm()
 
 function handleCreate(node: ProjectTreeNode | null) {
   parentId.value = node?.id ?? null
-  if (node) store.collapsedIds.delete(node.id)
+  if (node)
+    store.collapsedIds.delete(node.id)
   showCreate.value = true
 }
 
@@ -35,27 +36,32 @@ function handleEdit(node: ProjectTreeNode) {
 }
 
 async function handleReorder(orderedIds: string[]) {
-  if (store.treeBusy) return
+  if (store.treeBusy)
+    return
   store.treeBusy = true
   error.value = ''
   try {
     await store.reorderProjects(orderedIds)
-  } catch {
+  }
+  catch {
     error.value = 'Не удалось сохранить порядок проектов. Попробуйте ещё раз.'
-  } finally {
+  }
+  finally {
     store.treeBusy = false
   }
 }
 
 async function handleDelete(node: ProjectTreeNode) {
-  if (store.treeBusy) return
+  if (store.treeBusy)
+    return
   const accepted = await confirm({
     title: `Удалить проект «${node.title}»?`,
     message: 'Задачи перейдут во входящие, а дочерние проекты — в корень списка. Колонки проекта будут удалены.',
     confirmText: 'Удалить',
     variant: 'destructive',
   })
-  if (!accepted || store.treeBusy) return
+  if (!accepted || store.treeBusy)
+    return
   store.treeBusy = true
   error.value = ''
   try {
@@ -63,10 +69,13 @@ async function handleDelete(node: ProjectTreeNode) {
     taskStore.tasks = taskStore.tasks.map(task => task.projectId === node.id
       ? { ...task, projectId: null, columnId: null }
       : task)
-    if (route.params.projectId === node.id) await router.push('/tasks')
-  } catch {
+    if (route.params.projectId === node.id)
+      await router.push('/tasks')
+  }
+  catch {
     error.value = 'Не удалось удалить проект. Попробуйте ещё раз.'
-  } finally {
+  }
+  finally {
     store.treeBusy = false
   }
 }
@@ -85,7 +94,9 @@ async function handleDelete(node: ProjectTreeNode) {
         <Plus :size="14" />
       </button>
     </div>
-    <p v-if="error" role="alert" class="text-xs text-destructive py-2">{{ error }}</p>
+    <p v-if="error" role="alert" class="text-xs text-destructive py-2">
+      {{ error }}
+    </p>
     <ProjectTreeList
       :nodes="projectTree"
       :depth="0"

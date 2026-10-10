@@ -153,7 +153,7 @@ const isActive = computed(() => route.params.projectId === props.node.id)
           <button
             :aria-label="`Действия проекта ${node.title}`"
             :disabled="store.treeBusy"
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all sm:opacity-0 group-hover/row:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 cursor-pointer"
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all opacity-60 group-hover/row:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 cursor-pointer"
           >
             <MoreHorizontal :size="14" />
           </button>

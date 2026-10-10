@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import type { ProjectTreeNode } from '../model/types'
 import draggable from 'vuedraggable'
 import { useProjectStore } from '../model/project-store'
-import type { ProjectTreeNode } from '../model/types'
 import ProjectTreeItem from './ProjectTreeItem.vue'
 
 const props = defineProps<{
@@ -21,9 +21,11 @@ const store = useProjectStore()
 function move(index: number, offset: number) {
   const nodes = [...props.nodes]
   const target = index + offset
-  if (target < 0 || target >= nodes.length) return
+  if (target < 0 || target >= nodes.length)
+    return
   const [node] = nodes.splice(index, 1)
-  if (!node) return
+  if (!node)
+    return
   nodes.splice(target, 0, node)
   emit('reorder', nodes.map(item => item.id))
 }
