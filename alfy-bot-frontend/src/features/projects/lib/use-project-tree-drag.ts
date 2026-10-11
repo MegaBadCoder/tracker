@@ -5,7 +5,8 @@ import { computed, onUnmounted, ref } from 'vue'
 import { computeInsertionIndex } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { flattenProjects, PROJECT_INDENT, projectDestination } from './project-tree-drag'
 
-const DRAG_THRESHOLD = 5
+const LONG_PRESS_DELAY = 350
+const PRESS_MOVE_THRESHOLD = 8
 const SCROLL_EDGE = 40
 const SCROLL_SPEED = 450
 
@@ -19,7 +20,7 @@ interface DragState {
   active: boolean
 }
 
-/** Управляет переносом ветки за ручку. Вызывает commit только при отпускании внутри списка; Escape и pointercancel отменяют перенос. */
+/** Начинает перенос ветки после удержания 350 мс; движение более 8 px до активации оставляет прокрутку браузеру. Вызывает commit только при отпускании внутри списка; Escape и pointercancel отменяют перенос. */
 export function useProjectTreeDrag(
   list: Ref<HTMLElement | null>,
   nodes: () => ProjectTreeNode[],
@@ -31,6 +32,8 @@ export function useProjectTreeDrag(
   const destination = ref<ProjectDestination | null>(null)
   const lineTop = ref(0)
   const rows = computed(() => flattenProjects(nodes(), collapsed(), null))
+  let pressTimer = 0
+  let suppressClick = false
   let frame = 0
   let lastTime = 0
 
@@ -82,9 +85,10 @@ export function useProjectTreeDrag(
       return
     state.x = event.clientX
     state.y = event.clientY
-    if (!state.active && Math.hypot(state.x - state.startX, state.y - state.startY) >= DRAG_THRESHOLD) {
-      state.active = true
-      frame = requestAnimationFrame(scrollFrame)
+    if (!state.active && Math.hypot(state.x - state.startX, state.y - state.startY) > PRESS_MOVE_THRESHOLD) {
+      suppressClick = true
+      cancel()
+      return
     }
     if (state.active)
       event.preventDefault()
@@ -92,6 +96,7 @@ export function useProjectTreeDrag(
   }
 
   function cancel() {
+    clearTimeout(pressTimer)
     drag.value = null
     destination.value = null
     cancelAnimationFrame(frame)
@@ -101,6 +106,7 @@ export function useProjectTreeDrag(
     window.removeEventListener('pointercancel', cancel)
     window.removeEventListener('keydown', keyDown)
     window.removeEventListener('blur', cancel)
+    window.removeEventListener('touchmove', preventActiveScroll)
   }
 
   function pointerUp(event: PointerEvent) {
@@ -124,10 +130,20 @@ export function useProjectTreeDrag(
   function start(row: ProjectTreeRow, event: PointerEvent) {
     if (disabled() || event.button !== 0 || !event.isPrimary)
       return
-    event.preventDefault()
-    event.stopPropagation()
     cancel()
+    suppressClick = false
     drag.value = { row, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, x: event.clientX, y: event.clientY, active: false }
+    pressTimer = window.setTimeout(() => {
+      if (!drag.value || disabled()) {
+        cancel()
+        return
+      }
+      drag.value.active = true
+      suppressClick = true
+      updateDestination()
+      frame = requestAnimationFrame(scrollFrame)
+    }, LONG_PRESS_DELAY)
+    window.addEventListener('touchmove', preventActiveScroll, { passive: false })
     window.addEventListener('pointermove', pointerMove, { passive: false })
     window.addEventListener('pointerup', pointerUp)
     window.addEventListener('pointercancel', cancel)
@@ -135,6 +151,18 @@ export function useProjectTreeDrag(
     window.addEventListener('blur', cancel)
   }
 
+  function preventActiveScroll(event: TouchEvent) {
+    if (drag.value?.active && event.cancelable) event.preventDefault()
+  }
+
+  function preventDragClick(event: MouseEvent) {
+    if (!suppressClick || event.detail === 0) return
+    suppressClick = false
+    if (!(event.target instanceof Element) || !event.target.closest('[data-project-id]')) return
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
   onUnmounted(cancel)
-  return { rows, drag, destination, lineTop, start }
+  return { rows, drag, destination, lineTop, start, preventDragClick }
 }

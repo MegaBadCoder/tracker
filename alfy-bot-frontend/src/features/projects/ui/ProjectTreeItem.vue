@@ -5,7 +5,6 @@ import {
   CornerUpLeft,
   ArrowDown,
   ChevronRight,
-  GripVertical,
   Plus,
   Trash2,
   Book,
@@ -117,9 +116,6 @@ const isActive = computed(() => route.params.projectId === props.node.id)
 <template>
   <div>
     <div class="group/row relative flex min-w-0 items-center" :style="{ paddingLeft: `${depth * PROJECT_INDENT}px` }">
-      <span class="project-drag-handle shrink-0 cursor-grab touch-none p-1 text-sidebar-foreground/40" aria-hidden="true" @pointerdown="$emit('dragStart', $event)" @touchstart.stop @dragstart.prevent>
-        <GripVertical :size="12" />
-      </span>
       <button
         v-if="node.children.length"
         class="shrink-0 rounded p-1 hover:bg-sidebar-accent"
@@ -133,9 +129,14 @@ const isActive = computed(() => route.params.projectId === props.node.id)
       <RouterLink
         ref="linkRef"
         :to="`/tasks/project/${node.id}`"
+        :draggable="false"
+        @pointerdown="$emit('dragStart', $event)"
+        @touchstart.stop
+        @dragstart.prevent
+        @contextmenu.prevent
         data-drop-kind="project"
         :data-project-id="node.id"
-        class="flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-8 rounded-md text-sm font-medium transition-colors"
+        class="project-press-target select-none flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-8 rounded-md text-sm font-medium transition-colors"
         :class="[
           isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
           isHovered ? 'bg-accent ring-2 ring-primary' : '',
@@ -191,3 +192,9 @@ const isActive = computed(() => route.params.projectId === props.node.id)
 
   </div>
 </template>
+
+<style scoped>
+.project-press-target {
+  -webkit-touch-callout: none;
+}
+</style>

@@ -16,7 +16,7 @@ const emit = defineEmits<{
 }>()
 const store = useProjectStore()
 const list = ref<HTMLElement | null>(null)
-const { rows, drag, destination, lineTop, start } = useProjectTreeDrag(
+const { rows, drag, destination, lineTop, start, preventDragClick } = useProjectTreeDrag(
   list,
   () => props.nodes,
   () => store.collapsedIds,
@@ -53,7 +53,7 @@ function outdent(node: ProjectTreeNode) {
 </script>
 
 <template>
-  <div ref="list" class="relative flex flex-col gap-0.5 min-h-8" :class="drag?.active ? 'select-none cursor-grabbing' : ''">
+  <div ref="list" @click.capture="preventDragClick" class="relative flex flex-col gap-0.5 min-h-8" :class="drag?.active ? 'select-none cursor-grabbing' : ''">
     <div v-for="row in rows" :key="row.node.id" :data-tree-row="row.node.id" :class="drag?.active && drag.row.node.id === row.node.id ? 'opacity-30' : ''">
       <ProjectTreeItem
         :node="row.node"
