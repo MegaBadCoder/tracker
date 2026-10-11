@@ -347,7 +347,7 @@ describe('ProjectService', () => {
     it('обновляет порядок проектов по переданным ID', async () => {
       await service.reorder(1, ['proj-2', 'proj-1', 'proj-3']);
 
-      expect(repo.reorder).toHaveBeenCalledWith([
+      expect(repo.reorder).toHaveBeenCalledWith(1, [
         { id: 'proj-2', order: 0 },
         { id: 'proj-1', order: 1 },
         { id: 'proj-3', order: 2 },

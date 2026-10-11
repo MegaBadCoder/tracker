@@ -1,6 +1,6 @@
 # Перенос проектов между уровнями
 
-**Status:** reviewing
+**Status:** done
 **Branch:** fix/pomodoro-play-pause
 **Worktree:** none
 **Mode:** interactive
@@ -35,7 +35,7 @@ Result: passed
 - CK1 (IV1) — циклы через себя/ребёнка/внука и чужой родитель отклонены; SQLite подтверждает отсутствие изменений чужой ветки.
 - CK2 (IV2) — fault injection через SQLite trigger после изменения соседей полностью откатывает транзакцию; descendant parentId сохраняется.
 - CK3 (IV3) — store HTTP failure не меняет дерево; Chromium Escape и отпускание вне списка не отправляют запрос.
-- CK4 (IV4) — 104 frontend tests (проекты + task DnD), 73 backend project tests; frontend/backend builds проходят.
+- CK4 (IV4) — 104 frontend tests (проекты + task DnD), 74 backend project tests; frontend/backend builds проходят.
 - Smoke: реальный UI → ProjectController/Service → SQLite :memory: с тестовым auth guard; мышью вложить ветку, reload, вынести в корень, перенести к свёрнутому родителю, touch-outdent при 390px. Проверены БД и отсутствие JS errors. Пропущенный beforeId возвращает HTTP 400.
 - Todoist: воспроизведён документированный жест; реализация независимая, лимит в 3 уровня не добавлен.
 
@@ -44,9 +44,15 @@ Result: passed
 - CK7 — браузерный touchCancel не отправляет move; удержание drag у нижнего края длинной панели увеличивает scrollTop.
 
 ## Conclusion
+Цель подтверждена полным локальным browser→API→SQLite сценарием; реализация `dc0b441`, исправления `bc9d19e` и последующий fix reorder.
+
 ### Review fixes
 - Старый update допускал циклы: перенесён в общий writeTree; поля, отсутствующие в DTO, сохраняются, ответ перечитывается после записи.
 - Конкурирующие изменения дерева выполняются последовательно на одном SQLite-соединении.
+- Reorder тоже переведён в user-scoped writeTree: тест сначала воспроизвёл изменение чужого проекта; после исправления весь запрос отклоняется без частичных записей. UI-сортировка через меню проверена повторным smoke.
+
+### Deviations from plan
+- Защищены прежние update/reorder: независимое ревью показало, что иначе они обходят общие инварианты дерева. Внешние сигнатуры endpoint сохранены.
 
 ### Hands-off decisions
 - Дизайн и план автоматически одобрены согласно действующей инструкции пользователя.

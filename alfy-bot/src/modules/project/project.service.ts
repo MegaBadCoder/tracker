@@ -83,6 +83,6 @@ export class ProjectService {
       throw new BadRequestException('Ordered IDs array cannot be empty');
     }
     const updates = orderedIds.map((id, index) => ({ id, order: index }));
-    await this.projectRepo.reorder(updates);
+    await this.projectRepo.reorder(userId, updates);
   }
 }

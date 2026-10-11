@@ -92,9 +92,12 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
     return true;
   }
 
-  async reorder(updates: { id: string; order: number }[]): Promise<void> {
-    await Promise.all(
-      updates.map(({ id, order }) => this.repo.update(id, { order })),
-    );
+  async reorder(userId: number, updates: { id: string; order: number }[]): Promise<void> {
+    await this.writeTree(userId, projects => {
+      const owned = new Set(projects.map(project => project.id));
+      if (updates.some(update => !owned.has(update.id))) throw new NotFoundException('Project not found');
+      const orders = new Map(updates.map(update => [update.id, update.order]));
+      return projects.map(project => orders.has(project.id) ? { ...project, order: orders.get(project.id)! } : project);
+    });
   }
 }

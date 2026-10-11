@@ -1,3 +1,4 @@
+import { ProjectService } from '../project.service';
 import { DataSource } from 'typeorm';
 import * as entities from '../../../shared/entities';
 import { TypeOrmProjectRepository } from './typeorm-project.repository';
@@ -67,6 +68,15 @@ describe('перенос проектов в SQLite', () => {
     const b = await repo.create({ userId, title: 'B', parentId: null });
     await Promise.all([repo.move(userId, a.id, b.id, null), repo.update(userId, a.id, { title: 'Renamed', parentId: undefined })]);
     expect(await repo.findById(a.id, userId)).toMatchObject({ title: 'Renamed', parentId: b.id });
+  });
+
+  it('чужой ID в reorder не меняет ни свои, ни чужие проекты', async () => {
+    const otherUser = await db.getRepository(entities.User).save({ telegramId: 1001 });
+    const foreign = await repo.create({ userId: otherUser.id, title: 'Foreign', parentId: null, order: 7 });
+    const own = await repo.create({ userId, title: 'Own', parentId: null, order: 5 });
+    await expect(new ProjectService(repo).reorder(userId, [own.id, foreign.id])).rejects.toThrow();
+    expect((await repo.findById(own.id, userId))?.order).toBe(5);
+    expect((await repo.findById(foreign.id, otherUser.id))?.order).toBe(7);
   });
 
 });
