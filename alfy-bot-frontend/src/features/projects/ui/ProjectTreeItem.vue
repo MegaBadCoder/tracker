@@ -122,7 +122,14 @@ const isActive = computed(() => route.params.projectId === props.node.id)
 
 <template>
   <div>
-    <div class="group/row relative flex min-w-0 items-center" :style="{ paddingLeft: `${depth * PROJECT_INDENT}px` }">
+    <div
+      class="group/row relative flex min-w-0 items-center rounded-md transition-colors"
+      :class="[
+        isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
+        isHovered ? 'bg-accent ring-2 ring-primary' : '',
+      ]"
+      :style="{ paddingLeft: `${depth * PROJECT_INDENT}px` }"
+    >
       <RouterLink
         ref="linkRef"
         :to="`/tasks/project/${node.id}`"
@@ -134,10 +141,6 @@ const isActive = computed(() => route.params.projectId === props.node.id)
         data-drop-kind="project"
         :data-project-id="node.id"
         class="project-press-target select-none flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-2 rounded-md text-sm font-medium transition-colors"
-        :class="[
-          isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
-          isHovered ? 'bg-accent ring-2 ring-primary' : '',
-        ]"
       >
         <component
           :is="nodeIcon"
