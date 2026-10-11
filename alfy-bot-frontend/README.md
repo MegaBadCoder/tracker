@@ -35,7 +35,7 @@ src/
 ### Drag-and-drop — два независимых стека (не смешивать)
 
 - **Кастомный движок на PointerEvents** (`features/tasks/lib/dnd/`) — reorder задач в Inbox и list-проектах, drop на проекты/Inbox в сайдбаре, drag-create в календаре. Long-press 350ms на mobile, threshold 5px на desktop.
-- **vuedraggable** — задачи внутри board-колонок, переупорядочивание колонок и проектов в сайдбаре.
+- **vuedraggable** — задачи внутри board-колонок, переупорядочивание колонок.
 
 > **Типы вопросов** грузятся с бэкенда (`GET /api/question-types` через `stores/question-types-store.ts`), не хардкодятся на фронте — иначе бот и веб рассинхронизируются.
 
@@ -62,3 +62,5 @@ npx vue-tsc --noEmit -p tsconfig.app.json     # тип-чек без билда
 - `VITE_DEV_TELEGRAM_ID` — dev-флаг для авторизации без Telegram WebApp.
 
 Авторизация: `main.ts` пробует `authorize()` при наличии `Telegram.WebApp.initData` или dev-флага. Router guard редиректит на `/login` любой не-public маршрут без токена (`meta: { public: true }` — исключения).
+
+Проекты в сайдбаре перемещаются за ручку: вправо — вложить под предыдущий проект, влево — поднять уровень, вверх/вниз — выбрать место. Линия и подпись показывают назначение. Escape отменяет перенос. Ветка переносится вместе с потомками; меню «На уровень выше» даёт тот же выход из родителя без drag.

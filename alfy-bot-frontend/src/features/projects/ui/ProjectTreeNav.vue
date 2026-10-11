@@ -51,6 +51,22 @@ async function handleReorder(orderedIds: string[]) {
   }
 }
 
+async function handleRelocate(id: string, parentId: string | null, beforeId: string | null) {
+  if (store.treeBusy)
+    return
+  store.treeBusy = true
+  error.value = ''
+  try {
+    await store.moveProject(id, parentId, beforeId)
+  }
+  catch {
+    error.value = 'Не удалось переместить проект. Попробуйте ещё раз.'
+  }
+  finally {
+    store.treeBusy = false
+  }
+}
+
 async function handleDelete(node: ProjectTreeNode) {
   if (store.treeBusy)
     return
@@ -104,6 +120,7 @@ async function handleDelete(node: ProjectTreeNode) {
       @create-child="handleCreate"
       @delete="handleDelete"
       @reorder="handleReorder"
+      @relocate="handleRelocate"
     />
   </div>
   <ProjectCreateDialog v-model:open="showCreate" :parent-id="parentId" />

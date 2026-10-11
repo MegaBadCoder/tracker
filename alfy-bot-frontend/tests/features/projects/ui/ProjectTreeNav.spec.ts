@@ -121,11 +121,20 @@ describe('действия дерева', () => {
     wrapper.unmount()
   })
 
-  it('сохраняет новый порядок из draggable вместо исходного', async () => {
+  it('перемещает проект через единый запрос дерева', async () => {
+    const { wrapper, store } = setup()
+    vi.mocked(api.patch).mockResolvedValue({ data: store.projects.map(p => p.id === 'other' ? { ...p, parentId: 'root' } : p) })
+    wrapper.findComponent(ProjectTreeList).vm.$emit('relocate', 'other', 'root', null)
+    await flushPromises()
+    expect(api.patch).toHaveBeenCalledWith('/projects/other/move', { parentId: 'root', beforeId: null })
+    expect(store.projectMap.get('other')?.parentId).toBe('root')
+    wrapper.unmount()
+  })
+
+  it('меню сортирует соседей без смены родителя', async () => {
     const { wrapper, store } = setup()
     vi.mocked(api.patch).mockResolvedValue({})
-    const list = wrapper.findComponent(ProjectTreeList)
-    list.findComponent({ name: 'draggable' }).vm.$emit('update:modelValue', [...store.projectTree].reverse())
+    wrapper.findComponent(ProjectTreeItem).vm.$emit('move', 1)
     await flushPromises()
     expect(api.patch).toHaveBeenCalledWith('/projects/reorder', { orderedIds: ['other', 'root'] })
     expect(store.projectTree.map(p => p.id)).toEqual(['other', 'root'])

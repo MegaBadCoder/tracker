@@ -70,6 +70,10 @@ export class ProjectService {
     return this.projectRepo.save(project);
   }
 
+  async move(userId: number, id: string, parentId: string | null, beforeId: string | null): Promise<Project[]> {
+    return this.projectRepo.move(userId, id, parentId, beforeId);
+  }
+
   async delete(userId: number, id: string): Promise<void> {
     const deleted = await this.projectRepo.delete(id, userId);
     if (!deleted) throw new NotFoundException(`Project #${id} not found`);

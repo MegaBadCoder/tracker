@@ -106,6 +106,12 @@ export const useProjectStore = defineStore('projects', () => {
     }
   }
 
+  const moveProject = async (id: string, parentId: string | null, beforeId: string | null) => {
+    const { data } = await api.patch<Project[]>(`/projects/${id}/move`, { parentId, beforeId })
+    projects.value = data
+    if (parentId !== null) collapsedIds.value.delete(parentId)
+  }
+
   const deleteProject = async (id: string) => {
     await api.delete(`/projects/${id}`)
     projects.value = projects.value
@@ -128,5 +134,6 @@ export const useProjectStore = defineStore('projects', () => {
     updateProject,
     reorderProjects,
     deleteProject,
+    moveProject,
   }
 })

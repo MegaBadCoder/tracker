@@ -1,3 +1,4 @@
+import { planProjectMove } from '../lib/plan-project-move';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -41,6 +42,22 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
 
   async save(project: Project): Promise<Project> {
     return this.repo.save(project);
+  }
+
+  async move(userId: number, id: string, parentId: string | null, beforeId: string | null): Promise<Project[]> {
+    return this.repo.manager.transaction(async manager => {
+      const repository = manager.getRepository(Project);
+      const projects = await repository.find({ where: { userId }, order: { order: 'ASC', createdAt: 'DESC' } });
+      const updated = planProjectMove(projects, id, parentId, beforeId);
+      const previous = new Map(projects.map(project => [project.id, project]));
+      for (const project of updated) {
+        const old = previous.get(project.id)!;
+        if (old.parentId !== project.parentId || old.order !== project.order) {
+          await repository.update({ id: project.id, userId }, { parentId: project.parentId, order: project.order });
+        }
+      }
+      return updated;
+    });
   }
 
   async delete(id: string, userId: number): Promise<boolean> {

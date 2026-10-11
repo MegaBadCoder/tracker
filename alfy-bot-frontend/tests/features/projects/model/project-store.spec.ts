@@ -293,3 +293,25 @@ describe('управление деревом', () => {
     expect(store.projectTree[0]?.children.map(p => p.id)).toEqual(['b', 'a'])
   })
 })
+
+
+describe('перенос между уровнями', () => {
+  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks() })
+  it('сохраняет перенос одним запросом и применяет дерево сервера', async () => {
+    const store = useProjectStore()
+    store.projects = [makeProject({ id: 'a' }), makeProject({ id: 'b' })]
+    const updated = [makeProject({ id: 'a' }), makeProject({ id: 'b', parentId: 'a' })]
+    vi.mocked(api.patch).mockResolvedValue({ data: updated })
+    await store.moveProject('b', 'a', null)
+    expect(api.patch).toHaveBeenCalledWith('/projects/b/move', { parentId: 'a', beforeId: null })
+    expect(store.projects).toEqual(updated)
+  })
+  it('ошибка не оставляет частичный перенос', async () => {
+    const store = useProjectStore()
+    const original = [makeProject({ id: 'a' }), makeProject({ id: 'b' })]
+    store.projects = original
+    vi.mocked(api.patch).mockRejectedValue(new Error('offline'))
+    await expect(store.moveProject('b', 'a', null)).rejects.toThrow('offline')
+    expect(store.projects).toEqual(original)
+  })
+})

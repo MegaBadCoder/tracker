@@ -113,12 +113,13 @@ ESM-пакет, Node 22+. SDK — `@modelcontextprotocol/sdk` (`McpServer` + `St
 
 **`VITE_API_URL` задаётся вместе с префиксом `/api`.** `api/client.ts` подставляет переменную в `baseURL` как есть, а вызовы идут как `api.get('/tasks')` — значит для локального бэка нужно `http://localhost:3002/api`, иначе все запросы получают 404.
 
-## Drag-and-drop (две системы — выбирать по контексту)
+## Drag-and-drop (выбирать по контексту)
 
-В кодбазе сосуществуют два независимых DnD-стека. Не смешивать.
+В кодбазе используются отдельные DnD-контроллеры по контексту. Не смешивать.
 
 - **Кастомный движок на PointerEvents** в `features/tasks/lib/dnd/` (`useTaskDnd`, `useDragSource`, `useDropTarget`, `useReorderList`) + `<TaskDragGhost />` через teleport в `App.vue`. Используется для: reorder задач в Inbox (`TasksView`) и в проекте-list-без-колонок (`ProjectView` когда `columns.length === 0`), drop задач на проекты/Inbox в сайдбаре. Жесты: drag-handle (немедленно) + long-press 350ms на mobile + threshold 5px на desktop.
-- **`vuedraggable`** в `features/projects/ui/BoardView.vue`, `BoardColumn.vue`, `ProjectTreeNav.vue`. Используется для: задач внутри колонок board-view, переупорядочивания самих колонок, переупорядочивания проектов в сайдбаре. Не трогать без явной задачи.
+- **`vuedraggable`** в `features/projects/ui/BoardView.vue`, `BoardColumn.vue`. Используется для: задач внутри колонок board-view, переупорядочивания самих колонок. Не трогать без явной задачи.
+- **Дерево проектов** — отдельный PointerEvents-контроллер `features/projects/lib/use-project-tree-drag.ts`: плоские видимые строки, вертикаль выбирает место, горизонталь — уровень. Перенос ветки сохраняется атомарно через `PATCH /projects/:id/move` (`parentId`, `beforeId`, оба nullable). Не заменять двумя запросами parentId + reorder.
 - **Drag-create в календаре** — `features/calendar/lib/use-create-slot-drag.ts` (рисование задачи по сетке часов). Использует те же константы (`LONG_PRESS_DELAY_MS=350`, `TOUCH_DRAG_THRESHOLD_PX=8`), что и `features/tasks/lib/dnd/use-drag-source.ts`, чтобы на mobile сохранять нативный scroll до осознанного long-press. На desktop drag стартует мгновенно.
 
 # UI conventions — shadcn-vue

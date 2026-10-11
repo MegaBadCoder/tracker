@@ -2,6 +2,7 @@
 import type { ProjectTreeNode } from '../model/types'
 import {
   ArrowUp,
+  CornerUpLeft,
   ArrowDown,
   ChevronRight,
   GripVertical,
@@ -42,7 +43,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import ProjectTreeList from './ProjectTreeList.vue'
+import { PROJECT_INDENT } from '../lib/project-tree-drag'
 import { useProjectStore } from '../model/project-store'
 import { useDropTarget } from '@/features/tasks/lib/dnd/use-drop-target'
 
@@ -57,7 +58,8 @@ defineEmits<{
   edit: [node: ProjectTreeNode]
   createChild: [node: ProjectTreeNode]
   delete: [node: ProjectTreeNode]
-  reorder: [ids: string[]]
+  dragStart: [event: PointerEvent]
+  outdent: []
   move: [offset: number]
 }>()
 
@@ -114,8 +116,8 @@ const isActive = computed(() => route.params.projectId === props.node.id)
 
 <template>
   <div>
-    <div class="group/row relative flex min-w-0 items-center" :style="{ paddingLeft: `${depth * 12}px` }">
-      <span class="project-drag-handle shrink-0 cursor-grab touch-none p-1 text-sidebar-foreground/40" aria-hidden="true">
+    <div class="group/row relative flex min-w-0 items-center" :style="{ paddingLeft: `${depth * PROJECT_INDENT}px` }">
+      <span class="project-drag-handle shrink-0 cursor-grab touch-none p-1 text-sidebar-foreground/40" aria-hidden="true" @pointerdown="$emit('dragStart', $event)" @touchstart.stop @dragstart.prevent>
         <GripVertical :size="12" />
       </span>
       <button
@@ -175,6 +177,10 @@ const isActive = computed(() => route.params.projectId === props.node.id)
             <ArrowDown :size="14" class="mr-2" />
             Переместить ниже
           </DropdownMenuItem>
+          <DropdownMenuItem v-if="node.parentId" @click="$emit('outdent')">
+            <CornerUpLeft :size="14" class="mr-2" />
+            На уровень выше
+          </DropdownMenuItem>
           <DropdownMenuItem class="text-destructive" @click="$emit('delete', node)">
             <Trash2 :size="14" class="mr-2" />
             Удалить
@@ -183,14 +189,5 @@ const isActive = computed(() => route.params.projectId === props.node.id)
       </DropdownMenu>
     </div>
 
-    <ProjectTreeList
-      v-if="expanded && node.children.length"
-      :nodes="node.children"
-      :depth="depth + 1"
-      @edit="$emit('edit', $event)"
-      @create-child="$emit('createChild', $event)"
-      @delete="$emit('delete', $event)"
-      @reorder="$emit('reorder', $event)"
-    />
   </div>
 </template>
