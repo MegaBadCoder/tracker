@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import ProjectTreeNav from '@/features/projects/ui/ProjectTreeNav.vue'
 import { api } from '@/api/client'
+import ProjectTreeList from '@/features/projects/ui/ProjectTreeList.vue'
+import ProjectTreeItem from '@/features/projects/ui/ProjectTreeItem.vue'
+import ProjectCreateDialog from '@/features/projects/ui/ProjectCreateDialog.vue'
+import { useConfirm } from '@/composables/useConfirm'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -17,6 +21,7 @@ vi.mock('@/api/client', () => ({
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
   useRoute: () => ({ params: {} }),
+  useRouter: () => ({ push: vi.fn() }),
 }))
 
 describe('ProjectTreeNav', () => {
@@ -80,4 +85,91 @@ describe('ProjectTreeNav', () => {
     // Header should still render
     expect(wrapper.text()).toContain('Проекты')
   })
+})
+
+
+describe('действия дерева', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  function setup() {
+    const store = useProjectStore()
+    store.projects = ['root', 'child', 'other'].map((id, index) => ({
+      id, parentId: id === 'child' ? 'root' : null, title: id,
+      description: null, viewMode: 'list', icon: null, color: null, order: index,
+    }))
+    return { store, wrapper: mount(ProjectTreeNav) }
+  }
+
+  it('сворачивает и раскрывает детей без удаления данных', async () => {
+    const { store, wrapper } = setup()
+    await wrapper.get('[aria-label="Свернуть root"]').trigger('click')
+    expect(wrapper.text()).not.toContain('child')
+    expect(store.projects).toHaveLength(3)
+    await wrapper.get('[aria-label="Развернуть root"]').trigger('click')
+    expect(wrapper.text()).toContain('child')
+    wrapper.unmount()
+  })
+
+  it('передаёт родителя в создание подпроекта', async () => {
+    const { wrapper } = setup()
+    wrapper.findComponent(ProjectTreeItem).vm.$emit('createChild', { id: 'root' })
+    await flushPromises()
+    expect(wrapper.findComponent(ProjectCreateDialog).props()).toMatchObject({ open: true, parentId: 'root' })
+    wrapper.unmount()
+  })
+
+  it('перемещает проект через единый запрос дерева', async () => {
+    const { wrapper, store } = setup()
+    vi.mocked(api.patch).mockResolvedValue({ data: store.projects.map(p => p.id === 'other' ? { ...p, parentId: 'root' } : p) })
+    wrapper.findComponent(ProjectTreeList).vm.$emit('relocate', 'other', 'root', null)
+    await flushPromises()
+    expect(api.patch).toHaveBeenCalledWith('/projects/other/move', { parentId: 'root', beforeId: null })
+    expect(store.projectMap.get('other')?.parentId).toBe('root')
+    wrapper.unmount()
+  })
+
+  it('меню сортирует соседей без смены родителя', async () => {
+    const { wrapper, store } = setup()
+    vi.mocked(api.patch).mockResolvedValue({})
+    wrapper.findComponent(ProjectTreeItem).vm.$emit('move', 1)
+    await flushPromises()
+    expect(api.patch).toHaveBeenCalledWith('/projects/reorder', { orderedIds: ['other', 'root'] })
+    expect(store.projectTree.map(p => p.id)).toEqual(['other', 'root'])
+    wrapper.unmount()
+  })
+
+  it('показывает ошибку сортировки и возвращает прежний порядок', async () => {
+    const { wrapper, store } = setup()
+    vi.mocked(api.patch).mockRejectedValue(new Error('offline'))
+    wrapper.findComponent(ProjectTreeList).vm.$emit('reorder', ['other', 'root'])
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не удалось сохранить порядок')
+    expect(store.projectTree.map(p => p.id)).toEqual(['root', 'other'])
+    wrapper.unmount()
+  })
+
+  it('отмена подтверждения не удаляет проект', async () => {
+    const { wrapper, store } = setup()
+    wrapper.findComponent(ProjectTreeItem).vm.$emit('delete', store.projectTree[0])
+    useConfirm().handleCancel()
+    await flushPromises()
+    expect(api.delete).not.toHaveBeenCalled()
+    expect(store.projects).toHaveLength(3)
+    wrapper.unmount()
+  })
+  it('ошибка переноса сохраняет дерево и показывает сообщение', async () => {
+    const { wrapper, store } = setup()
+    const original = JSON.parse(JSON.stringify(store.projects))
+    vi.mocked(api.patch).mockRejectedValue(new Error('offline'))
+    wrapper.findComponent(ProjectTreeList).vm.$emit('relocate', 'other', 'root', null)
+    await flushPromises()
+    expect(store.projects).toEqual(original)
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не удалось переместить проект')
+    expect(store.treeBusy).toBe(false)
+    wrapper.unmount()
+  })
+
 })

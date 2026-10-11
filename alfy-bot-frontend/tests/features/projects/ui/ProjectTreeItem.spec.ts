@@ -90,7 +90,7 @@ describe('projectTreeItem — подсветка цели переноса', () 
     window.dispatchEvent(new PointerEvent('pointermove', { clientX: 50, clientY: 20 }))
     await wrapper.vm.$nextTick()
 
-    expect(link.className).not.toContain('ring-primary')
+    expect(link.parentElement?.className).not.toContain('ring-primary')
   })
 
   it('подсвечивает agile-проект как цель, когда тащат задачу из agile-проекта', async () => {
@@ -112,6 +112,6 @@ describe('projectTreeItem — подсветка цели переноса', () 
     window.dispatchEvent(new PointerEvent('pointermove', { clientX: 50, clientY: 20 }))
     await wrapper.vm.$nextTick()
 
-    expect(link.className).toContain('ring-primary')
+    expect(link.parentElement?.className).toContain('ring-primary')
   })
 })

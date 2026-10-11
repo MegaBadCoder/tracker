@@ -17,6 +17,8 @@ export abstract class ProjectRepositoryPort {
   ): Promise<Project | null>;
   abstract create(data: Partial<Project>): Promise<Project>;
   abstract save(project: Project): Promise<Project>;
+  abstract update(userId: number, id: string, changes: Partial<Project>): Promise<Project>;
+  abstract move(userId: number, id: string, parentId: string | null, beforeId: string | null): Promise<Project[]>;
   abstract delete(id: string, userId: number): Promise<boolean>;
-  abstract reorder(updates: { id: string; order: number }[]): Promise<void>;
+  abstract reorder(userId: number, updates: { id: string; order: number }[]): Promise<void>;
 }

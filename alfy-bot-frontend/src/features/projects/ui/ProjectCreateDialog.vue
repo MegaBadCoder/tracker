@@ -63,7 +63,7 @@
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
           </Button>
-          <Button :disabled="!canSubmit" @click="handleSubmit">
+          <Button :disabled="saving || !canSubmit" @click="handleSubmit">
             Создать
           </Button>
         </div>
@@ -111,6 +111,7 @@ const canSubmit = computed(() =>
 )
 
 const store = useProjectStore()
+const saving = ref(false)
 
 watch(() => props.open, (val) => {
   if (val) {
@@ -126,9 +127,10 @@ watch(() => props.open, (val) => {
 })
 
 async function handleSubmit() {
-  if (!canSubmit.value) return
+  if (saving.value || !canSubmit.value) return
 
   errorMessage.value = null
+  saving.value = true
   try {
     await store.createProject({
       title: title.value.trim(),
@@ -143,6 +145,8 @@ async function handleSubmit() {
   } catch (err) {
     console.error('Ошибка создания проекта:', err)
     errorMessage.value = apiErrorMessage(err, 'Не удалось создать проект')
+  } finally {
+    saving.value = false
   }
 }
 </script>

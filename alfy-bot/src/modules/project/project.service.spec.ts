@@ -45,6 +45,7 @@ describe('ProjectService', () => {
         .fn()
         .mockImplementation((data) => Promise.resolve(makeProject(data))),
       save: jest.fn().mockImplementation((project) => Promise.resolve(project)),
+      update: jest.fn().mockImplementation(async (userId, id, changes) => ({ ...await repo.findById(id, userId), ...changes })),
       delete: jest.fn().mockResolvedValue(true),
       reorder: jest.fn().mockResolvedValue(undefined),
     };
@@ -321,7 +322,7 @@ describe('ProjectService', () => {
       ).rejects.toThrow(
         new BadRequestException('Task key prefix is only for agile projects'),
       );
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('префикс другого проекта пользователя — 400', async () => {
@@ -335,7 +336,7 @@ describe('ProjectService', () => {
       ).rejects.toThrow(
         new BadRequestException('Task key prefix is already used'),
       );
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('повторная установка собственного префикса — не конфликт', async () => {
@@ -379,7 +380,7 @@ describe('ProjectService', () => {
         viewMode: 'board',
       });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({
           title: 'Обновлённый',
           viewMode: 'board',
@@ -392,7 +393,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { color: '#00ff00' });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ color: '#00ff00' }),
       );
     });
@@ -402,7 +403,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { icon: 'rocket' });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ icon: 'rocket' }),
       );
     });
@@ -412,7 +413,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { color: null });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ color: null }),
       );
     });
@@ -422,7 +423,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { icon: null });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ icon: null }),
       );
     });
@@ -436,7 +437,7 @@ describe('ProjectService', () => {
         color: '#0000ff',
       });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({
           title: 'Новый',
           icon: 'fire',
@@ -458,7 +459,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { parentId: 'proj-2' });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ parentId: 'proj-2' }),
       );
     });
@@ -543,7 +544,7 @@ describe('ProjectService', () => {
     it('обновляет порядок проектов по переданным ID', async () => {
       await service.reorder(1, ['proj-2', 'proj-1', 'proj-3']);
 
-      expect(repo.reorder).toHaveBeenCalledWith([
+      expect(repo.reorder).toHaveBeenCalledWith(1, [
         { id: 'proj-2', order: 0 },
         { id: 'proj-1', order: 1 },
         { id: 'proj-3', order: 2 },

@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import type { ProjectTreeNode } from '../model/types'
 import {
+  ArrowUp,
+  CornerUpLeft,
+  ArrowDown,
+  ChevronRight,
+  Plus,
+  Trash2,
   Book,
   Briefcase,
   Camera,
@@ -36,16 +42,29 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { PROJECT_INDENT } from '../lib/project-tree-drag'
+import { useProjectStore } from '../model/project-store'
 import { useDropTarget } from '@/features/tasks/lib/dnd/use-drop-target'
 
 const props = defineProps<{
   node: ProjectTreeNode
   depth: number
+  canMoveUp: boolean
+  canMoveDown: boolean
+  dragActive?: boolean
 }>()
 
 defineEmits<{
   edit: [node: ProjectTreeNode]
+  createChild: [node: ProjectTreeNode]
+  delete: [node: ProjectTreeNode]
+  dragStart: [event: PointerEvent]
+  outdent: []
+  move: [offset: number]
 }>()
+
+const store = useProjectStore()
+const expanded = computed(() => !store.collapsedIds.has(props.node.id))
 
 const iconComponents: Record<string, any> = {
   FolderOpen,
@@ -91,25 +110,38 @@ const { isHovered } = useDropTarget({
   projectId: props.node.id,
 })
 
+function guardActiveDrag(event: TouchEvent) {
+  if (!props.dragActive) return
+  if (event.cancelable) event.preventDefault()
+  event.stopPropagation()
+}
+
 const route = useRoute()
 const isActive = computed(() => route.params.projectId === props.node.id)
 </script>
 
 <template>
   <div>
-    <div class="group/row relative">
+    <div
+      class="group/row relative flex min-w-0 items-center rounded-md transition-colors"
+      :class="[
+        isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
+        isHovered ? 'bg-accent ring-2 ring-primary' : '',
+      ]"
+      :style="{ paddingLeft: `${depth * PROJECT_INDENT}px` }"
+    >
       <RouterLink
         ref="linkRef"
         :to="`/tasks/project/${node.id}`"
+        :draggable="false"
+        @pointerdown="$emit('dragStart', $event)"
+        @touchmove="guardActiveDrag"
+        @dragstart.prevent
+        @contextmenu="dragActive && $event.preventDefault()"
         data-drop-kind="project"
         :data-project-id="node.id"
         :data-project-type="node.type"
-        class="flex items-center gap-3 px-3 py-2 pr-8 rounded-md text-sm font-medium transition-colors"
-        :style="{ paddingLeft: `${12 + depth * 16}px` }"
-        :class="[
-          isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
-          isHovered ? 'bg-accent ring-2 ring-primary' : '',
-        ]"
+        class="project-press-target select-none flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-2 rounded-md text-sm font-medium transition-colors"
       >
         <component
           :is="nodeIcon"
@@ -120,30 +152,60 @@ const isActive = computed(() => route.params.projectId === props.node.id)
         <span class="truncate flex-1">{{ node.title }}</span>
       </RouterLink>
 
-      <!-- Actions menu -->
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <button
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all opacity-0 group-hover/row:opacity-100 cursor-pointer"
+            :aria-label="`Действия проекта ${node.title}`"
+            :disabled="store.treeBusy"
+            class="shrink-0 p-1 rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all opacity-60 group-hover/row:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 cursor-pointer"
           >
             <MoreHorizontal :size="14" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem @click="$emit('createChild', node)">
+            <Plus :size="14" class="mr-2" />
+            Создать подпроект
+          </DropdownMenuItem>
           <DropdownMenuItem @click="$emit('edit', node)">
             <Pencil :size="14" class="mr-2" />
             Изменить
           </DropdownMenuItem>
+          <DropdownMenuItem :disabled="!canMoveUp" @click="$emit('move', -1)">
+            <ArrowUp :size="14" class="mr-2" />
+            Переместить выше
+          </DropdownMenuItem>
+          <DropdownMenuItem :disabled="!canMoveDown" @click="$emit('move', 1)">
+            <ArrowDown :size="14" class="mr-2" />
+            Переместить ниже
+          </DropdownMenuItem>
+          <DropdownMenuItem v-if="node.parentId" @click="$emit('outdent')">
+            <CornerUpLeft :size="14" class="mr-2" />
+            На уровень выше
+          </DropdownMenuItem>
+          <DropdownMenuItem class="text-destructive" @click="$emit('delete', node)">
+            <Trash2 :size="14" class="mr-2" />
+            Удалить
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <button
+        v-if="node.children.length"
+        class="shrink-0 rounded p-1 hover:bg-sidebar-accent"
+        :aria-label="`${expanded ? 'Свернуть' : 'Развернуть'} ${node.title}`"
+        :aria-expanded="expanded"
+        @click="store.toggleExpanded(node.id)"
+      >
+        <ChevronRight :size="12" :class="expanded ? 'rotate-90' : ''" />
+      </button>
+      <span v-else class="w-5 shrink-0" />
     </div>
 
-    <ProjectTreeItem
-      v-for="child in node.children"
-      :key="child.id"
-      :node="child"
-      :depth="depth + 1"
-      @edit="$emit('edit', $event)"
-    />
   </div>
 </template>
+
+<style scoped>
+.project-press-target {
+  -webkit-touch-callout: none;
+}
+</style>

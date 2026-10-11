@@ -45,7 +45,7 @@
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
           </Button>
-          <Button :disabled="!canSave" @click="handleSave">
+          <Button :disabled="saving || !canSave" @click="handleSave">
             Сохранить
           </Button>
         </div>
@@ -78,6 +78,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useProjectStore()
+const saving = ref(false)
 
 const localTitle = ref('')
 const localDescription = ref('')
@@ -119,9 +120,10 @@ watch(() => props.open, (val) => {
 })
 
 async function handleSave() {
-  if (!props.project || !canSave.value) return
+  if (saving.value || !props.project || !canSave.value) return
 
   errorMessage.value = null
+  saving.value = true
   try {
     await store.updateProject(props.project.id, {
       title: localTitle.value.trim(),
@@ -135,6 +137,8 @@ async function handleSave() {
   } catch (err) {
     console.error('Ошибка обновления проекта:', err)
     errorMessage.value = apiErrorMessage(err, 'Не удалось сохранить проект')
+  } finally {
+    saving.value = false
   }
 }
 </script>

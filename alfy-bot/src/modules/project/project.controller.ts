@@ -15,6 +15,7 @@ import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { MoveProjectDto } from './dto/move-project.dto';
 import { ReorderDto } from './dto/reorder.dto';
 
 interface AuthRequest extends Request {
@@ -44,6 +45,12 @@ export class ProjectController {
   @ApiOperation({ summary: 'Изменить порядок проектов' })
   async reorder(@Request() req: AuthRequest, @Body() dto: ReorderDto) {
     return this.projectService.reorder(req.user.sub, dto.orderedIds);
+  }
+
+  @Patch(':id/move')
+  @ApiOperation({ summary: 'Перенести проект вместе с веткой на другой уровень' })
+  async move(@Request() req: AuthRequest, @Param('id') id: string, @Body() dto: MoveProjectDto) {
+    return this.projectService.move(req.user.sub, id, dto.parentId, dto.beforeId);
   }
 
   @Get(':id')

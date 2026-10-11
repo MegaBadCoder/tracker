@@ -258,3 +258,61 @@ describe('useProjectStore', () => {
     })
   })
 })
+
+describe('управление деревом', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('сохраняет детей удалённого родителя в корне, а внуков в ветке', async () => {
+    const store = useProjectStore()
+    store.projects = [makeProject({ id: 'root' }), makeProject({ id: 'child', parentId: 'root' }), makeProject({ id: 'grandchild', parentId: 'child' })]
+    vi.mocked(api.delete).mockResolvedValue({})
+    await store.deleteProject('root')
+    expect(store.projectTree.map(p => p.id)).toEqual(['child'])
+    expect(store.projectTree[0]?.children.map(p => p.id)).toEqual(['grandchild'])
+  })
+
+  it('ошибка удаления сохраняет всю ветку', async () => {
+    const store = useProjectStore()
+    store.projects = [makeProject({ id: 'root' }), makeProject({ id: 'child', parentId: 'root' })]
+    vi.mocked(api.delete).mockRejectedValue(new Error('offline'))
+    await expect(store.deleteProject('root')).rejects.toThrow('offline')
+    expect(store.projectTree[0]?.children[0]?.id).toBe('child')
+  })
+
+  it('сортирует соседей, сохраняя другие ветки, и откатывает ошибку', async () => {
+    const store = useProjectStore()
+    store.projects = [makeProject({ id: 'root' }), makeProject({ id: 'a', parentId: 'root', order: 0 }), makeProject({ id: 'b', parentId: 'root', order: 1 })]
+    vi.mocked(api.patch).mockResolvedValue({})
+    await store.reorderProjects(['b', 'a'])
+    expect(api.patch).toHaveBeenCalledWith('/projects/reorder', { orderedIds: ['b', 'a'] })
+    expect(store.projectTree[0]?.children.map(p => p.id)).toEqual(['b', 'a'])
+    vi.mocked(api.patch).mockRejectedValue(new Error('offline'))
+    await expect(store.reorderProjects(['a', 'b'])).rejects.toThrow('offline')
+    expect(store.projectTree[0]?.children.map(p => p.id)).toEqual(['b', 'a'])
+  })
+})
+
+
+describe('перенос между уровнями', () => {
+  beforeEach(() => { setActivePinia(createPinia()); vi.clearAllMocks() })
+  it('сохраняет перенос одним запросом и применяет дерево сервера', async () => {
+    const store = useProjectStore()
+    store.projects = [makeProject({ id: 'a' }), makeProject({ id: 'b' })]
+    const updated = [makeProject({ id: 'a' }), makeProject({ id: 'b', parentId: 'a' })]
+    vi.mocked(api.patch).mockResolvedValue({ data: updated })
+    await store.moveProject('b', 'a', null)
+    expect(api.patch).toHaveBeenCalledWith('/projects/b/move', { parentId: 'a', beforeId: null })
+    expect(store.projects).toEqual(updated)
+  })
+  it('ошибка не оставляет частичный перенос', async () => {
+    const store = useProjectStore()
+    const original = [makeProject({ id: 'a' }), makeProject({ id: 'b' })]
+    store.projects = original
+    vi.mocked(api.patch).mockRejectedValue(new Error('offline'))
+    await expect(store.moveProject('b', 'a', null)).rejects.toThrow('offline')
+    expect(store.projects).toEqual(original)
+  })
+})

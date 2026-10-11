@@ -118,8 +118,11 @@ export class ProjectService {
       project.id,
     );
 
-    Object.assign(project, dto);
-    return this.projectRepo.save(project);
+    return this.projectRepo.update(userId, id, dto);
+  }
+
+  async move(userId: number, id: string, parentId: string | null, beforeId: string | null): Promise<Project[]> {
+    return this.projectRepo.move(userId, id, parentId, beforeId);
   }
 
   async delete(userId: number, id: string): Promise<void> {
@@ -132,6 +135,6 @@ export class ProjectService {
       throw new BadRequestException('Ordered IDs array cannot be empty');
     }
     const updates = orderedIds.map((id, index) => ({ id, order: index }));
-    await this.projectRepo.reorder(updates);
+    await this.projectRepo.reorder(userId, updates);
   }
 }

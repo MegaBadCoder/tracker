@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { PanelLeftClose } from 'lucide-vue-next'
+import { Button } from '@/components/ui/button'
 import UserSection from './UserSection.vue'
 import SidebarNav from './SidebarNav.vue'
 import type { NavLink } from '@/types/navigation'
@@ -8,10 +10,13 @@ import { navLinks } from '@/router/nav'
 const props = defineProps<{
   open: boolean
   links?: NavLink[]
+  desktopCollapsed?: boolean
+  collapsible?: boolean
 }>()
 
 const emit = defineEmits<{
   close: []
+  collapse: []
   open: []
 }>()
 
@@ -117,12 +122,17 @@ function resetDrag() {
 
 <template>
   <!-- Desktop sidebar -->
-  <aside class="hidden sm:flex flex-col w-64 flex-shrink-0 border-r border-sidebar-border bg-sidebar h-screen sticky top-0">
-    <div class="p-4 pt-5">
-      <UserSection :links="navLinks" />
+  <aside :class="desktopCollapsed ? 'hidden' : 'hidden sm:flex'" class="flex-col w-64 flex-shrink-0 border-r border-sidebar-border bg-sidebar h-dvh sticky top-0 overflow-hidden">
+    <div class="shrink-0 flex items-center gap-1 p-4 pt-5">
+      <div class="min-w-0 flex-1"><UserSection :links="navLinks" /></div>
+      <Button v-if="collapsible" variant="ghost" size="icon" class="shrink-0" aria-label="Скрыть боковое меню" title="Скрыть боковое меню" @click="emit('collapse')">
+        <PanelLeftClose class="h-5 w-5" />
+      </Button>
     </div>
-    <SidebarNav v-if="links?.length" :links="links" />
-    <slot name="section-extra" />
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-sidebar-scroll>
+      <SidebarNav v-if="links?.length" :links="links" />
+      <slot name="section-extra" />
+    </div>
   </aside>
 
   <!-- Mobile: edge detector for swipe-to-open + sliding panel -->
@@ -147,18 +157,23 @@ function resetDrag() {
         @click="emit('close')"
       />
       <aside
-        class="absolute left-0 top-0 h-full w-72 bg-sidebar border-r border-sidebar-border shadow-lg"
+        class="absolute left-0 top-0 h-full w-72 flex flex-col overflow-hidden bg-sidebar border-r border-sidebar-border shadow-lg"
         :style="[panelStyle, { touchAction: 'pan-y' }]"
         @touchstart.passive="onTouchStart($event, 'close')"
         @touchmove.passive="onTouchMove"
         @touchend="onTouchEnd"
         @touchcancel="resetDrag"
       >
-        <div class="p-4 pt-5">
-          <UserSection :links="navLinks" />
+        <div class="shrink-0 flex items-center gap-1 p-4 pt-5">
+          <div class="min-w-0 flex-1"><UserSection :links="navLinks" /></div>
+          <Button variant="ghost" size="icon" class="shrink-0" aria-label="Закрыть боковое меню" @click="emit('close')">
+            <PanelLeftClose class="h-5 w-5" />
+          </Button>
         </div>
-        <SidebarNav v-if="links?.length" :links="links" />
-        <slot name="section-extra" />
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-sidebar-scroll>
+          <SidebarNav v-if="links?.length" :links="links" />
+          <slot name="section-extra" />
+        </div>
       </aside>
     </div>
   </Teleport>
