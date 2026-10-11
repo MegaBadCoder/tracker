@@ -51,6 +51,7 @@ const props = defineProps<{
   depth: number
   canMoveUp: boolean
   canMoveDown: boolean
+  dragActive?: boolean
 }>()
 
 defineEmits<{
@@ -109,6 +110,12 @@ const { isHovered } = useDropTarget({
   projectId: props.node.id,
 })
 
+function guardActiveDrag(event: TouchEvent) {
+  if (!props.dragActive) return
+  if (event.cancelable) event.preventDefault()
+  event.stopPropagation()
+}
+
 const route = useRoute()
 const isActive = computed(() => route.params.projectId === props.node.id)
 </script>
@@ -131,9 +138,9 @@ const isActive = computed(() => route.params.projectId === props.node.id)
         :to="`/tasks/project/${node.id}`"
         :draggable="false"
         @pointerdown="$emit('dragStart', $event)"
-        @touchstart.stop
+        @touchmove="guardActiveDrag"
         @dragstart.prevent
-        @contextmenu.prevent
+        @contextmenu="dragActive && $event.preventDefault()"
         data-drop-kind="project"
         :data-project-id="node.id"
         class="project-press-target select-none flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-8 rounded-md text-sm font-medium transition-colors"

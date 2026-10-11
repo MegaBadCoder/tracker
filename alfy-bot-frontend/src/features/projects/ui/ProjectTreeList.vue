@@ -58,6 +58,7 @@ function outdent(node: ProjectTreeNode) {
       <ProjectTreeItem
         :node="row.node"
         :depth="row.depth"
+        :drag-active="drag?.active ?? false"
         :can-move-up="siblings(row.node)[0]?.id !== row.node.id"
         :can-move-down="siblings(row.node).slice(-1)[0]?.id !== row.node.id"
         @drag-start="start(row, $event)"
