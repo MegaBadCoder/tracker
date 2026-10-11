@@ -326,13 +326,15 @@ interface TaskFormData extends Omit<Task, 'id' | 'completed' | 'pomodoroComplete
 
 interface Props {
   loading?: boolean
+  /** Дата, с которой форма стартует и к которой возвращается после отправки. */
+  defaultDueDate?: Date
 }
 
 interface Emits {
   (e: 'submit', task: Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>): void
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   loading: false
 })
 
@@ -341,7 +343,7 @@ const emit = defineEmits<Emits>()
 const form = reactive<TaskFormData>({
   title: '',
   description: '',
-  dueDate: undefined,
+  dueDate: props.defaultDueDate,
   deadline: undefined,
   priority: undefined,
   tags: [],
@@ -380,7 +382,7 @@ const titleInputRef = ref<InstanceType<typeof ContentEditableInput> | null>(null
 const resetForm = () => {
   form.title = ''
   form.description = ''
-  form.dueDate = undefined
+  form.dueDate = props.defaultDueDate
   dueDateTime.value = ''
   form.deadline = undefined
   form.priority = undefined

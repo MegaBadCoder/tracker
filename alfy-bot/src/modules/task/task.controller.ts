@@ -153,7 +153,9 @@ export class TaskController {
   }
 
   @Post(':id/materialize')
-  @ApiOperation({ summary: 'Проявить виртуальное вхождение повторяющейся задачи' })
+  @ApiOperation({
+    summary: 'Проявить виртуальное вхождение повторяющейся задачи',
+  })
   async materialize(
     @Request() req: AuthRequest,
     @Param('id') id: string,

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PomodoroConfig, Task } from '../../shared/entities';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { UserSettingsPort } from './domain/user-settings.port';
+import { TaskNumberPort } from './domain/task-number.port';
 import {
   buildNextInstance,
   computeNextDueDate,
@@ -27,6 +28,7 @@ export class OverdueRecurringService {
   constructor(
     private readonly taskRepo: TaskRepositoryPort,
     private readonly userSettings: UserSettingsPort,
+    private readonly taskNumbers: TaskNumberPort,
   ) {}
 
   async processAllUsersAtMidnight(nowUtc: Date): Promise<void> {
@@ -90,6 +92,12 @@ export class OverdueRecurringService {
         let successorData: Partial<Task> | null = nextDate
           ? buildNextInstance(task, nextDate, parentId)
           : null;
+        if (successorData) {
+          successorData = {
+            ...successorData,
+            number: await this.taskNumbers.allocate(task.projectId),
+          };
+        }
         if (successorData && task.pomodoroConfig) {
           successorData = {
             ...successorData,

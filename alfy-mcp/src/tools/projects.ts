@@ -13,6 +13,7 @@ interface ProjectItem {
   parentId: string | null;
   description: string | null;
   viewMode: 'list' | 'board';
+  type: 'simple' | 'agile';
   icon: string | null;
   color: string | null;
   order: number;
@@ -30,6 +31,7 @@ function pickProject(p: ProjectItem): ProjectItem {
     parentId: p.parentId ?? null,
     description: p.description ?? null,
     viewMode: p.viewMode,
+    type: p.type,
     icon: p.icon ?? null,
     color: p.color ?? null,
     order: p.order,
@@ -40,7 +42,7 @@ export function registerProjectTools(server: McpServer, client: AlfyRestClient):
   server.registerTool(
     'list_projects',
     {
-      description: 'List all projects as a flat list (id, title, parentId, description, viewMode, icon, color, order)',
+      description: 'List all projects as a flat list (id, title, parentId, description, type, viewMode, icon, color, order). type=agile supports sprints.',
       inputSchema: {},
     },
     async () => {
@@ -58,6 +60,7 @@ export function registerProjectTools(server: McpServer, client: AlfyRestClient):
         description: z.string().optional().describe('Project description'),
         parentId: z.string().uuid().optional().describe('Parent project UUID'),
         viewMode: z.enum(['list', 'board']).optional().describe('View mode (default: list)'),
+        type: z.enum(['simple', 'agile']).optional().describe('Тип проекта; agile поддерживает истории и спринты. После создания тип не меняется.'),
         icon: z.string().optional().describe('Icon name'),
         color: z.string().optional().describe('Color hex, e.g. #ff0000'),
       },
@@ -67,6 +70,7 @@ export function registerProjectTools(server: McpServer, client: AlfyRestClient):
       if (args.description !== undefined) body['description'] = args.description;
       if (args.parentId !== undefined) body['parentId'] = args.parentId;
       if (args.viewMode !== undefined) body['viewMode'] = args.viewMode;
+      if (args.type !== undefined) body['type'] = args.type;
       if (args.icon !== undefined) body['icon'] = args.icon;
       if (args.color !== undefined) body['color'] = args.color;
       const created = await client.post<ProjectItem>('/projects', body);

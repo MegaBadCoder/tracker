@@ -560,13 +560,19 @@ describe('retargetRecurrenceToDate', () => {
 describe('isSameUtcDay', () => {
   it('true for same calendar day different time', () => {
     expect(
-      isSameUtcDay(d('2026-04-13T10:00:00.000Z'), d('2026-04-13T15:30:00.000Z')),
+      isSameUtcDay(
+        d('2026-04-13T10:00:00.000Z'),
+        d('2026-04-13T15:30:00.000Z'),
+      ),
     ).toBe(true);
   });
 
   it('false for adjacent days', () => {
     expect(
-      isSameUtcDay(d('2026-04-13T10:00:00.000Z'), d('2026-04-14T10:00:00.000Z')),
+      isSameUtcDay(
+        d('2026-04-13T10:00:00.000Z'),
+        d('2026-04-14T10:00:00.000Z'),
+      ),
     ).toBe(false);
   });
 });

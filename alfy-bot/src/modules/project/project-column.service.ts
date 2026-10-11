@@ -41,7 +41,7 @@ export class ProjectColumnService {
   ): Promise<ProjectColumn> {
     const project = await this.validateProjectAccess(userId, projectId);
 
-    if (project.viewMode === 'list') {
+    if (project.type === 'simple' && project.viewMode === 'list') {
       throw new BadRequestException(
         'Cannot add columns to a list-mode project',
       );

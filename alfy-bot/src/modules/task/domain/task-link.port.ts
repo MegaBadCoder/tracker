@@ -12,10 +12,7 @@ export abstract class TaskLinkPort {
     goalIds: number[],
   ): Promise<void>;
 
-  abstract findTaskIdsByGoal(
-    userId: number,
-    goalId: number,
-  ): Promise<string[]>;
+  abstract findTaskIdsByGoal(userId: number, goalId: number): Promise<string[]>;
 
   abstract replaceTaskLinksForGoal(
     userId: number,

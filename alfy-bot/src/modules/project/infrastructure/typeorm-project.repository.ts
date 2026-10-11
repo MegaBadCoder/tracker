@@ -2,7 +2,7 @@ import { planProjectMove } from '../lib/plan-project-move';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Project } from '../../../shared/entities';
+import { Project, Task } from '../../../shared/entities';
 import { ProjectRepositoryPort } from '../domain/project-repository.port';
 
 @Injectable()
@@ -35,6 +35,13 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
       where: { id, userId },
       relations: ['columns'],
     });
+  }
+
+  async findByTaskKeyPrefix(
+    userId: number,
+    taskKeyPrefix: string,
+  ): Promise<Project | null> {
+    return this.repo.findOne({ where: { userId, taskKeyPrefix } });
   }
 
   async create(data: Partial<Project>): Promise<Project> {
@@ -75,7 +82,7 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
       const projects = await repository.find({ where: { userId }, order: { order: 'ASC', createdAt: 'DESC' } });
       const updated = transform(projects);
       const previous = new Map(projects.map(project => [project.id, project]));
-      const fields = ['parentId', 'order', 'title', 'description', 'viewMode', 'icon', 'color'] as const;
+      const fields = ['parentId', 'order', 'title', 'description', 'viewMode', 'icon', 'color', 'taskKeyPrefix'] as const;
       for (const project of updated) {
         const old = previous.get(project.id)!;
         const changes = Object.fromEntries(fields.filter(field => old[field] !== project[field]).map(field => [field, project[field]]));
@@ -88,7 +95,10 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
   async delete(id: string, userId: number): Promise<boolean> {
     const project = await this.findById(id, userId);
     if (!project) return false;
-    await this.repo.remove(project);
+    await this.repo.manager.transaction(async (manager) => {
+      await manager.update(Task, { projectId: id }, { number: null });
+      await manager.remove(project);
+    });
     return true;
   }
 

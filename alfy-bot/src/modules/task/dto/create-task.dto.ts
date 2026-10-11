@@ -55,7 +55,11 @@ export class CreateTaskDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: 'high', enum: ['high', 'medium', 'low'], nullable: true })
+  @ApiPropertyOptional({
+    example: 'high',
+    enum: ['high', 'medium', 'low'],
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
   priority?: 'high' | 'medium' | 'low' | null;
@@ -91,15 +95,42 @@ export class CreateTaskDto {
   @IsObject()
   checklist?: ChecklistData;
 
-  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    nullable: true,
+  })
   @IsOptional()
   @IsUUID()
-  projectId?: string;
+  projectId?: string | null;
 
   @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440001' })
   @IsOptional()
   @IsUUID()
   columnId?: string;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440002',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string | null;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440003',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  sprintId?: string | null;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440004',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  releaseId?: string | null;
 
   @ApiPropertyOptional({ description: 'Recurrence rule for repeating tasks' })
   @IsOptional()

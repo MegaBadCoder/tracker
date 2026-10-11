@@ -1,3 +1,4 @@
+import { TypeOrmProjectColumnRepository } from './typeorm-project-column.repository';
 import { ProjectService } from '../project.service';
 import { DataSource } from 'typeorm';
 import * as entities from '../../../shared/entities';
@@ -70,11 +71,19 @@ describe('перенос проектов в SQLite', () => {
     expect(await repo.findById(a.id, userId)).toMatchObject({ title: 'Renamed', parentId: b.id });
   });
 
+  it('сохраняет префикс Agile-проекта при редактировании и переносе', async () => {
+    const parent = await repo.create({ userId, title: 'Parent' });
+    const project = await repo.create({ userId, title: 'Agile', type: 'agile', taskKeyPrefix: 'OLD' });
+    await repo.update(userId, project.id, { taskKeyPrefix: 'NEW' });
+    await repo.move(userId, project.id, parent.id, null);
+    expect(await repo.findById(project.id, userId)).toMatchObject({ taskKeyPrefix: 'NEW', parentId: parent.id, type: 'agile' });
+  });
+
   it('чужой ID в reorder не меняет ни свои, ни чужие проекты', async () => {
     const otherUser = await db.getRepository(entities.User).save({ telegramId: 1001 });
     const foreign = await repo.create({ userId: otherUser.id, title: 'Foreign', parentId: null, order: 7 });
     const own = await repo.create({ userId, title: 'Own', parentId: null, order: 5 });
-    await expect(new ProjectService(repo).reorder(userId, [own.id, foreign.id])).rejects.toThrow();
+    await expect(new ProjectService(repo, new TypeOrmProjectColumnRepository(db.getRepository(entities.ProjectColumn))).reorder(userId, [own.id, foreign.id])).rejects.toThrow();
     expect((await repo.findById(own.id, userId))?.order).toBe(5);
     expect((await repo.findById(foreign.id, otherUser.id))?.order).toBe(7);
   });

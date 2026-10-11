@@ -35,6 +35,8 @@ export function useDragSource(opts: {
   cardEl: Ref<HTMLElement | null>
   handleEl: Ref<HTMLElement | null>
   onTap: () => void
+  /** false — карточкой владеет другой DnD-стек (vuedraggable), не мешаем ему. */
+  enabled?: boolean
 }): void {
   const dnd = useTaskDnd()
 
@@ -161,6 +163,13 @@ export function useDragSource(opts: {
   }
 
   onMounted(() => {
+    // Карточка внутри vuedraggable-списка отдаёт жест сортировке: этот движок
+    // при старте делает setPointerCapture и забирает все pointer-события себе,
+    // после чего Sortable перетаскивания просто не видит. Два стека на одном
+    // элементе не уживаются — см. CLAUDE.md.
+    if (opts.enabled === false)
+      return
+
     const card = opts.cardEl.value
     const handle = opts.handleEl.value
 

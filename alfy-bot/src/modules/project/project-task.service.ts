@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
+import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
+import { TaskNumberPort } from '../task/domain/task-number.port';
 import { MoveTaskDto } from './dto/move-task.dto';
 import { ReorderTasksDto } from './dto/reorder-tasks.dto';
 
@@ -15,7 +17,9 @@ export class ProjectTaskService {
   constructor(
     private readonly projectRepo: ProjectRepositoryPort,
     private readonly columnRepo: ProjectColumnRepositoryPort,
+    private readonly groupRepo: BoardGroupRepositoryPort,
     private readonly taskRepo: TaskRepositoryPort,
+    private readonly taskNumbers: TaskNumberPort,
   ) {}
 
   async moveTask(
@@ -47,6 +51,22 @@ export class ProjectTaskService {
     const targetProjectId =
       dto.projectId !== undefined ? dto.projectId : currentProjectId;
     const targetColumnId = dto.columnId !== undefined ? dto.columnId : null;
+    // Асимметрия с columnId намеренная. Обычная board-доска шлёт move без
+    // groupId, и трактовка "не пришло значит обнулить" стирала бы эпик у
+    // задачи после одного перетаскивания в режиме board — то есть настройка
+    // отображения выполняла бы необратимое доменное действие. Отсутствие
+    // поля значит "не трогать", явный null значит "убрать из группы".
+    // Исключение — переезд в другой проект: группа принадлежит старому
+    // проекту, тащить её за собой нельзя.
+    const keepsProject = targetProjectId === task.projectId;
+    const targetGroupId =
+      dto.groupId !== undefined
+        ? dto.groupId
+        : keepsProject
+          ? task.groupId
+          : null;
+    const targetSprintId = keepsProject ? task.sprintId : null;
+    const targetReleaseId = keepsProject ? task.releaseId : null;
 
     // Cannot set column without project
     if (targetColumnId && !targetProjectId) {
@@ -54,28 +74,47 @@ export class ProjectTaskService {
     }
 
     // Validate target project if moving to a different project
+    let targetProject = currentProject;
     if (targetProjectId && targetProjectId !== currentProjectId) {
-      const targetProject = await this.projectRepo.findById(
-        targetProjectId,
-        userId,
-      );
-      if (!targetProject)
+      const found = await this.projectRepo.findById(targetProjectId, userId);
+      if (!found)
         throw new NotFoundException(
           `Target project #${targetProjectId} not found`,
         );
-      if (targetProject.userId !== userId)
+      if (found.userId !== userId)
         throw new ForbiddenException('Target project belongs to another user');
+      targetProject = found;
+    }
 
-      if (targetColumnId && targetProject.viewMode === 'list') {
+    if (targetColumnId && targetProjectId) {
+      if (
+        targetProject.type === 'simple' &&
+        targetProject.viewMode === 'list'
+      ) {
         throw new BadRequestException(
           'Cannot assign column in a list-mode project',
         );
       }
-    } else if (targetProjectId && targetColumnId) {
-      // Same project — validate viewMode
-      if (currentProject.viewMode === 'list') {
+    }
+
+    // Drop в сайдбаре кладёт в URL проект назначения,
+    // поэтому источник переноса — task.projectId.
+    if (!keepsProject && task.projectId) {
+      const originProject =
+        task.projectId === currentProjectId
+          ? currentProject
+          : task.projectId === targetProjectId
+            ? targetProject
+            : await this.projectRepo.findById(task.projectId, userId);
+
+      if (
+        originProject?.type === 'agile' &&
+        (!targetProjectId || targetProject.type !== 'agile')
+      ) {
         throw new BadRequestException(
-          'Cannot assign column in a list-mode project',
+          targetProjectId
+            ? 'Cannot move a task out of an agile project'
+            : 'Cannot move a task from an agile project to the inbox',
         );
       }
     }
@@ -90,11 +129,34 @@ export class ProjectTaskService {
         throw new NotFoundException(`Column #${targetColumnId} not found`);
     }
 
+    // Validate group
+    if (targetGroupId && targetProjectId) {
+      const group = await this.groupRepo.findById(
+        targetGroupId,
+        targetProjectId,
+      );
+      if (!group)
+        throw new NotFoundException(`Group #${targetGroupId} not found`);
+    }
+
+    const columnId =
+      targetSprintId && !targetColumnId && targetProjectId
+        ? await this.firstColumnId(targetProjectId)
+        : targetColumnId;
+
+    const number = keepsProject
+      ? task.number
+      : await this.taskNumbers.allocate(targetProjectId);
+
     return this.taskRepo.updatePosition(
       taskId,
       userId,
       targetProjectId,
-      targetColumnId,
+      columnId,
+      targetGroupId,
+      targetSprintId,
+      targetReleaseId,
+      number,
       order,
     );
   }
@@ -112,5 +174,11 @@ export class ProjectTaskService {
 
     const updates = dto.orderedIds.map((id, index) => ({ id, order: index }));
     await this.taskRepo.reorderTasks(updates);
+  }
+
+  private async firstColumnId(projectId: string): Promise<string | null> {
+    const columns = await this.columnRepo.findAllByProject(projectId);
+    if (columns.length === 0) return null;
+    return columns.reduce((min, c) => (c.order < min.order ? c : min)).id;
   }
 }

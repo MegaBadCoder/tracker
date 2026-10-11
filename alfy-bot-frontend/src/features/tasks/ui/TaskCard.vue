@@ -4,6 +4,8 @@ import { AlertCircle, Calendar as CalendarIcon, CheckSquare, Clock, Flag, Folder
 import { computed, ref, toRef } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { RoundCheckbox } from '@/components/ui/roundCheckbox'
+import { taskKey } from '@/features/projects/lib/task-key'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import { computeChecklistProgress } from '../lib/checklist'
 import { useDragSource } from '../lib/dnd/use-drag-source'
 import { DATE_SHORT, DATE_WITH_TIME, formatDate, formatPomodoro } from '../lib/formatters'
@@ -16,14 +18,32 @@ const emit = defineEmits<TaskCardEmits>()
 const cardEl = ref<HTMLElement | null>(null)
 const handleEl = ref<HTMLElement | null>(null)
 
+const ownsGesture = computed(() => props.dndSource !== false)
+
 useDragSource({
   task: toRef(props, 'task'),
   cardEl,
   handleEl,
   onTap: () => emit('open', props.task),
+  enabled: ownsGesture.value,
 })
 
+// Когда жестом владеет vuedraggable, открывать задачу некому — onTap
+// кастомного движка не сработает, поэтому нужен обычный клик.
+function onCardClick(event: MouseEvent) {
+  if (ownsGesture.value)
+    return
+  if ((event.target as HTMLElement).closest('[data-no-drag]'))
+    return
+  emit('open', props.task)
+}
+
 const isCompact = computed(() => props.variant === 'compact')
+
+const projectStore = useProjectStore()
+const key = computed(() =>
+  taskKey(props.task.projectId ? projectStore.projectMap.get(props.task.projectId) : undefined, props.task),
+)
 
 const checklistStats = computed(() => computeChecklistProgress(props.task.checklist?.items ?? []))
 const checklistTotal = computed(() => checklistStats.value.total)
@@ -49,11 +69,18 @@ const hasMeta = computed(
     ref="cardEl"
     role="listitem"
     :data-task-id="task.id"
+    @click="onCardClick"
     :class="[
-      'group flex items-center gap-2 cursor-pointer transition-all duration-200 hover:bg-muted/60 hover:shadow-sm',
-      isCompact ? 'pl-1 pr-3 py-2 min-h-[36px]' : 'pl-1 pr-4 py-3 min-h-[44px]',
+      // transition-all анимировал бы и раскладку; перечисляем ровно то, что меняется
+      'group flex items-center gap-2 cursor-pointer transition-[background-color,border-color,box-shadow] duration-200',
+      // На доске карточке нужна собственная поверхность: без неё она была
+      // прозрачной и сливалась с подложкой истории. --card в тёмной теме уже
+      // на ступень светлее фона (0.205 против 0.145) — используем эту ступень.
+      isCompact
+        ? 'pl-1 pr-2.5 py-1.5 min-h-[36px] rounded-md border border-border bg-card shadow-sm hover:bg-muted/50'
+        : 'pl-1 pr-4 py-3 min-h-[44px] hover:bg-muted/60 hover:shadow-sm',
       task.isOverdue
-        ? 'border-l-4 border-red-500 bg-red-500/10 dark:bg-red-500/20'
+        ? 'border-l-4 border-l-red-500 bg-red-500/10 dark:bg-red-500/15'
         : task.completed && 'opacity-50',
     ]"
   >
@@ -84,8 +111,20 @@ const hasMeta = computed(
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2">
         <span
+          v-if="key"
+          data-testid="task-key"
+          class="shrink-0 text-[11px] font-mono text-muted-foreground"
+        >
+          {{ key }}
+        </span>
+        <span
           :class="[
-            'text-sm truncate',
+            'truncate',
+            // На доске карточка — самый частый элемент, и на 14px она спорила
+            // с заголовками колонок и эпиков того же кегля. Ниже 12px уводить
+            // нельзя — начинает страдать читаемость, поэтому на 12px задача
+            // отделяется от подписи истории уже не кеглем, а цветом и весом.
+            isCompact ? 'text-xs' : 'text-sm',
             task.isOverdue
               ? 'text-red-600 dark:text-red-400 font-medium'
               : task.completed

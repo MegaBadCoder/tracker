@@ -6,6 +6,7 @@ import { GoalService } from '../src/modules/goal/application/goal.service';
 import { GoalReportController } from '../src/modules/report/goal-report.controller';
 import { ReportService } from '../src/modules/report/application/report.service';
 import { JwtOrApiTokenGuard } from '../src/modules/auth/guards/jwt-or-api-token.guard';
+import { TaskGoalQueryPort } from '../src/modules/task/domain/task-goal-query.port';
 
 // Routing regression: GoalController and GoalReportController share the `goals`
 // prefix. GoalController is registered FIRST here (mirrors AppModule, which imports
@@ -27,6 +28,12 @@ describe('Web goal reports routing (e2e)', () => {
     getGoalReportStatus: jest.fn(),
     getReportQueue: jest.fn(),
   };
+  // GoalController gained a TaskGoalQueryPort dependency; this suite builds its
+  // own TestingModule, so the port has to be provided here or nothing compiles.
+  const taskGoals = {
+    listByGoal: jest.fn(),
+    replaceTaskLinksForGoal: jest.fn(),
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -34,11 +41,14 @@ describe('Web goal reports routing (e2e)', () => {
       providers: [
         { provide: GoalService, useValue: goalService },
         { provide: ReportService, useValue: reportService },
+        { provide: TaskGoalQueryPort, useValue: taskGoals },
       ],
     })
       .overrideGuard(JwtOrApiTokenGuard)
       .useValue({
-        canActivate: (ctx: { switchToHttp: () => { getRequest: () => { user?: unknown } } }) => {
+        canActivate: (ctx: {
+          switchToHttp: () => { getRequest: () => { user?: unknown } };
+        }) => {
           ctx.switchToHttp().getRequest().user = { sub: 42 };
           return true;
         },
@@ -47,7 +57,9 @@ describe('Web goal reports routing (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
   });
 
@@ -73,7 +85,9 @@ describe('Web goal reports routing (e2e)', () => {
 
   it('GET /api/goals/reports/queue without date defaults to today (YYYY-MM-DD)', async () => {
     reportService.getReportQueue.mockResolvedValue([]);
-    await request(app.getHttpServer()).get('/api/goals/reports/queue').expect(200);
+    await request(app.getHttpServer())
+      .get('/api/goals/reports/queue')
+      .expect(200);
 
     const arg = reportService.getReportQueue.mock.calls[0][1] as string;
     expect(arg).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -92,13 +106,23 @@ describe('Web goal reports routing (e2e)', () => {
       .get('/api/goals/9/report-status?date=2026-06-01')
       .expect(200);
 
-    expect(reportService.getGoalReportStatus).toHaveBeenCalledWith(42, 9, '2026-06-01');
+    expect(reportService.getGoalReportStatus).toHaveBeenCalledWith(
+      42,
+      9,
+      '2026-06-01',
+    );
     expect(res.body.goalId).toBe(9);
   });
 
   it('GET /api/goals/:id (existing route) still works alongside the new controller', async () => {
-    goalService.findById.mockResolvedValue({ id: 5, user_id: 42, goal_name: 'X' });
-    const res = await request(app.getHttpServer()).get('/api/goals/5').expect(200);
+    goalService.findById.mockResolvedValue({
+      id: 5,
+      user_id: 42,
+      goal_name: 'X',
+    });
+    const res = await request(app.getHttpServer())
+      .get('/api/goals/5')
+      .expect(200);
     expect(res.body.id).toBe(5);
     expect(reportService.getGoalReportStatus).not.toHaveBeenCalled();
   });

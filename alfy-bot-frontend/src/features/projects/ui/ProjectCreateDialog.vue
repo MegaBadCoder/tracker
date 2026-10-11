@@ -36,13 +36,34 @@
           />
         </div>
 
-        <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
+        <div class="space-y-2">
+          <label class="text-sm font-medium">Тип проекта</label>
+          <Tabs :model-value="type" @update:model-value="type = $event as ProjectType">
+            <TabsList class="w-full">
+              <TabsTrigger value="simple" class="flex-1">
+                Обычный
+              </TabsTrigger>
+              <TabsTrigger value="agile" class="flex-1">
+                Agile
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <p class="text-xs text-muted-foreground">
+            Тип нельзя изменить после создания проекта.
+          </p>
+        </div>
+
+        <TaskKeyPrefixField v-if="type === 'agile'" v-model="taskKeyPrefix" />
+
+        <p v-if="errorMessage" class="text-sm text-destructive" role="alert" data-testid="project-create-error">
+          {{ errorMessage }}
+        </p>
 
         <div class="flex justify-end gap-2 pt-2">
           <Button variant="ghost" @click="$emit('update:open', false)">
             Отмена
           </Button>
-          <Button :disabled="saving || !title.trim()" @click="handleSubmit">
+          <Button :disabled="saving || !canSubmit" @click="handleSubmit">
             Создать
           </Button>
         </div>
@@ -52,14 +73,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import type { ProjectType } from '../model/types'
+import { computed, ref, watch } from 'vue'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { apiErrorMessage } from '../lib/api-error'
+import { isObviouslyInvalidTaskKeyPrefix } from '../lib/task-key'
 import { useProjectStore } from '../model/project-store'
 import ProjectPicker from './ProjectPicker.vue'
 import IconPicker from './IconPicker.vue'
 import ColorPicker from './ColorPicker.vue'
+import TaskKeyPrefixField from './TaskKeyPrefixField.vue'
 
 const props = defineProps<{
   open: boolean
@@ -75,27 +101,36 @@ const description = ref('')
 const icon = ref<string | null>(null)
 const color = ref<string | null>(null)
 const localParentId = ref<string | null>(null)
+const type = ref<ProjectType>('simple')
+const taskKeyPrefix = ref('')
+const errorMessage = ref<string | null>(null)
+
+const canSubmit = computed(() =>
+  title.value.trim().length > 0
+  && !(type.value === 'agile' && isObviouslyInvalidTaskKeyPrefix(taskKeyPrefix.value)),
+)
 
 const store = useProjectStore()
 const saving = ref(false)
-const error = ref('')
 
 watch(() => props.open, (val) => {
-  error.value = ''
   if (val) {
     title.value = ''
     description.value = ''
     icon.value = null
     color.value = null
     localParentId.value = props.parentId ?? null
+    type.value = 'simple'
+    taskKeyPrefix.value = ''
+    errorMessage.value = null
   }
 })
 
 async function handleSubmit() {
-  if (saving.value || !title.value.trim()) return
+  if (saving.value || !canSubmit.value) return
 
+  errorMessage.value = null
   saving.value = true
-  error.value = ''
   try {
     await store.createProject({
       title: title.value.trim(),
@@ -103,10 +138,13 @@ async function handleSubmit() {
       parentId: localParentId.value,
       icon: icon.value,
       color: color.value,
+      type: type.value,
+      ...(type.value === 'agile' && taskKeyPrefix.value.trim() && { taskKeyPrefix: taskKeyPrefix.value.trim() }),
     })
     emit('update:open', false)
-  } catch {
-    error.value = 'Не удалось создать проект. Попробуйте ещё раз.'
+  } catch (err) {
+    console.error('Ошибка создания проекта:', err)
+    errorMessage.value = apiErrorMessage(err, 'Не удалось создать проект')
   } finally {
     saving.value = false
   }

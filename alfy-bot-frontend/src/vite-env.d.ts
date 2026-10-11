@@ -3,6 +3,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
+  readonly VITE_MCP_URL?: string
   readonly VITE_DEV_TELEGRAM_ID: string
   readonly VITE_DEV_USE_WIDGET: string
   readonly VITE_BOT_USERNAME: string

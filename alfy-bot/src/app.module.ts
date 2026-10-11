@@ -30,10 +30,17 @@ import {
   PushSubscription,
   Project,
   ProjectColumn,
+  BoardGroup,
+  Sprint,
+  Release,
   ApiToken,
   Link,
 } from './shared/entities';
 import { ScheduleMigrationService } from './shared/database/schedule-migration.service';
+import { BoardGroupConstraintsMigrationService } from './shared/database/board-group-constraints.service';
+import { initializeWithSchemaSync } from './shared/database/create-data-source';
+import { ProjectTypeMigrationService } from './shared/database/project-type-migration.service';
+import { TaskNumberMigrationService } from './shared/database/task-number-migration.service';
 import { QuestionMigrationService } from './shared/database/question-migration.service';
 import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
 import { RecurringSeriesRepairService } from './shared/database/recurring-series-repair.service';
@@ -53,26 +60,39 @@ const telegramImports = isTelegramEnabled()
   imports: [
     ConfigModule.forRoot(),
     ScheduleModule.forRoot(),
-    TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: 'data/database.sqlite',
-      entities: [
-        User,
-        AuthMethod,
-        Goal,
-        Question,
-        ReportAnswer,
-        Schedule,
-        Task,
-        PomodoroConfig,
-        TimerSession,
-        PushSubscription,
-        Project,
-        ProjectColumn,
-        ApiToken,
-        Link,
-      ],
-      synchronize: true,
+    TypeOrmModule.forRootAsync({
+      useFactory: () => ({
+        type: 'sqlite',
+        database: 'data/database.sqlite',
+        entities: [
+          User,
+          AuthMethod,
+          Goal,
+          Question,
+          ReportAnswer,
+          Schedule,
+          Task,
+          PomodoroConfig,
+          TimerSession,
+          PushSubscription,
+          Project,
+          ProjectColumn,
+          BoardGroup,
+          Sprint,
+          Release,
+          ApiToken,
+          Link,
+        ],
+        synchronize: true,
+      }),
+      dataSourceFactory: (options) => {
+        if (!options) {
+          throw new Error(
+            'TypeOrmModule did not provide DataSourceOptions to dataSourceFactory',
+          );
+        }
+        return initializeWithSchemaSync(options);
+      },
     }),
     ...telegramImports,
     SharedModule,
@@ -93,6 +113,9 @@ const telegramImports = isTelegramEnabled()
     QuestionMigrationService,
     AuthMethodMigrationService,
     RecurringSeriesRepairService,
+    BoardGroupConstraintsMigrationService,
+    ProjectTypeMigrationService,
+    TaskNumberMigrationService,
   ],
 })
 export class AppModule {}

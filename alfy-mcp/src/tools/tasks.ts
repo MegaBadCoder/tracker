@@ -13,6 +13,7 @@ interface TaskItem {
   completed: boolean;
   dueDate: string | null;
   projectId?: string | null;
+  sprintId?: string | null;
 }
 
 export function registerTaskTools(server: McpServer, client: AlfyRestClient): void {
@@ -22,17 +23,21 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
       description: 'List tasks with optional client-side filters',
       inputSchema: {
         project_id: z.string().optional().describe('Filter by project UUID'),
+        sprint_id: z.string().uuid().nullable().optional().describe('UUID спринта; null — задачи бэклога'),
         status: z.enum(['pending', 'completed']).optional().describe('Filter by completion status'),
         due_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Include tasks with dueDate >= this date (YYYY-MM-DD)'),
         due_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Include tasks with dueDate <= this date (YYYY-MM-DD)'),
       },
     },
-    async ({ project_id, status, due_from, due_to }) => {
+    async ({ project_id, sprint_id, status, due_from, due_to }) => {
       const tasks = await client.get<TaskItem[]>('/tasks');
       let result: TaskItem[] = tasks;
 
       if (project_id !== undefined) {
         result = result.filter((t) => t.projectId === project_id);
+      }
+      if (sprint_id !== undefined) {
+        result = result.filter((t) => (t.sprintId ?? null) === sprint_id);
       }
       if (status === 'completed') {
         result = result.filter((t) => t.completed);
@@ -83,6 +88,8 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
         tags: z.array(z.string()).optional().describe('Tags'),
         projectId: z.string().uuid().optional().describe('Project UUID'),
         columnId: z.string().uuid().optional().describe('Board column UUID'),
+        groupId: z.string().uuid().nullable().optional().describe('UUID эпика или истории; null — без группы'),
+        sprintId: z.string().uuid().nullable().optional().describe('UUID спринта; null — бэклог; без поля наследуется спринт истории'),
       },
     },
     async (args) => {
@@ -97,6 +104,8 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
       if (args.tags !== undefined) body['tags'] = args.tags;
       if (args.projectId !== undefined) body['projectId'] = args.projectId;
       if (args.columnId !== undefined) body['columnId'] = args.columnId;
+      if (args.groupId !== undefined) body['groupId'] = args.groupId;
+      if (args.sprintId !== undefined) body['sprintId'] = args.sprintId;
       const created = await client.post('/tasks', body);
       return toText(created);
     },
@@ -118,6 +127,8 @@ export function registerTaskTools(server: McpServer, client: AlfyRestClient): vo
         tags: z.array(z.string()).optional().describe('New tags'),
         projectId: z.string().uuid().nullable().optional().describe('Move to project UUID, or null for Inbox'),
         columnId: z.string().uuid().nullable().optional().describe('Move to board column UUID, or null to unset'),
+        groupId: z.string().uuid().nullable().optional().describe('UUID эпика или истории; null снимает группу'),
+        sprintId: z.string().uuid().nullable().optional().describe('UUID незакрытого спринта; null переносит задачу в бэклог'),
       },
     },
     async ({ id, ...rest }) => {

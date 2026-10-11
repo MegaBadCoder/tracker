@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OverdueRecurringService } from './overdue-recurring.service';
 import { TaskRepositoryPort } from './domain/task-repository.port';
 import { UserSettingsPort } from './domain/user-settings.port';
+import { TaskNumberPort } from './domain/task-number.port';
 import { PomodoroConfig, Task } from '../../shared/entities';
 import type { RecurrenceRule } from '../../shared/types/recurrence.types';
 
@@ -44,6 +45,7 @@ describe('OverdueRecurringService', () => {
   let service: OverdueRecurringService;
   let repo: Record<string, jest.Mock>;
   let userSettings: Record<string, jest.Mock>;
+  let taskNumbers: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     repo = {
@@ -77,11 +79,16 @@ describe('OverdueRecurringService', () => {
       listAllUserIds: jest.fn().mockResolvedValue([]),
     };
 
+    taskNumbers = {
+      allocate: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OverdueRecurringService,
         { provide: TaskRepositoryPort, useValue: repo },
         { provide: UserSettingsPort, useValue: userSettings },
+        { provide: TaskNumberPort, useValue: taskNumbers },
       ],
     }).compile();
 
@@ -123,6 +130,52 @@ describe('OverdueRecurringService', () => {
       expect(successor.recurringParentId).toBe('t1');
 
       expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('successor получает номер в проекте задачи', async () => {
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        projectId: 'proj-agile',
+        number: 1,
+        dueDate: new Date('2026-04-28T09:00:00.000Z'),
+        recurrence: dailyRule,
+        onMissed: 'freeze',
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+      taskNumbers.allocate.mockResolvedValue(8);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-agile');
+      const [, successor] = repo.freezeAndCreateNext.mock.calls[0];
+      expect(successor.number).toBe(8);
+    });
+
+    it('без successor номер не выдаётся', async () => {
+      const candidate = makeTask({
+        id: 't1',
+        userId: 1,
+        projectId: 'proj-agile',
+        dueDate: new Date('2026-04-28T09:00:00.000Z'),
+        recurrence: { frequency: 'daily', interval: 1, endCount: 1 },
+        recurringCompletedCount: 1,
+        onMissed: 'freeze',
+      });
+      repo.findOverdueRecurringCandidates.mockResolvedValue([candidate]);
+
+      await service.processForUser(
+        1,
+        'UTC',
+        new Date('2026-04-29T00:00:00.000Z'),
+      );
+
+      expect(repo.freezeAndCreateNext).toHaveBeenCalledWith('t1', null);
+      expect(taskNumbers.allocate).not.toHaveBeenCalled();
     });
 
     it('переносит pomodoro-настройки на successor и сбрасывает pomodoroCompleted', async () => {

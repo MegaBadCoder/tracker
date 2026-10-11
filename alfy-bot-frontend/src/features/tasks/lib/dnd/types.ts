@@ -1,3 +1,4 @@
+import type { ProjectType } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 
 export interface DragSession {
@@ -18,6 +19,8 @@ export interface DropTargetRegistration {
   kind: DropTargetKind
   el: HTMLElement
   projectId?: string
+  /** Тип проекта-цели (`kind === 'project'`). Не задан для `inbox`/`reorder-slot`. */
+  projectType?: ProjectType
 }
 
 export interface ReorderListRegistration {

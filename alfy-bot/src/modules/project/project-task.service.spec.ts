@@ -7,8 +7,15 @@ import {
 import { ProjectTaskService } from './project-task.service';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { ProjectColumnRepositoryPort } from './domain/project-column-repository.port';
+import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { TaskRepositoryPort } from '../task/domain/task-repository.port';
-import { Project, ProjectColumn, Task } from '../../shared/entities';
+import { TaskNumberPort } from '../task/domain/task-number.port';
+import {
+  Project,
+  ProjectColumn,
+  BoardGroup,
+  Task,
+} from '../../shared/entities';
 
 function makeProject(overrides: Partial<Project> = {}): Project {
   const p = new Project();
@@ -19,6 +26,7 @@ function makeProject(overrides: Partial<Project> = {}): Project {
     title: 'Проект',
     description: null,
     viewMode: 'board' as const,
+    type: 'simple' as const,
     icon: null,
     color: null,
     order: 0,
@@ -46,6 +54,27 @@ function makeColumn(overrides: Partial<ProjectColumn> = {}): ProjectColumn {
   return c;
 }
 
+function makeGroup(overrides: Partial<BoardGroup> = {}): BoardGroup {
+  const g = new BoardGroup();
+  Object.assign(g, {
+    id: 'group-1',
+    userId: 1,
+    projectId: 'proj-1',
+    parentId: null,
+    type: 'epic',
+    title: 'Эпик',
+    description: null,
+    status: 'open',
+    completedAt: null,
+    color: null,
+    order: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  });
+  return g;
+}
+
 function makeTask(overrides: Partial<Task> = {}): Task {
   const t = new Task();
   Object.assign(t, {
@@ -62,6 +91,10 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     checklist: null,
     projectId: null,
     columnId: null,
+    groupId: null,
+    sprintId: null,
+    releaseId: null,
+    number: null,
     order: 0,
     pomodoroConfig: null,
     createdAt: new Date(),
@@ -75,7 +108,9 @@ describe('ProjectTaskService — move & reorder', () => {
   let service: ProjectTaskService;
   let projRepo: Record<string, jest.Mock>;
   let colRepo: Record<string, jest.Mock>;
+  let groupRepo: Record<string, jest.Mock>;
   let taskRepo: Record<string, jest.Mock>;
+  let taskNumbers: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     projRepo = {
@@ -97,6 +132,16 @@ describe('ProjectTaskService — move & reorder', () => {
       reorder: jest.fn(),
     };
 
+    groupRepo = {
+      findAllByProject: jest.fn().mockResolvedValue([]),
+      findById: jest.fn().mockResolvedValue(null),
+      countChildren: jest.fn().mockResolvedValue(0),
+      create: jest.fn(),
+      save: jest.fn(),
+      delete: jest.fn(),
+      reorder: jest.fn(),
+    };
+
     taskRepo = {
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
@@ -110,10 +155,36 @@ describe('ProjectTaskService — move & reorder', () => {
       findAllByProject: jest.fn().mockResolvedValue([]),
       updatePosition: jest
         .fn()
-        .mockImplementation((taskId, _userId, projectId, columnId, order) =>
-          Promise.resolve(makeTask({ id: taskId, projectId, columnId, order })),
+        .mockImplementation(
+          (
+            taskId,
+            _userId,
+            projectId,
+            columnId,
+            groupId,
+            sprintId,
+            releaseId,
+            number,
+            order,
+          ) =>
+            Promise.resolve(
+              makeTask({
+                id: taskId,
+                projectId,
+                columnId,
+                order,
+                groupId,
+                sprintId,
+                releaseId,
+                number,
+              }),
+            ),
         ),
       reorderTasks: jest.fn().mockResolvedValue(undefined),
+    };
+
+    taskNumbers = {
+      allocate: jest.fn().mockResolvedValue(null),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -121,7 +192,9 @@ describe('ProjectTaskService — move & reorder', () => {
         ProjectTaskService,
         { provide: ProjectRepositoryPort, useValue: projRepo },
         { provide: ProjectColumnRepositoryPort, useValue: colRepo },
+        { provide: BoardGroupRepositoryPort, useValue: groupRepo },
         { provide: TaskRepositoryPort, useValue: taskRepo },
+        { provide: TaskNumberPort, useValue: taskNumbers },
       ],
     }).compile();
 
@@ -145,6 +218,10 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         null,
+        null,
+        null,
+        null,
+        null,
         0,
       );
     });
@@ -161,6 +238,10 @@ describe('ProjectTaskService — move & reorder', () => {
       expect(taskRepo.updatePosition).toHaveBeenCalledWith(
         'task-1',
         1,
+        null,
+        null,
+        null,
+        null,
         null,
         null,
         0,
@@ -183,6 +264,10 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         'col-1',
+        null,
+        null,
+        null,
+        null,
         2,
       );
     });
@@ -205,6 +290,10 @@ describe('ProjectTaskService — move & reorder', () => {
         1,
         'proj-1',
         'col-2',
+        null,
+        null,
+        null,
+        null,
         0,
       );
     });
@@ -222,6 +311,10 @@ describe('ProjectTaskService — move & reorder', () => {
         'task-1',
         1,
         'proj-1',
+        null,
+        null,
+        null,
+        null,
         null,
         5,
       );
@@ -320,6 +413,46 @@ describe('ProjectTaskService — move & reorder', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('позволяет назначить columnId в agile-проекте текущего с viewMode=list', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockResolvedValue(
+        makeProject({ type: 'agile', viewMode: 'list' }),
+      );
+      colRepo.findById.mockResolvedValue(makeColumn());
+
+      await expect(
+        service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          order: 0,
+        }),
+      ).resolves.toBeDefined();
+    });
+
+    it('позволяет назначить columnId при переезде в agile-проект с viewMode=list', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'proj-1'
+            ? makeProject()
+            : makeProject({
+                id: 'proj-2',
+                type: 'agile',
+                viewMode: 'list',
+              }),
+        ),
+      );
+      colRepo.findById.mockResolvedValue(makeColumn({ projectId: 'proj-2' }));
+
+      await expect(
+        service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-2',
+          columnId: 'col-1',
+          order: 0,
+        }),
+      ).resolves.toBeDefined();
+    });
+
     it('бросает BadRequestException если order отрицательный', async () => {
       taskRepo.findById.mockResolvedValue(makeTask());
       projRepo.findById.mockResolvedValue(makeProject());
@@ -330,6 +463,453 @@ describe('ProjectTaskService — move & reorder', () => {
           order: -1,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('бросает NotFoundException если groupId не существует в целевом проекте', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
+      groupRepo.findById.mockResolvedValue(null);
+
+      await expect(
+        service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-1',
+          groupId: 'group-other',
+          order: 0,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    // Обычная board-доска (use-board-dnd) groupId не присылает вообще.
+    // Если трактовать отсутствие как «обнулить», то переключение проекта из
+    // agile в board и одно перетаскивание молча выкинут задачу из эпика —
+    // необратимое доменное действие, завязанное на настройку отображения.
+    it('сохраняет существующий groupId, если он не пришёл в запросе', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
+      colRepo.findById.mockResolvedValue(makeColumn());
+      groupRepo.findById.mockResolvedValue(makeGroup());
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-1',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        'group-1',
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    // Группа принадлежит старому проекту — тащить её за собой нельзя, иначе
+    // сработает триггер trg_task_group_same_project.
+    it('обнуляет groupId при переезде в другой проект, даже если он не пришёл', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', groupId: 'group-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ id: 'proj-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-2',
+        null,
+        null,
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('обнуляет sprintId при переезде в другой проект', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', sprintId: 'sprint-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ id: 'proj-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-2',
+        null,
+        null,
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('сохраняет sprintId при смене колонки внутри проекта', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          sprintId: 'sprint-1',
+        }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject());
+      colRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-2',
+        null,
+        'sprint-1',
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('обнуляет releaseId при переезде в другой проект', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({ projectId: 'proj-1', releaseId: 'release-1' }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject({ id: 'proj-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-2',
+        null,
+        null,
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('сохраняет releaseId при смене колонки внутри проекта', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-1',
+          releaseId: 'release-1',
+        }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject());
+      colRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2' }));
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-2',
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-2',
+        null,
+        null,
+        'release-1',
+        null,
+        0,
+      );
+    });
+
+    it('задача спринта без columnId в запросе получает первую колонку проекта, а не теряет её', async () => {
+      taskRepo.findById.mockResolvedValue(
+        makeTask({
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          sprintId: 'sprint-1',
+        }),
+      );
+      projRepo.findById.mockResolvedValue(makeProject());
+      colRepo.findAllByProject.mockResolvedValue([
+        makeColumn({ id: 'col-2', order: 1 }),
+        makeColumn({ id: 'col-1', order: 0 }),
+      ]);
+
+      await service.moveTask(1, 'proj-1', 'task-1', { order: 1 });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        null,
+        'sprint-1',
+        null,
+        null,
+        1,
+      );
+    });
+
+    it('обнуляет groupId, когда null пришёл явно', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask({ groupId: 'group-1' }));
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
+      colRepo.findById.mockResolvedValue(makeColumn());
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        columnId: 'col-1',
+        groupId: null,
+        order: 0,
+      });
+
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        'col-1',
+        null,
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    it('передаёт валидный groupId в updatePosition', async () => {
+      taskRepo.findById.mockResolvedValue(makeTask());
+      projRepo.findById.mockResolvedValue(makeProject({ viewMode: 'board' }));
+      groupRepo.findById.mockResolvedValue(makeGroup());
+
+      await service.moveTask(1, 'proj-1', 'task-1', {
+        projectId: 'proj-1',
+        groupId: 'group-1',
+        order: 0,
+      });
+
+      expect(groupRepo.findById).toHaveBeenCalledWith('group-1', 'proj-1');
+      expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+        'task-1',
+        1,
+        'proj-1',
+        null,
+        'group-1',
+        null,
+        null,
+        null,
+        0,
+      );
+    });
+
+    describe('номер задачи', () => {
+      it('сохраняет номер при перемещении внутри проекта', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-1', columnId: 'col-1', number: 5 }),
+        );
+        projRepo.findById.mockResolvedValue(makeProject());
+        colRepo.findById.mockResolvedValue(makeColumn({ id: 'col-2' }));
+
+        await service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-1',
+          columnId: 'col-2',
+          order: 0,
+        });
+
+        expect(taskNumbers.allocate).not.toHaveBeenCalled();
+        expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+          'task-1',
+          1,
+          'proj-1',
+          'col-2',
+          null,
+          null,
+          null,
+          5,
+          0,
+        );
+      });
+
+      it('выдаёт новый номер при переезде в другой проект', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-1', number: null }),
+        );
+        projRepo.findById.mockResolvedValue(
+          makeProject({ id: 'proj-2', type: 'agile' }),
+        );
+        taskNumbers.allocate.mockResolvedValue(9);
+
+        await service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: 'proj-2',
+          order: 0,
+        });
+
+        expect(taskNumbers.allocate).toHaveBeenCalledWith('proj-2');
+        expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+          'task-1',
+          1,
+          'proj-2',
+          null,
+          null,
+          null,
+          null,
+          9,
+          0,
+        );
+      });
+
+      it('при переезде из обычного проекта во Входящие номер null', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockResolvedValue(makeProject());
+
+        await service.moveTask(1, 'proj-1', 'task-1', {
+          projectId: null,
+          order: 0,
+        });
+
+        expect(taskNumbers.allocate).toHaveBeenCalledWith(null);
+        expect(taskRepo.updatePosition).toHaveBeenCalledWith(
+          'task-1',
+          1,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          0,
+        );
+      });
+    });
+
+    // Запрет действует независимо от того, что стоит в URL: перетаскивание
+    // задачи из сайдбара шлёт целевой проект как :projectId в URL и совсем
+    // не передаёт dto.projectId — «текущим» с точки зрения этого эндпоинта
+    // становится проект назначения, а не тот, где задача реально лежит.
+    describe('запрет переноса из agile-проекта', () => {
+      it('бросает BadRequestException при переносе из agile в обычный проект', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'proj-1'
+              ? makeProject({ id: 'proj-1', type: 'agile' })
+              : makeProject({ id, type: 'simple' }),
+          ),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: 'proj-2',
+            order: 0,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(taskRepo.updatePosition).not.toHaveBeenCalled();
+      });
+
+      it('бросает BadRequestException при переносе из agile-проекта во Входящие', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockResolvedValue(
+          makeProject({ id: 'proj-1', type: 'agile' }),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: null,
+            order: 0,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(taskRepo.updatePosition).not.toHaveBeenCalled();
+      });
+
+      it('разрешает перенос из agile-проекта в другой agile-проект', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(makeProject({ id, type: 'agile' })),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: 'proj-2',
+            order: 0,
+          }),
+        ).resolves.toBeDefined();
+      });
+
+      it('разрешает перенос из обычного проекта в agile-проект', async () => {
+        taskRepo.findById.mockResolvedValue(makeTask({ projectId: 'proj-1' }));
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'proj-1'
+              ? makeProject({ id: 'proj-1', type: 'simple' })
+              : makeProject({ id, type: 'agile' }),
+          ),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-1', 'task-1', {
+            projectId: 'proj-2',
+            order: 0,
+          }),
+        ).resolves.toBeDefined();
+      });
+
+      it('блокирует перенос из agile, даже когда :projectId в URL — это целевой проект (drop в сайдбаре)', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-agile' }),
+        );
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(
+            id === 'proj-agile'
+              ? makeProject({ id: 'proj-agile', type: 'agile' })
+              : makeProject({ id, type: 'simple' }),
+          ),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-target', 'task-1', {
+            columnId: null,
+            order: 5,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(taskRepo.updatePosition).not.toHaveBeenCalled();
+      });
+
+      it('разрешает такой же drop в сайдбаре, если целевой проект тоже agile', async () => {
+        taskRepo.findById.mockResolvedValue(
+          makeTask({ projectId: 'proj-agile' }),
+        );
+        projRepo.findById.mockImplementation((id: string) =>
+          Promise.resolve(makeProject({ id, type: 'agile' })),
+        );
+
+        await expect(
+          service.moveTask(1, 'proj-target', 'task-1', {
+            columnId: null,
+            order: 5,
+          }),
+        ).resolves.toBeDefined();
+      });
     });
   });
 

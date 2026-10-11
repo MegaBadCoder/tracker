@@ -5,3 +5,11 @@
 process.env.ENABLE_TELEGRAM = 'false';
 process.env.BOT_TOKEN = 'test-bot-token';
 process.env.JWT_SECRET = 'test-secret';
+
+// EmailService reads SMTP_HOST/SMTP_USER/SMTP_PASS with getOrThrow in its
+// constructor, so a missing key kills the whole Nest app at boot — every e2e
+// suite fails with an unrelated "Configuration key does not exist". Same
+// import-time reasoning as the Telegram vars above: this has to live here.
+process.env.SMTP_HOST = 'smtp.test.local';
+process.env.SMTP_USER = 'e2e@test.local';
+process.env.SMTP_PASS = 'test-password';

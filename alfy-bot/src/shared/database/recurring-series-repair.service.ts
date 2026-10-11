@@ -27,8 +27,10 @@ export class RecurringSeriesRepairService implements OnApplicationBootstrap {
       const live = members.filter((t) => !t.completed && !t.isOverdue);
       for (const member of members) {
         if (!member.recurrence) continue;
-        const isDeadRoot = member.completed && !member.recurringParentId && live.length === 0;
-        const isCompletedChild = member.completed && Boolean(member.recurringParentId);
+        const isDeadRoot =
+          member.completed && !member.recurringParentId && live.length === 0;
+        const isCompletedChild =
+          member.completed && Boolean(member.recurringParentId);
         if (!isDeadRoot && !isCompletedChild) continue;
         member.recurrence = null;
         await repo.save(member);

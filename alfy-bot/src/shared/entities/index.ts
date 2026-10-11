@@ -11,5 +11,8 @@ export { TimerSession } from './timer-session.entity';
 export { PushSubscription } from './push-subscription.entity';
 export { Project } from './project.entity';
 export { ProjectColumn } from './project-column.entity';
+export { BoardGroup } from './board-group.entity';
 export { ApiToken } from './api-token.entity';
 export { Link } from './link.entity';
+export { Sprint } from './sprint.entity';
+export { Release } from './release.entity';

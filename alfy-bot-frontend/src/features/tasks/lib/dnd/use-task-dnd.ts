@@ -1,11 +1,16 @@
+import type { DropTargetProjectType } from './drop-rules'
 import type {
   DragSession,
   DropTargetRegistration,
   Pointer,
   ReorderListRegistration,
 } from './types'
+import type { ProjectType } from '@/features/projects/model/types'
+import type { Task } from '@/features/tasks/model/types'
 import { reactive, readonly } from 'vue'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
+import { canDropTask } from './drop-rules'
 import { findHoveredTarget } from './hit-test'
 import { computeInsertionIndex } from './use-reorder-list'
 
@@ -50,15 +55,35 @@ function collectDomDropTargets(): DropTargetRegistration[] {
       kind,
       el,
       projectId: el.dataset.projectId,
+      projectType: el.dataset.projectType as ProjectType | undefined,
     })
   })
   return out
 }
 
+function canAcceptDrag(task: Task, target: DropTargetRegistration): boolean {
+  if (target.kind === 'reorder-slot')
+    return true
+
+  const targetType: DropTargetProjectType | undefined
+    = target.kind === 'inbox' ? 'inbox' : target.projectType
+  const sourceType: ProjectType | null | undefined = task.projectId
+    ? useProjectStore().projectMap.get(task.projectId)?.type
+    : null
+
+  if (targetType === undefined || sourceType === undefined) {
+    console.error('DnD: не удалось определить тип проекта, перенос заблокирован', task.id, task.projectId, target.projectId)
+    return false
+  }
+
+  return canDropTask(sourceType, targetType)
+}
+
 function updateHitTest(pointer: Pointer): void {
   // Refresh from DOM each tick — handles dynamic visibility, scroll, slot dup.
   const live = collectDomDropTargets()
-  state.hoveredTarget = findHoveredTarget(live, pointer)
+  const hit = findHoveredTarget(live, pointer)
+  state.hoveredTarget = hit && state.active && !canAcceptDrag(state.active.task, hit) ? null : hit
 
   // Find which reorder list contains the pointer.
   let foundList: ReorderListRegistration | null = null

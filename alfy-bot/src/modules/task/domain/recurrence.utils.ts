@@ -74,7 +74,11 @@ export function retargetRecurrenceToDate(
   fromSlot: Date,
   toDate: Date,
 ): RecurrenceRule {
-  if (rule.frequency === 'weekly' && rule.daysOfWeek && rule.daysOfWeek.length > 0) {
+  if (
+    rule.frequency === 'weekly' &&
+    rule.daysOfWeek &&
+    rule.daysOfWeek.length > 0
+  ) {
     const delta = (toDate.getUTCDay() - fromSlot.getUTCDay() + 7) % 7;
     if (delta === 0) return rule;
     const daysOfWeek = [

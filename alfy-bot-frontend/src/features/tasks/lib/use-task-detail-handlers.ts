@@ -1,6 +1,8 @@
-import { ref, type Ref, isRef, toRef } from 'vue'
-import type { Task, ChecklistItem, TaskPatch } from '../model/types'
-import { useRecurringReschedule, shouldPromptReschedule } from './use-recurring-reschedule'
+import type { Ref } from 'vue'
+import type { ChecklistItem, Task, TaskPatch } from '../model/types'
+import { isRef, onBeforeUnmount, onMounted, ref, toRef } from 'vue'
+import { registerTaskOpener } from './task-detail-navigation'
+import { shouldPromptReschedule, useRecurringReschedule } from './use-recurring-reschedule'
 
 interface TaskStore {
   tasks: Task[] | Ref<Task[]>
@@ -35,6 +37,16 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
     selectedTask.value = task
     isDetailOpen.value = true
   }
+
+  let unregisterTaskOpener: (() => void) | null = null
+
+  onMounted(() => {
+    unregisterTaskOpener = registerTaskOpener(handleOpenTask)
+  })
+
+  onBeforeUnmount(() => {
+    unregisterTaskOpener?.()
+  })
 
   async function discardPendingIfEmpty() {
     const id = pendingCreateTaskId.value

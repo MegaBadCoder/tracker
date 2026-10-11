@@ -43,7 +43,12 @@ export interface Task {
   onMissed?: 'shift' | 'freeze'
   projectId?: string | null
   columnId?: string | null
+  groupId?: string | null
+  sprintId?: string | null
+  releaseId?: string | null
   order?: number
+  /** Номер задачи внутри agile-проекта; `null` у задач обычных проектов и Входящих. */
+  number?: number | null
   parentId?: string
   goalIds?: number[]
   subtasks?: Task[]
@@ -58,6 +63,12 @@ export interface TaskCardProps {
   task: Task
   projectName?: string
   variant?: 'default' | 'compact'
+  /**
+   * false — карточка лежит внутри vuedraggable-списка и жест принадлежит ему.
+   * Кастомный PointerEvents-движок при старте делает setPointerCapture и
+   * забирает события себе, из-за чего Sortable перетаскивания не видит.
+   */
+  dndSource?: boolean
 }
 
 export interface TaskCardEmits {
