@@ -14,6 +14,9 @@ const TasksSidebarSection = defineAsyncComponent(() =>
 
 const route = useRoute()
 const sidebarOpen = ref(false)
+const desktopCollapsed = ref(false)
+const isTasksSection = computed(() => route.matched.some(record => record.meta.sectionNav === 'tasks'))
+const desktopSidebarCollapsed = computed(() => isTasksSection.value && desktopCollapsed.value)
 
 const sectionNavRegistry: Record<string, NavLink[]> = {
   tasks: tasksNavLinks,
@@ -36,23 +39,23 @@ const sectionExtra = computed<Component | undefined>(() => {
 })
 
 function openSidebar() {
-  sidebarOpen.value = true
+  if (window.matchMedia('(min-width: 640px)').matches) desktopCollapsed.value = false
+  else sidebarOpen.value = true
 }
 
 function closeSidebar() {
   sidebarOpen.value = false
 }
 
-// На мобильной версии sidebar — оверлей; после перехода по разделу его надо свернуть.
-// На десктопе панель видна всегда (CSS), поэтому вызов безвреден.
 watch(() => route.path, () => closeSidebar())
 
 provide('openSidebar', openSidebar)
+provide('desktopSidebarCollapsed', desktopSidebarCollapsed)
 </script>
 
 <template>
   <div class="flex min-h-[100dvh]">
-    <AppSidebar :open="sidebarOpen" :links="sectionLinks" @close="closeSidebar" @open="openSidebar">
+    <AppSidebar :open="sidebarOpen" :links="sectionLinks" :collapsible="isTasksSection" :desktop-collapsed="desktopSidebarCollapsed" @collapse="desktopCollapsed = true" @close="closeSidebar" @open="openSidebar">
       <template v-if="sectionExtra" #section-extra>
         <component :is="sectionExtra" />
       </template>

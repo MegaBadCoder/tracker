@@ -1,5 +1,5 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 // Мокаем AppSidebar целиком, чтобы не тянуть UserSection/useTheme (localStorage на module-load).
@@ -7,16 +7,19 @@ import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 vi.mock('@/components/AppSidebar.vue', () => ({
   default: {
     name: 'AppSidebar',
-    props: ['open', 'links'],
-    emits: ['open', 'close'],
+    props: ['open', 'links', 'desktopCollapsed'],
+    emits: ['open', 'close', 'collapse'],
     template: `
-      <div data-testid="sb" :data-open="String(open)">
+      <div data-testid="sb" :data-open="String(open)" :data-collapsed="String(desktopCollapsed)">
         <span v-for="l in links" :key="l.to" class="lnk">{{ l.label }}</span>
+        <button data-testid="collapse" @click="$emit('collapse')">collapse</button>
         <button data-testid="open" @click="$emit('open')">open</button>
       </div>
     `,
   },
 }))
+
+afterEach(() => vi.restoreAllMocks())
 
 const AppLayout = (await import('@/components/AppLayout.vue')).default
 
@@ -25,6 +28,8 @@ function makeRouter(): Router {
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: { template: '<div />' } },
+      { path: '/tasks', component: { template: '<div />' }, meta: { sectionNav: 'tasks' } },
+      { path: '/tasks/calendar', component: { template: '<div />' }, meta: { sectionNav: 'tasks' } },
       { path: '/habits', component: { template: '<div />' }, meta: { sectionNav: 'habits' } },
       { path: '/habits/atomic', component: { template: '<div />' }, meta: { sectionNav: 'habits' } },
     ],
@@ -50,6 +55,7 @@ describe('appLayout — секция привычек', () => {
 
 describe('appLayout — мобильное сворачивание sidebar', () => {
   it('закрывает sidebar после перехода по разделу (регрессия)', async () => {
+    vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: false } as MediaQueryList)
     const { wrapper, router } = await mountAt('/')
     // открыли sidebar (как по тапу на меню)
     await wrapper.find('[data-testid="open"]').trigger('click')
@@ -60,4 +66,19 @@ describe('appLayout — мобильное сворачивание sidebar', ()
     await flushPromises()
     expect(wrapper.find('[data-testid="sb"]').attributes('data-open')).toBe('false')
   })
+})
+
+
+it('скрывает desktop sidebar между страницами задач и восстанавливает кнопкой открытия', async () => {
+  vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
+  const { wrapper, router } = await mountAt('/tasks')
+  await wrapper.get('[data-testid="collapse"]').trigger('click')
+  expect(wrapper.get('[data-testid="sb"]').attributes('data-collapsed')).toBe('true')
+  await router.push('/tasks/calendar')
+  await flushPromises()
+  expect(wrapper.get('[data-testid="sb"]').attributes('data-collapsed')).toBe('true')
+  await wrapper.get('[data-testid="open"]').trigger('click')
+  expect(wrapper.get('[data-testid="sb"]').attributes('data-collapsed')).toBe('false')
+  expect(wrapper.get('[data-testid="sb"]').attributes('data-open')).toBe('false')
+  wrapper.unmount()
 })
