@@ -123,16 +123,6 @@ const isActive = computed(() => route.params.projectId === props.node.id)
 <template>
   <div>
     <div class="group/row relative flex min-w-0 items-center" :style="{ paddingLeft: `${depth * PROJECT_INDENT}px` }">
-      <button
-        v-if="node.children.length"
-        class="shrink-0 rounded p-1 hover:bg-sidebar-accent"
-        :aria-label="`${expanded ? 'Свернуть' : 'Развернуть'} ${node.title}`"
-        :aria-expanded="expanded"
-        @click="store.toggleExpanded(node.id)"
-      >
-        <ChevronRight :size="12" :class="expanded ? 'rotate-90' : ''" />
-      </button>
-      <span v-else class="w-5 shrink-0" />
       <RouterLink
         ref="linkRef"
         :to="`/tasks/project/${node.id}`"
@@ -143,7 +133,7 @@ const isActive = computed(() => route.params.projectId === props.node.id)
         @contextmenu="dragActive && $event.preventDefault()"
         data-drop-kind="project"
         :data-project-id="node.id"
-        class="project-press-target select-none flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-8 rounded-md text-sm font-medium transition-colors"
+        class="project-press-target select-none flex min-w-0 flex-1 items-center gap-2 px-1 py-2 pr-2 rounded-md text-sm font-medium transition-colors"
         :class="[
           isActive ? 'bg-sidebar-accent text-sidebar-primary' : 'text-sidebar-foreground hover:bg-sidebar-accent/50',
           isHovered ? 'bg-accent ring-2 ring-primary' : '',
@@ -163,7 +153,7 @@ const isActive = computed(() => route.params.projectId === props.node.id)
           <button
             :aria-label="`Действия проекта ${node.title}`"
             :disabled="store.treeBusy"
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all opacity-60 group-hover/row:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 cursor-pointer"
+            class="shrink-0 p-1 rounded text-sidebar-foreground/40 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all opacity-60 group-hover/row:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 cursor-pointer"
           >
             <MoreHorizontal :size="14" />
           </button>
@@ -195,6 +185,16 @@ const isActive = computed(() => route.params.projectId === props.node.id)
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <button
+        v-if="node.children.length"
+        class="shrink-0 rounded p-1 hover:bg-sidebar-accent"
+        :aria-label="`${expanded ? 'Свернуть' : 'Развернуть'} ${node.title}`"
+        :aria-expanded="expanded"
+        @click="store.toggleExpanded(node.id)"
+      >
+        <ChevronRight :size="12" :class="expanded ? 'rotate-90' : ''" />
+      </button>
+      <span v-else class="w-5 shrink-0" />
     </div>
 
   </div>
