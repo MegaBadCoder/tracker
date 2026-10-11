@@ -160,4 +160,16 @@ describe('действия дерева', () => {
     expect(store.projects).toHaveLength(3)
     wrapper.unmount()
   })
+  it('ошибка переноса сохраняет дерево и показывает сообщение', async () => {
+    const { wrapper, store } = setup()
+    const original = JSON.parse(JSON.stringify(store.projects))
+    vi.mocked(api.patch).mockRejectedValue(new Error('offline'))
+    wrapper.findComponent(ProjectTreeList).vm.$emit('relocate', 'other', 'root', null)
+    await flushPromises()
+    expect(store.projects).toEqual(original)
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не удалось переместить проект')
+    expect(store.treeBusy).toBe(false)
+    wrapper.unmount()
+  })
+
 })

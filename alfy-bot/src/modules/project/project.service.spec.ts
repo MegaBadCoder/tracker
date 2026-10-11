@@ -42,6 +42,7 @@ describe('ProjectService', () => {
         .fn()
         .mockImplementation((data) => Promise.resolve(makeProject(data))),
       save: jest.fn().mockImplementation((project) => Promise.resolve(project)),
+      update: jest.fn().mockImplementation((_userId, id, changes) => Promise.resolve(makeProject({ id, ...changes }))),
       delete: jest.fn().mockResolvedValue(true),
       reorder: jest.fn().mockResolvedValue(undefined),
     };
@@ -200,7 +201,7 @@ describe('ProjectService', () => {
         viewMode: 'board',
       });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({
           title: 'Обновлённый',
           viewMode: 'board',
@@ -213,7 +214,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { color: '#00ff00' });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ color: '#00ff00' }),
       );
     });
@@ -223,7 +224,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { icon: 'rocket' });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ icon: 'rocket' }),
       );
     });
@@ -233,7 +234,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { color: null });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ color: null }),
       );
     });
@@ -243,7 +244,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { icon: null });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ icon: null }),
       );
     });
@@ -257,7 +258,7 @@ describe('ProjectService', () => {
         color: '#0000ff',
       });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({
           title: 'Новый',
           icon: 'fire',
@@ -279,7 +280,7 @@ describe('ProjectService', () => {
 
       await service.update(1, 'proj-1', { parentId: 'proj-2' });
 
-      expect(repo.save).toHaveBeenCalledWith(
+      expect(repo.update).toHaveBeenCalledWith(1, 'proj-1',
         expect.objectContaining({ parentId: 'proj-2' }),
       );
     });

@@ -43,4 +43,30 @@ describe('перенос проектов в SQLite', () => {
     expect((await repo.findById(own.id, userId))?.parentId).toBeNull();
     expect((await repo.findById(foreign.id, otherUser.id))?.parentId).toBeNull();
   });
+  it('последовательные проверки исключают цикл при одновременных переносах', async () => {
+    const a = await repo.create({ userId, title: 'A', parentId: null });
+    const b = await repo.create({ userId, title: 'B', parentId: null });
+    const results = await Promise.allSettled([
+      repo.move(userId, a.id, b.id, null),
+      repo.move(userId, b.id, a.id, null),
+    ]);
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    const actual = await repo.findAllByUser(userId);
+    expect(actual.filter(project => project.parentId === null)).toHaveLength(1);
+  });
+
+  it('старый update не позволяет вложить проект в своего потомка', async () => {
+    const a = await repo.create({ userId, title: 'A', parentId: null });
+    const b = await repo.create({ userId, title: 'B', parentId: a.id });
+    await expect(repo.update(userId, a.id, { parentId: b.id })).rejects.toThrow('cycles');
+    expect((await repo.findById(a.id, userId))?.parentId).toBeNull();
+  });
+
+  it('редактирование названия не откатывает одновременный перенос', async () => {
+    const a = await repo.create({ userId, title: 'A', parentId: null });
+    const b = await repo.create({ userId, title: 'B', parentId: null });
+    await Promise.all([repo.move(userId, a.id, b.id, null), repo.update(userId, a.id, { title: 'Renamed', parentId: undefined })]);
+    expect(await repo.findById(a.id, userId)).toMatchObject({ title: 'Renamed', parentId: b.id });
+  });
+
 });

@@ -66,8 +66,7 @@ export class ProjectService {
         throw new ForbiddenException('Parent project belongs to another user');
     }
 
-    Object.assign(project, dto);
-    return this.projectRepo.save(project);
+    return this.projectRepo.update(userId, id, dto);
   }
 
   async move(userId: number, id: string, parentId: string | null, beforeId: string | null): Promise<Project[]> {
