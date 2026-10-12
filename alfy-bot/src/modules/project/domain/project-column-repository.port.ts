@@ -8,6 +8,13 @@ export abstract class ProjectColumnRepositoryPort {
   ): Promise<ProjectColumn | null>;
   abstract create(data: Partial<ProjectColumn>): Promise<ProjectColumn>;
   abstract save(column: ProjectColumn): Promise<ProjectColumn>;
-  abstract delete(id: string, projectId: string): Promise<boolean>;
-  abstract reorder(updates: { id: string; order: number }[]): Promise<void>;
+  abstract delete(
+    id: string,
+    projectId: string,
+    isAgile: boolean,
+  ): Promise<boolean>;
+  abstract reorder(
+    projectId: string,
+    updates: { id: string; order: number }[],
+  ): Promise<void>;
 }
