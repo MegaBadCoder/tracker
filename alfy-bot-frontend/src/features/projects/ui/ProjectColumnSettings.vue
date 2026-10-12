@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ProjectColumn } from '../model/types'
 import { ArrowDown, ArrowUp, Check, Trash2 } from 'lucide-vue-next'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import * as columnsApi from '../api/columns-api'
@@ -9,6 +9,7 @@ import { apiErrorMessage } from '../lib/api-error'
 import { useColumnStore } from '../model/column-store'
 
 const props = defineProps<{ projectId: string }>()
+const emit = defineEmits<{ busyChange: [busy: boolean]; dirtyChange: [dirty: boolean] }>()
 const store = useColumnStore()
 const columns = ref<ProjectColumn[]>([])
 const titles = ref<Record<string, string>>({})
@@ -18,7 +19,10 @@ const busy = ref(false)
 const error = ref('')
 const loaded = ref(false)
 const deleting = ref<string | null>(null)
+const dirty = computed(() => !!newTitle.value.trim() || columns.value.some(column => titles.value[column.id]?.trim() !== column.title))
+watch(dirty, value => emit('dirtyChange', value), { flush: 'sync' })
 let generation = 0
+watch(busy, value => emit('busyChange', value), { flush: 'sync' })
 
 function applyColumns(value: ProjectColumn[], sync: boolean) {
   columns.value = [...value].sort((a, b) => a.order - b.order)
@@ -116,8 +120,7 @@ watch(() => props.projectId, load, { immediate: true })
 </script>
 
 <template>
-  <section class="space-y-3 border-t pt-4" aria-label="Колонки проекта">
-    <h3 class="text-sm font-semibold">Колонки</h3>
+  <section class="space-y-3" aria-label="Колонки проекта">
     <p class="text-xs text-muted-foreground">Изменения сохраняются сразу. Удалить можно только колонку без задач, включая завершённые и задачи других спринтов.</p>
     <p v-if="loading" class="text-sm text-muted-foreground" role="status">Загрузка колонок…</p>
     <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>

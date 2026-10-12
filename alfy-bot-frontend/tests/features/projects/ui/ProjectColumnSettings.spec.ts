@@ -101,4 +101,14 @@ describe('настройки колонок проекта', () => {
     expect(wrapper.findAll('[data-column-id]')).toHaveLength(0)
     expect(wrapper.text()).toContain('Добавьте первую')
   })
+  it('сообщает о черновике названия и сбрасывает признак после сохранения', async () => {
+    const wrapper = await setup()
+    await wrapper.get('[aria-label="Название колонки План"]').setValue('Новый')
+    expect(wrapper.emitted('dirtyChange')?.at(-1)).toEqual([true])
+    vi.mocked(api.patch).mockResolvedValue({ data: { ...columns[0], title: 'Новый' } })
+    await wrapper.findAll('form')[0]!.trigger('submit')
+    await flushPromises()
+    expect(wrapper.emitted('dirtyChange')?.at(-1)).toEqual([false])
+  })
+
 })
