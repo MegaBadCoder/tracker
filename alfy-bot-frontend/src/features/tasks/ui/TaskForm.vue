@@ -326,11 +326,13 @@ interface TaskFormData extends Omit<Task, 'id' | 'completed' | 'pomodoroComplete
 
 interface Props {
   loading?: boolean
+  modal?: boolean
   /** Дата, с которой форма стартует и к которой возвращается после отправки. */
   defaultDueDate?: Date
 }
 
 interface Emits {
+  (e: 'cancel'): void
   (e: 'submit', task: Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>): void
 }
 
@@ -376,7 +378,7 @@ function onDueDateTimeChange() {
   form.dueDate = updateDeadlineTime(form.dueDate, dueDateTime.value)
 }
 
-const expanded = ref(false)
+const expanded = ref(props.modal)
 const titleInputRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
 
 const resetForm = () => {
@@ -399,22 +401,27 @@ const resetForm = () => {
 }
 
 const handleCancel = () => {
+  if (props.loading) return
+  emit('cancel')
   expanded.value = false
   resetForm()
   titleInputRef.value?.el?.blur()
 }
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && expanded.value) {
+  if (!props.modal && e.key === 'Escape' && expanded.value) {
     handleCancel()
   }
 }
 
-onMounted(() => document.addEventListener('keydown', handleKeydown))
+onMounted(() => {
+  document.addEventListener('keydown', handleKeydown)
+  if (props.modal) titleInputRef.value?.el?.focus()
+})
 onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
 
 const handleSubmit = () => {
-  if (!form.title.trim()) return
+  if (!form.title.trim() || props.loading) return
   emit('submit', structuredClone(toRaw(form)) as Task)
 }
 

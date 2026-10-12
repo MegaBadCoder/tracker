@@ -48,7 +48,8 @@ export class ProjectColumnService {
     }
 
     const existing = await this.columnRepo.findAllByProject(projectId);
-    const nextOrder = existing.length;
+    const nextOrder =
+      existing.reduce((max, column) => Math.max(max, column.order), -1) + 1;
 
     return this.columnRepo.create({
       projectId,
@@ -74,9 +75,13 @@ export class ProjectColumnService {
   }
 
   async delete(userId: number, projectId: string, id: string): Promise<void> {
-    await this.validateProjectAccess(userId, projectId);
+    const project = await this.validateProjectAccess(userId, projectId);
 
-    const deleted = await this.columnRepo.delete(id, projectId);
+    const deleted = await this.columnRepo.delete(
+      id,
+      projectId,
+      project.type === 'agile',
+    );
     if (!deleted) throw new NotFoundException(`Column #${id} not found`);
   }
 
@@ -92,6 +97,6 @@ export class ProjectColumnService {
     }
 
     const updates = orderedIds.map((id, index) => ({ id, order: index }));
-    await this.columnRepo.reorder(updates);
+    await this.columnRepo.reorder(projectId, updates);
   }
 }

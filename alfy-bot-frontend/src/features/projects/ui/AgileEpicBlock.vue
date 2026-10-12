@@ -46,13 +46,6 @@ const doneCount = computed(() => allEpicTasks.value.filter(t => t.completed).len
 
 const epicTasksByColumn = computed(() => groupTasksByColumn(props.epicTasks))
 
-// Рамка рисуется inset-тенью, а не border/padding: тень не занимает места,
-// поэтому subgrid-колонки эпика остаются на одной вертикали с колонками доски.
-// Любой отступ на этом блоке сдвинул бы его дорожки относительно заголовков.
-const epicFrame = computed(() => ({
-  boxShadow: `inset 3px 0 0 0 ${props.epic.color || 'var(--primary)'}, inset 0 0 0 1px color-mix(in oklab, var(--border) 70%, transparent)`,
-}))
-
 function commitRename(title: string) {
   renaming.value = false
   emit('renameGroup', props.epic.id, title)
@@ -81,10 +74,9 @@ function handleCreateStory(title: string) {
 
 <template>
   <div
-    class="col-span-full grid [grid-template-columns:subgrid] mt-4 rounded-lg overflow-hidden bg-muted/20"
-    :style="epicFrame"
+    class="col-span-full grid [grid-template-columns:subgrid] mt-3"
   >
-    <div class="col-span-full flex items-center gap-2 pl-4 pr-3 py-2.5 bg-muted/60">
+    <div class="col-span-full flex items-center gap-2 px-3 py-1.5">
       <button
         class="shrink-0 -m-1.5 p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-label="collapsed ? 'Развернуть эпик' : 'Свернуть эпик'"
@@ -176,11 +168,11 @@ function handleCreateStory(title: string) {
         v-if="epicTasks.length > 0 || addingEpicTask"
         class="col-span-full grid [grid-template-columns:subgrid] border-t border-border"
       >
-        <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5 bg-muted/25">
+        <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5">
           <span class="text-xs italic text-muted-foreground/80 truncate">Задачи эпика</span>
           <span class="text-[11px] text-muted-foreground/60">{{ epicTasks.length }}</span>
         </div>
-        <div v-if="addingEpicTask" class="col-span-full pl-8 pr-3 py-1.5 bg-muted/25">
+        <div v-if="addingEpicTask" class="col-span-full pl-8 pr-3 py-1.5">
           <InlineTitleInput
             placeholder="Название задачи"
             @submit="handleCreateEpicTask"
