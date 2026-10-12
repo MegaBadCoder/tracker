@@ -41,7 +41,7 @@
         <p v-if="errorMessage" role="alert" class="mt-4 text-sm text-destructive" data-testid="project-edit-error">{{ errorMessage }}</p>
       </div>
 
-      <footer class="shrink-0 border-t bg-muted/20 px-6 py-4">
+      <footer class="shrink-0 bg-muted/20 px-6 py-4">
         <div v-if="confirmClose" class="space-y-3" role="alert">
           <p class="text-sm">Изменения не сохранены. Закрыть окно?</p>
           <div class="flex justify-end gap-2">

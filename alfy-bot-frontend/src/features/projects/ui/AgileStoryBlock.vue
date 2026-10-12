@@ -44,16 +44,10 @@ function handleCreateTask(title: string) {
 </script>
 
 <template>
-  <!-- Вложенность читается слоями, а не вдвинутым прямоугольником: отступ или
-       margin на этом блоке сдвинул бы его subgrid-колонки относительно эпика
-       и разломал сквозное выравнивание. Поэтому поверхность светлее эпика,
-       рейл тоньше, подпись с отступом. -->
   <div
-    class="col-span-full grid [grid-template-columns:subgrid] border-t border-border first:border-t-0"
+    class="col-span-full grid [grid-template-columns:subgrid] mt-1"
   >
-    <!-- Подпись — «хром» поверх панели эпика; область с карточками остаётся
-         холстом, иначе карточке не на чем проступить. -->
-    <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5 bg-muted/35">
+    <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5">
       <InlineTitleInput
         v-if="renaming"
         placeholder="Название истории"
@@ -92,7 +86,7 @@ function handleCreateTask(title: string) {
         />
       </div>
     </div>
-    <div v-if="addingTask" class="col-span-full pl-8 pr-3 py-1.5 bg-muted/35">
+    <div v-if="addingTask" class="col-span-full pl-8 pr-3 py-1.5">
       <InlineTitleInput
         placeholder="Название задачи"
         @submit="handleCreateTask"

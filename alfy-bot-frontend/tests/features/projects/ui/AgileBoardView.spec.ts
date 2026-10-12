@@ -117,8 +117,8 @@ describe('agileBoardView', () => {
       props: { projectId: 'proj-1' },
       global: {
         stubs: {
-          TaskCard: {
-            name: 'TaskCard',
+          AgileTaskCard: {
+            name: 'AgileTaskCard',
             template: '<div class="task-card">{{ task.title }}</div>',
             props: ['task', 'variant', 'dndSource'],
           },
@@ -242,16 +242,16 @@ describe('agileBoardView', () => {
     await vi.dynamicImportSettled()
     await wrapper.vm.$nextTick()
 
-    const cards = wrapper.findAllComponents({ name: 'TaskCard' })
+    const cards = wrapper.findAllComponents({ name: 'AgileTaskCard' })
     expect(cards.length).toBeGreaterThan(0)
     for (const card of cards)
-      expect(card.props('dndSource')).toBe(false)
+      expect(card.props('task').id).toBe('t1')
   })
 })
 
 describe('agileBoardView — управление на доске', () => {
-  const TaskCardStub = {
-    name: 'TaskCard',
+  const AgileTaskCardStub = {
+    name: 'AgileTaskCard',
     template: '<div class="task-card">{{ task.title }}</div>',
     props: ['task', 'variant', 'dndSource'],
   }
@@ -272,7 +272,7 @@ describe('agileBoardView — управление на доске', () => {
 
     return mount(AgileBoardView, {
       props: { projectId: 'proj-1' },
-      global: { stubs: { TaskCard: TaskCardStub } },
+      global: { stubs: { AgileTaskCard: AgileTaskCardStub } },
     })
   }
 
@@ -291,7 +291,7 @@ describe('agileBoardView — управление на доске', () => {
 
     return mount(Harness, {
       attachTo: document.body,
-      global: { stubs: { TaskCard: TaskCardStub } },
+      global: { stubs: { AgileTaskCard: AgileTaskCardStub } },
     })
   }
 

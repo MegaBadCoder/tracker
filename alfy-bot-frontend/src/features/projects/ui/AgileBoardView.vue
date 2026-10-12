@@ -145,7 +145,7 @@ watch(() => props.projectId, (id) => {
     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
   </div>
   <div v-else class="overflow-x-auto pb-4 h-full">
-    <div class="grid" :style="{ gridTemplateColumns: `repeat(${lanes.length}, ${COLUMN_WIDTH_PX}px)` }">
+    <div class="grid gap-x-2" :style="{ gridTemplateColumns: `repeat(${lanes.length}, ${COLUMN_WIDTH_PX}px)` }">
       <div class="contents">
         <div
           v-for="lane in lanes"
@@ -200,7 +200,7 @@ watch(() => props.projectId, (id) => {
         </div>
       </div>
 
-      <div class="col-span-full grid [grid-template-columns:subgrid] border-t-2 border-border">
+      <div class="col-span-full grid [grid-template-columns:subgrid] mt-2">
         <div class="col-span-full px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Без эпика
         </div>
