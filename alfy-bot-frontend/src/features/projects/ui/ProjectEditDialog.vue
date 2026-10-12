@@ -1,6 +1,6 @@
 <template>
   <Dialog :open="open" @update:open="$emit('update:open', $event)">
-    <DialogContent class="sm:max-w-md">
+    <DialogContent class="sm:max-w-lg max-h-[85dvh] overflow-y-auto">
       <div class="space-y-4">
         <h2 class="text-lg font-semibold">Редактировать проект</h2>
 
@@ -37,6 +37,8 @@
 
         <TaskKeyPrefixField v-if="project?.type === 'agile'" v-model="localTaskKeyPrefix" />
 
+        <ProjectColumnSettings v-if="open && project?.type === 'agile'" :key="project.id" :project-id="project.id" />
+
         <p v-if="errorMessage" class="text-sm text-destructive" role="alert" data-testid="project-edit-error">
           {{ errorMessage }}
         </p>
@@ -67,6 +69,7 @@ import ProjectPicker from './ProjectPicker.vue'
 import IconPicker from './IconPicker.vue'
 import ColorPicker from './ColorPicker.vue'
 import TaskKeyPrefixField from './TaskKeyPrefixField.vue'
+import ProjectColumnSettings from './ProjectColumnSettings.vue'
 
 const props = defineProps<{
   project: Project | null
