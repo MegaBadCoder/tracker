@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Task } from '@/features/tasks/model/types'
 import draggable from 'vuedraggable'
-import TaskCard from '@/features/tasks/ui/TaskCard.vue'
+import AgileTaskCard from './AgileTaskCard.vue'
 
 const props = defineProps<{
   tasks: Task[]
@@ -21,7 +21,7 @@ function handleChange(event: any) {
 </script>
 
 <template>
-  <div class="flex min-h-10 flex-col px-1.5 py-1.5 border-l border-border/50 first:border-l-0">
+  <div class="flex min-h-[88px] flex-col bg-muted/30 p-1.5">
     <!-- flex-1 обязателен: без него список принимает drop только на высоту
          своего содержимого, и в пустой ячейке это полоска в 20px посреди
          88px — карточка отскакивает назад, а выглядит как «не переносится». -->
@@ -35,11 +35,8 @@ function handleChange(event: any) {
       @change="handleChange"
     >
       <template #item="{ element }">
-        <TaskCard
+        <AgileTaskCard
           :task="element"
-          variant="compact"
-          :dnd-source="false"
-          @toggle="$emit('toggleTask', $event)"
           @open="$emit('openTask', $event)"
         />
       </template>

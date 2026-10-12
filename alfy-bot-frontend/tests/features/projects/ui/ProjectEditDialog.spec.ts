@@ -58,14 +58,17 @@ describe('ProjectEditDialog', () => {
       },
       global: {
         stubs: {
-          Dialog: { template: '<div><slot /></div>' },
+          Dialog: { name: 'Dialog', emits: ['update:open'], template: '<div><slot /></div>' },
           DialogContent: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<h2><slot /></h2>' },
+          DialogDescription: { template: '<p><slot /></p>' },
+          ProjectColumnSettings: true,
           Input: {
             props: ['modelValue', 'placeholder'],
             emits: ['update:modelValue'],
             template: '<input :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
           },
-          Button: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
+          Button: { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' },
           IconPicker: true,
           ColorPicker: true,
           ProjectPicker: ProjectPickerStub,
@@ -87,14 +90,17 @@ describe('ProjectEditDialog', () => {
       },
       global: {
         stubs: {
-          Dialog: { template: '<div><slot /></div>' },
+          Dialog: { name: 'Dialog', emits: ['update:open'], template: '<div><slot /></div>' },
           DialogContent: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<h2><slot /></h2>' },
+          DialogDescription: { template: '<p><slot /></p>' },
+          ProjectColumnSettings: true,
           Input: {
             props: ['modelValue', 'placeholder'],
             emits: ['update:modelValue'],
             template: '<input :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
           },
-          Button: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
+          Button: { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' },
           IconPicker: true,
           ColorPicker: true,
           ProjectPicker: ProjectPickerStub,
@@ -106,8 +112,7 @@ describe('ProjectEditDialog', () => {
     await nextTick()
 
     await wrapper.find('button.set-null').trigger('click')
-    const saveButton = wrapper.findAll('button').find(button => button.text() === 'Сохранить')
-    await saveButton?.trigger('click')
+    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateProject).toHaveBeenCalledWith(
@@ -119,14 +124,17 @@ describe('ProjectEditDialog', () => {
   })
 
   const editStubs = {
-    Dialog: { template: '<div><slot /></div>' },
+    Dialog: { name: 'Dialog', emits: ['update:open'], template: '<div><slot /></div>' },
     DialogContent: { template: '<div><slot /></div>' },
+          DialogTitle: { template: '<h2><slot /></h2>' },
+          DialogDescription: { template: '<p><slot /></p>' },
+          ProjectColumnSettings: true,
     Input: {
       props: ['modelValue', 'placeholder'],
       emits: ['update:modelValue'],
       template: '<input :value="modelValue" :placeholder="placeholder" @input="$emit(\'update:modelValue\', $event.target.value)" />',
     },
-    Button: { template: '<button :disabled="$attrs.disabled" @click="$emit(\'click\')"><slot /></button>' },
+    Button: { emits: ['click'], template: '<button :disabled="$attrs.disabled" @click="$emit(\'click\')"><slot /></button>' },
     IconPicker: true,
     ColorPicker: true,
     ProjectPicker: ProjectPickerStub,
@@ -161,7 +169,7 @@ describe('ProjectEditDialog', () => {
     expect((input.element as HTMLInputElement).value).toBe('ALF')
 
     await input.setValue('bot')
-    await saveButton(wrapper)?.trigger('click')
+    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateProject).toHaveBeenCalledWith(
@@ -174,7 +182,7 @@ describe('ProjectEditDialog', () => {
     const wrapper = await openDialog(makeProject({ type: 'agile', taskKeyPrefix: 'ALF' }))
 
     await wrapper.get('[data-testid="task-key-prefix-input"]').setValue('  ')
-    await saveButton(wrapper)?.trigger('click')
+    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateProject).toHaveBeenCalledWith(
@@ -185,8 +193,9 @@ describe('ProjectEditDialog', () => {
 
   it('у обычного проекта taskKeyPrefix в payload не передаётся', async () => {
     const wrapper = await openDialog(makeProject({ type: 'simple' }))
+    await wrapper.get('[placeholder="Название проекта"]').setValue('Обновлённый')
 
-    await saveButton(wrapper)?.trigger('click')
+    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateProject.mock.calls[0]?.[1]).not.toHaveProperty('taskKeyPrefix')
@@ -196,7 +205,7 @@ describe('ProjectEditDialog', () => {
     const wrapper = await openDialog(makeProject({ type: 'agile', taskKeyPrefix: null }))
 
     await wrapper.get('[data-testid="task-key-prefix-input"]').setValue('АЛФ')
-    await saveButton(wrapper)?.trigger('click')
+    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(saveButton(wrapper)?.attributes('disabled')).toBeDefined()
@@ -208,10 +217,58 @@ describe('ProjectEditDialog', () => {
     const wrapper = await openDialog(makeProject({ type: 'agile', taskKeyPrefix: null }))
 
     await wrapper.get('[data-testid="task-key-prefix-input"]').setValue('ALF')
-    await saveButton(wrapper)?.trigger('click')
+    await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(wrapper.get('[data-testid="project-edit-error"]').text()).toBe('Task key prefix is already used')
     expect(wrapper.emitted('update:open')).toBeUndefined()
   })
+  it('показывает данные при первом открытом монтировании и блокирует неизменённое сохранение', async () => {
+    const wrapper = mount(ProjectEditDialog, { props: { open: true, project: makeProject() }, global: { stubs: editStubs } })
+    expect((wrapper.get('[placeholder="Название проекта"]').element as HTMLInputElement).value).toBe('Проект')
+    expect(saveButton(wrapper)?.attributes('disabled')).toBeDefined()
+  })
+
+  it('предлагает вернуться к несохранённым данным перед закрытием', async () => {
+    const wrapper = await openDialog(makeProject())
+    await wrapper.get('[placeholder="Название проекта"]').setValue('Черновик')
+    await wrapper.findAll('button').find(button => button.text() === 'Отмена')!.trigger('click')
+    expect(wrapper.text()).toContain('не сохранены')
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    await wrapper.findAll('button').find(button => button.text() === 'Вернуться')!.trigger('click')
+    expect((wrapper.get('[placeholder="Название проекта"]').element as HTMLInputElement).value).toBe('Черновик')
+    await wrapper.findAll('button').find(button => button.text() === 'Отмена')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'Не сохранять')!.trigger('click')
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+  })
+
+  it('смена проекта сбрасывает предыдущий черновик', async () => {
+    const wrapper = await openDialog(makeProject())
+    await wrapper.get('[placeholder="Название проекта"]').setValue('Черновик')
+    await wrapper.setProps({ project: makeProject({ id: 'other', title: 'Другой' }) })
+    expect((wrapper.get('[placeholder="Название проекта"]').element as HTMLInputElement).value).toBe('Другой')
+    expect(saveButton(wrapper)?.attributes('disabled')).toBeDefined()
+  })
+
+  it('не закрывает окно пока сохраняются колонки', async () => {
+    const wrapper = await openDialog(makeProject({ type: 'agile' }))
+    wrapper.findComponent({ name: 'ProjectColumnSettings' }).vm.$emit('busyChange', true)
+    await nextTick()
+    wrapper.findComponent({ name: 'Dialog' }).vm.$emit('update:open', false)
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+  })
+
+  it('сохранение основного раздела не теряет черновик колонки', async () => {
+    const wrapper = await openDialog(makeProject({ type: 'agile' }))
+    await wrapper.get('[placeholder="Название проекта"]').setValue('Обновлённый')
+    wrapper.findComponent({ name: 'ProjectColumnSettings' }).vm.$emit('dirtyChange', true)
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(updateProject).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    expect(wrapper.get('[role="tab"][data-state="active"]').text()).toBe('Колонки')
+    await wrapper.findAll('button').find(button => button.text() === 'Готово')!.trigger('click')
+    expect(wrapper.text()).toContain('Изменения не сохранены')
+  })
+
 })

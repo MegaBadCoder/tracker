@@ -69,9 +69,14 @@ function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
 }
 
 const stubs = {
+  Dialog: { props: ['open'], template: '<div v-if="open"><slot /></div>' },
+  DialogContent: { template: '<div><slot /></div>' },
+  DialogHeader: { template: '<div><slot /></div>' },
+  DialogTitle: { template: '<h2><slot /></h2>' },
+  DialogDescription: { template: '<p><slot /></p>' },
   BoardView: true,
   AgileBoardView: true,
-  SprintBanner: true,
+  SprintBanner: { props: { canComplete: Boolean }, template: '<div><slot /></div>' },
   GroupedListView: true,
   TaskForm: { name: 'TaskForm', template: '<div />', methods: { resetForm() {} } },
   TaskDetailDialog: true,
@@ -178,11 +183,13 @@ describe('projectView — agile-проект и активный спринт', 
     expect(link?.props('to')).toEqual({ name: 'tasks-project-backlog', params: { projectId: 'proj-1' } })
   })
 
-  it('с активным спринтом рендерит SprintBanner, форму задачи и доску', async () => {
+  it('с активным спринтом открывает форму задачи только по кнопке', async () => {
     const wrapper = mountAgile([makeSprint()])
     await flushPromises()
 
     expect(wrapper.findComponent(SprintBanner).exists()).toBe(true)
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
+    await wrapper.findAll('button').find(b => b.text() === 'Добавить задачу')!.trigger('click')
     expect(wrapper.findComponent(TaskForm).exists()).toBe(true)
     expect(wrapper.findComponent(AgileBoardView).exists()).toBe(true)
     expect(wrapper.text()).not.toContain('Нет активного спринта')
@@ -237,14 +244,30 @@ describe('projectView — agile-проект и активный спринт', 
     const wrapper = mountAgile([makeSprint({ id: 'sprint-1' })])
     await flushPromises()
 
+    await wrapper.findAll('button').find(b => b.text() === 'Добавить задачу')!.trigger('click')
     wrapper.findComponent(TaskForm).vm.$emit('submit', { title: 'Новая', completed: false })
     await flushPromises()
 
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
     expect(api.post).toHaveBeenCalledWith('/tasks', expect.objectContaining({
       title: 'Новая',
       projectId: 'proj-1',
       sprintId: 'sprint-1',
     }))
+  })
+
+  it('сохраняет форму при ошибке и позволяет повторить отправку', async () => {
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('offline'))
+    const wrapper = mountAgile([makeSprint()])
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text() === 'Добавить задачу')!.trigger('click')
+    wrapper.findComponent(TaskForm).vm.$emit('submit', { title: 'Черновик', completed: false })
+    await flushPromises()
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(true)
+    expect(wrapper.find('[role="alert"]').text()).toContain('Не удалось создать задачу')
+    wrapper.findComponent(TaskForm).vm.$emit('cancel')
+    await flushPromises()
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
   })
 
   it('задача из формы обычного проекта уходит без sprintId', async () => {

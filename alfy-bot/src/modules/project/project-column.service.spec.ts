@@ -128,6 +128,20 @@ describe('ProjectColumnService', () => {
       );
     });
 
+    it('добавляет колонку после последней при пропуске в порядке', async () => {
+      projRepo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+      colRepo.findAllByProject.mockResolvedValue([
+        makeColumn({ id: 'col-1', order: 0 }),
+        makeColumn({ id: 'col-3', order: 2 }),
+      ]);
+
+      await service.create(1, 'proj-1', { title: 'Новая' });
+
+      expect(colRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ order: 3 }),
+      );
+    });
+
     it('создаёт колонку с указанным color', async () => {
       projRepo.findById.mockResolvedValue(makeProject());
       colRepo.findAllByProject.mockResolvedValue([]);
@@ -221,7 +235,15 @@ describe('ProjectColumnService', () => {
 
       await service.delete(1, 'proj-1', 'col-1');
 
-      expect(colRepo.delete).toHaveBeenCalledWith('col-1', 'proj-1');
+      expect(colRepo.delete).toHaveBeenCalledWith('col-1', 'proj-1', false);
+    });
+
+    it('передаёт тип Agile для защиты занятой колонки', async () => {
+      projRepo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+
+      await service.delete(1, 'proj-1', 'col-1');
+
+      expect(colRepo.delete).toHaveBeenCalledWith('col-1', 'proj-1', true);
     });
 
     it('бросает NotFoundException если колонка не найдена', async () => {
@@ -242,7 +264,7 @@ describe('ProjectColumnService', () => {
 
       await service.reorder(1, 'proj-1', ['col-3', 'col-1', 'col-2']);
 
-      expect(colRepo.reorder).toHaveBeenCalledWith([
+      expect(colRepo.reorder).toHaveBeenCalledWith('proj-1', [
         { id: 'col-3', order: 0 },
         { id: 'col-1', order: 1 },
         { id: 'col-2', order: 2 },

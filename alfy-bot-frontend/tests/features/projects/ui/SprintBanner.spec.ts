@@ -54,13 +54,24 @@ describe('sprintBanner', () => {
   function setup(sprint: Sprint | null, tasks: Task[] = [], props: { canComplete?: boolean } = {}) {
     useSprintStore().lists['proj-1'] = sprint ? [sprint] : []
     useTaskStore().tasks = tasks
-    return mount(SprintBanner, { props: { projectId: 'proj-1', ...props } })
+    return mount(SprintBanner, {
+      props: { projectId: 'proj-1', ...props },
+      global: { stubs: {
+        Dialog: { props: ['open'], template: '<div v-if="open"><slot /></div>' },
+        DialogContent: { template: '<div><slot /></div>' },
+        DialogHeader: { template: '<div><slot /></div>' },
+        DialogTitle: { template: '<h2><slot /></h2>' },
+        DialogDescription: { template: '<p><slot /></p>' },
+      } },
+    })
   }
 
-  it('показывает название и цель спринта', () => {
+  it('показывает цель только после нажатия на название спринта', async () => {
     const wrapper = setup(makeSprint())
 
     expect(wrapper.text()).toContain('Спринт 1')
+    expect(wrapper.text()).not.toContain('Выпустить MVP')
+    await wrapper.find('button').trigger('click')
     expect(wrapper.text()).toContain('Выпустить MVP')
   })
 
@@ -117,7 +128,7 @@ describe('sprintBanner', () => {
   it('скрывает кнопку «Завершить спринт» без canComplete', () => {
     const wrapper = setup(makeSprint())
 
-    expect(wrapper.findAll('button')).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('Завершить спринт')
   })
 
   it('с canComplete показывает кнопку, и клик эмитит complete', async () => {

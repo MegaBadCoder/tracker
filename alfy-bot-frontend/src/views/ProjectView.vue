@@ -7,6 +7,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import PageContainer from '@/components/PageContainer.vue'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { useConfirm } from '@/composables/useConfirm'
 import { useColumnStore } from '@/features/projects/model/column-store'
 import { useProjectStore } from '@/features/projects/model/project-store'
@@ -55,6 +56,18 @@ const completeTarget = ref<Sprint | null>(null)
 
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
+const taskDialogOpen = ref(false)
+const taskCreationError = ref('')
+
+function updateTaskDialog(open: boolean) {
+  if (isCreatingTask.value) return
+  taskDialogOpen.value = open
+  if (open) taskCreationError.value = ''
+}
+
+watch(() => activeSprint.value?.id, () => {
+  taskDialogOpen.value = false
+})
 
 const taskStore = useTaskStore()
 const { tasks, loading, error } = storeToRefs(taskStore)
@@ -117,7 +130,9 @@ async function handleViewModeChange(mode: string) {
 }
 
 async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
+  if (isCreatingTask.value) return
   isCreatingTask.value = true
+  taskCreationError.value = ''
   try {
     if (isAgileProject.value) {
       if (!activeSprint.value)
@@ -128,8 +143,10 @@ async function handleAddTask(taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) {
       await createTask({ ...taskData, projectId: projectId.value })
     }
     taskFormRef.value?.resetForm()
+    taskDialogOpen.value = false
   }
   catch (err) {
+    taskCreationError.value = 'Не удалось создать задачу. Попробуйте ещё раз.'
     console.error('Ошибка добавления задачи:', err)
   }
   finally {
@@ -204,14 +221,14 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
         <ProjectTabs :project-id="projectId" />
       </div>
 
-      <div v-if="(loading && tasks.length === 0) || sprintsPending" class="text-center py-8">
+      <div v-if="(loading && tasks.length === 0 && !isCreatingTask) || sprintsPending" class="text-center py-8">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
         <p class="mt-2 text-muted-foreground">
           Загрузка задач...
         </p>
       </div>
 
-      <div v-else-if="error || sprintStore.error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 m-4">
+      <div v-else-if="(error && !taskCreationError) || sprintStore.error" class="bg-destructive/10 border border-destructive/20 rounded-lg p-4 m-4">
         <p class="text-destructive">
           {{ error || sprintStore.error }}
         </p>
@@ -232,10 +249,20 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
       </div>
 
       <template v-else>
-        <SprintBanner class="mt-3" :project-id="projectId" can-complete @complete="completeTarget = activeSprint" />
-
-        <div class="px-4 py-3">
-          <TaskForm ref="taskFormRef" :loading="isCreatingTask" :initial-project-id="projectId" @submit="handleAddTask as any" />
+        <SprintBanner class="mt-3 mb-3" :project-id="projectId" can-complete @complete="completeTarget = activeSprint">
+          <Button size="sm" variant="outline" @click="updateTaskDialog(true)">Добавить задачу</Button>
+        </SprintBanner>
+        <div>
+          <Dialog :open="taskDialogOpen" @update:open="updateTaskDialog">
+            <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-xl" @interact-outside.prevent @escape-key-down="isCreatingTask && $event.preventDefault()">
+              <DialogHeader>
+                <DialogTitle>Новая задача</DialogTitle>
+                <DialogDescription>{{ project?.title }} · {{ activeSprint.name }}</DialogDescription>
+              </DialogHeader>
+              <TaskForm v-if="taskDialogOpen" ref="taskFormRef" modal :loading="isCreatingTask" @submit="handleAddTask as any" @cancel="updateTaskDialog(false)" />
+              <p v-if="taskCreationError" role="alert" class="text-sm text-destructive">{{ taskCreationError }}</p>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <main class="flex-1 min-h-0 px-4 pb-4">
