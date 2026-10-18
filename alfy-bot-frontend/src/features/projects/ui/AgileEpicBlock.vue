@@ -20,9 +20,12 @@ const props = defineProps<{
   canMoveUp?: boolean
   canMoveDown?: boolean
   reordering?: boolean
+  backlogGroupIds?: string[]
+  returningToBacklog?: boolean
 }>()
 
 const emit = defineEmits<{
+  returnToBacklog: [group: BoardGroupNode]
   moveGroup: [group: BoardGroupNode, direction: -1 | 1]
   toggleTask: [id: string]
   openTask: [task: Task]
@@ -132,6 +135,9 @@ function handleCreateStory(title: string) {
         </Button>
         <GroupActionsMenu
           :group="epic"
+          :can-return-to-backlog="backlogGroupIds?.includes(epic.id)"
+          :returning-to-backlog="returningToBacklog"
+          @return-to-backlog="$emit('returnToBacklog', epic)"
           @open="$emit('openGroup', epic.id)"
           @rename="renaming = true"
           @set-color="(color) => $emit('setGroupColor', epic.id, color)"
@@ -152,6 +158,9 @@ function handleCreateStory(title: string) {
         :can-move-up="index > 0"
         :can-move-down="index < stories.length - 1"
         :reordering="reordering"
+        :backlog-group-ids="backlogGroupIds"
+        :returning-to-backlog="returningToBacklog"
+        @return-to-backlog="$emit('returnToBacklog', $event)"
         @move-group="(group, direction) => $emit('moveGroup', group, direction)"
         @toggle-task="$emit('toggleTask', $event)"
         @open-task="$emit('openTask', $event)"
