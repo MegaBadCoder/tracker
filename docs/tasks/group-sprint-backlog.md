@@ -1,6 +1,6 @@
 # Возврат эпика или истории из спринта в бэклог
 
-**Status:** executing
+**Status:** done
 **Branch:** codex/group-sprint-backlog
 **Worktree:** /Users/v/projects/Alfy/.worktrees/group-sprint-backlog
 **Mode:** interactive
@@ -41,3 +41,20 @@
 ### Interface graph
 - PH1 -> IF1 @ alfy-bot/src/modules/project/ alfy-bot/test/
 - PH2 IF1 -> @ alfy-bot-frontend/src/features/projects/ alfy-bot-frontend/tests/features/projects/ alfy-mcp/
+
+## Verify
+- Backend: 36 unit и 11 HTTP/SQLite e2e; build и scoped lint пройдены. Принудительная ошибка SQLite подтверждает полный rollback.
+- Frontend: 60 тестов, type-check, build и scoped lint пройдены. Проверены исчезновение групп, назначенные пустые истории, создание и ошибка назначения, порядок видимых соседей.
+- MCP: 197 тестов, build и lint пройдены; реальный SDK → REST smoke подтвердил story updated=1, epic updated=2, повтор updated=0, сохранение других спринтов и отказ закрытого спринта.
+- Браузер с локальным API: возврат истории убрал только её из доски; возврат эпика убрал остальные группы; перезагрузка сохранила результат. Бэклог содержит 3 возвращённые задачи, следующий спринт сохранил свою задачу, обе истории остались в структуре проекта.
+- Скриншот: /Users/v/.codex/visualizations/2026/10/09/01a120ab-bf2f-7d90-a51f-5fca7d78316d/group-sprint-backlog.png.
+
+## Conclusion
+Возврат групп в бэклог работает через доску и MCP; после возврата группы исчезают с доски текущего спринта, данные сохраняются. Реализация: b7387d0; независимое ревью не выявило critical/important замечаний.
+
+Invariants:
+- IV1 — HTTP e2e и реальный MCP smoke подтвердили изоляцию пользователя, проекта и спринта, отказ закрытого спринта.
+- IV2 — SQLite rollback-тест и повторные MCP вызовы с updated=0 подтвердили атомарность и идемпотентность.
+- IV3 — HTTP e2e, MCP smoke и браузер подтвердили сохранение структуры и данных других спринтов.
+
+Plan adherence: по уточнению пользователя добавлена фильтрация групп текущего спринта; адаптированы создание групп и перестановка видимых соседей. MCP выделен в отдельный коммит.
