@@ -43,6 +43,8 @@ const { deleteGroupWithConfirm } = useGroupDeletion()
 const groupDetail = useGroupDetail()
 
 const addingEpic = ref(false)
+const reordering = ref(false)
+const reorderError = ref<string | null>(null)
 
 const sortedColumns = computed(() =>
   [...columnStore.columns].sort((a, b) => a.order - b.order),
@@ -82,6 +84,37 @@ const projectTasksByColumn = computed(() => groupTasksByColumn(projectTasks.valu
 
 function laneTaskCount(lane: ProjectColumn): number {
   return projectTasksByColumn.value.get(lane.id)?.length ?? 0
+}
+
+async function handleMoveGroup(group: BoardGroupNode, direction: -1 | 1) {
+  if (reordering.value)
+    return
+
+  const projectId = props.projectId
+  const tree = groupStore.groupsOf(projectId)
+  const siblings = [...(group.parentId ? tree.find(epic => epic.id === group.parentId)?.children ?? [] : tree)]
+    .sort((a, b) => a.order - b.order)
+  const index = siblings.findIndex(sibling => sibling.id === group.id)
+  const targetIndex = index + direction
+  if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length)
+    return
+
+  const orderedIds = siblings.map(sibling => sibling.id)
+  const targetId = orderedIds[targetIndex]!
+  orderedIds[targetIndex] = group.id
+  orderedIds[index] = targetId
+  reordering.value = true
+  reorderError.value = null
+  try {
+    await groupStore.reorderGroups(projectId, orderedIds)
+  }
+  catch {
+    if (props.projectId === projectId)
+      reorderError.value = 'Не удалось сохранить порядок. Прежний порядок восстановлен. Попробуйте ещё раз.'
+  }
+  finally {
+    reordering.value = false
+  }
 }
 
 async function handleToggleGroupDone(group: BoardGroupNode) {
@@ -133,6 +166,7 @@ function handleTaskChange(event: any, columnId: string, groupId: string | null, 
 }
 
 watch(() => props.projectId, (id) => {
+  reorderError.value = null
   if (id) {
     columnStore.fetchColumns(id)
     groupStore.fetchGroups(id)
@@ -145,6 +179,9 @@ watch(() => props.projectId, (id) => {
     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
   </div>
   <div v-else class="overflow-x-auto pb-4 h-full">
+    <p v-if="reorderError" role="alert" class="sticky left-0 mb-3 text-sm text-destructive">
+      {{ reorderError }}
+    </p>
     <div class="grid gap-x-2" :style="{ gridTemplateColumns: `repeat(${lanes.length}, ${COLUMN_WIDTH_PX}px)` }">
       <div class="contents">
         <div
@@ -163,12 +200,16 @@ watch(() => props.projectId, (id) => {
       </div>
 
       <AgileEpicBlock
-        v-for="row in epicRows"
+        v-for="(row, index) in epicRows"
         :key="row.epic.id"
         :epic="row.epic"
         :stories="row.stories"
         :epic-tasks="row.epicTasks"
         :lanes="lanes"
+        :can-move-up="index > 0"
+        :can-move-down="index < epicRows.length - 1"
+        :reordering="reordering"
+        @move-group="handleMoveGroup"
         @toggle-task="$emit('toggleTask', $event)"
         @open-task="$emit('openTask', $event)"
         @task-change="handleTaskChange"

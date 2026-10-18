@@ -8,9 +8,12 @@ import { api } from '@/api/client'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import * as columnsApi from '@/features/projects/api/columns-api'
 import * as groupsApi from '@/features/projects/api/groups-api'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { useGroupDetail } from '@/features/projects/model/use-group-detail'
 import AgileBoardView from '@/features/projects/ui/AgileBoardView.vue'
+import AgileEpicBlock from '@/features/projects/ui/AgileEpicBlock.vue'
+import AgileStoryBlock from '@/features/projects/ui/AgileStoryBlock.vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 
 vi.mock('@/features/projects/api/columns-api', () => ({
@@ -301,6 +304,85 @@ describe('agileBoardView — управление на доске', () => {
       throw new Error(`Button with text "${text}" not found`)
     return button
   }
+
+  function orderedGroups() {
+    return [1, 2, 3, 4].map(n => makeEpic({
+      id: `epic-${n}`,
+      title: `Эпик ${n}`,
+      order: n - 1,
+      children: [1, 2].map(m => makeEpic({
+        id: `story-${n}-${m}`,
+        title: `История ${n}-${m}`,
+        type: 'story',
+        parentId: `epic-${n}`,
+        order: m - 1,
+      })),
+    }))
+  }
+
+  it('стрелки эпиков сохраняют полный порядок и сохраняют задачи и колонки', async () => {
+    vi.mocked(groupsApi.reorderGroups).mockResolvedValue({} as any)
+    const tasks = [makeTask({ groupId: 'story-1-1', columnId: 'col-1' })]
+    const wrapper = setup([makeColumn()], orderedGroups(), tasks)
+    await flushPromises()
+
+    expect(wrapper.get('button[aria-label="Переместить эпик Эпик 1 выше"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="Переместить эпик Эпик 4 ниже"]').attributes('disabled')).toBeDefined()
+    for (const title of ['Эпик 3', 'Эпик 3', 'Эпик 4', 'Эпик 4']) {
+      await wrapper.get(`button[aria-label="Переместить эпик ${title} выше"]`).trigger('click')
+      await flushPromises()
+    }
+
+    expect(groupsApi.reorderGroups).toHaveBeenLastCalledWith('proj-1', ['epic-3', 'epic-4', 'epic-1', 'epic-2'])
+    expect(wrapper.findAllComponents(AgileEpicBlock).map(c => c.props('epic').id)).toEqual(['epic-3', 'epic-4', 'epic-1', 'epic-2'])
+    expect(useTaskStore().tasks).toEqual(tasks)
+    expect(wrapper.findAll('.sticky.top-0')).toHaveLength(1)
+  })
+
+  it('стрелки историй меняют порядок только внутри их эпика', async () => {
+    vi.mocked(groupsApi.reorderGroups).mockResolvedValue({} as any)
+    const wrapper = setup([makeColumn()], orderedGroups(), [])
+    await flushPromises()
+
+    expect(wrapper.get('button[aria-label="Переместить историю История 1-1 выше"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="Переместить историю История 1-2 ниже"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('button[aria-label="Переместить историю История 1-1 ниже"]').trigger('click')
+    await flushPromises()
+
+    expect(groupsApi.reorderGroups).toHaveBeenCalledWith('proj-1', ['story-1-2', 'story-1-1'])
+    expect(wrapper.findAllComponents(AgileStoryBlock).map(c => c.props('story').id)).toEqual([
+      'story-1-2',
+      'story-1-1',
+      'story-2-1',
+      'story-2-2',
+      'story-3-1',
+      'story-3-2',
+      'story-4-1',
+      'story-4-2',
+    ])
+    expect(useGroupStore().groupsOf('proj-1')[0]?.children.every(story => story.parentId === 'epic-1')).toBe(true)
+  })
+
+  it('блокирует стрелки до ответа и при ошибке возвращает порядок с сообщением', async () => {
+    let rejectSave!: (error: Error) => void
+    vi.mocked(groupsApi.reorderGroups).mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectSave = reject
+    }))
+    const wrapper = setup([makeColumn()], orderedGroups(), [])
+    await flushPromises()
+    await wrapper.get('button[aria-label="Переместить эпик Эпик 1 ниже"]').trigger('click')
+
+    expect(wrapper.findAllComponents(AgileEpicBlock)[0]?.props('epic').id).toBe('epic-2')
+    expect(wrapper.findAll('button[aria-label^="Переместить"]').every(b => b.attributes('disabled') !== undefined)).toBe(true)
+    await wrapper.get('button[aria-label="Переместить эпик Эпик 1 ниже"]').trigger('click')
+    expect(groupsApi.reorderGroups).toHaveBeenCalledTimes(1)
+
+    rejectSave(new Error('offline'))
+    await flushPromises()
+    expect(wrapper.findAllComponents(AgileEpicBlock)[0]?.props('epic').id).toBe('epic-1')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не удалось сохранить порядок')
+    expect(wrapper.get('button[aria-label="Переместить эпик Эпик 1 ниже"]').attributes('disabled')).toBeUndefined()
+  })
 
   it('«+ Эпик» создаёт новый эпик', async () => {
     vi.mocked(groupsApi.createGroup).mockResolvedValueOnce({
