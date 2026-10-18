@@ -61,7 +61,7 @@ export function registerSprintTools(server: McpServer, client: AlfyRestClient): 
   });
 
   server.registerTool('list_project_groups', {
-    description: 'Дерево эпиков и историй проекта с UUID, статусами и назначениями спринтов и релизов. Используйте UUID истории в move_story_to_sprint.',
+    description: 'Дерево эпиков и историй проекта с UUID, статусами и назначениями спринтов и релизов. Для создания, изменения и удаления используйте create_project_group, update_project_group и delete_project_group. Используйте UUID истории в move_story_to_sprint.',
     inputSchema: { projectId },
     annotations: { readOnlyHint: true },
   }, async ({ projectId }) => toText(await client.get(`/projects/${projectId}/groups`)));
