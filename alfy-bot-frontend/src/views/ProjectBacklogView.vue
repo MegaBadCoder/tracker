@@ -8,6 +8,7 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useConfirm } from '@/composables/useConfirm'
 import { apiErrorMessage } from '@/features/projects/lib/api-error'
 import { matchesEpic } from '@/features/projects/lib/backlog-stories'
@@ -28,6 +29,7 @@ import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import TaskListOptionsMenu from '@/features/tasks/ui/TaskListOptionsMenu.vue'
 
 const openSidebar = inject<() => void>('openSidebar')
@@ -101,15 +103,51 @@ async function handleMoveStory(storyId: string, sprintId: string | null) {
   }
 }
 
-async function handleCreateTask(sprintId: string | null, title: string, groupId?: string) {
-  actionError.value = null
+const creationTarget = ref<{ projectId: string, sprintId: string | null, groupId?: string } | null>(null)
+const isCreatingTask = ref(false)
+const taskCreationError = ref<string | null>(null)
+const creationStory = computed(() => creationTarget.value?.groupId
+  ? findGroup(groupStore.groupsOf(creationTarget.value.projectId), creationTarget.value.groupId)
+  : null)
+const isReleasedStory = computed(() => !!creationTarget.value && releaseStore.releasesOf(creationTarget.value.projectId)
+  .some(release => release.id === creationStory.value?.releaseId && release.status === 'released'))
+const creationLabel = computed(() => {
+  const target = creationTarget.value
+  if (!target)
+    return ''
+  const sprint = sprintStore.lists[target.projectId]?.find(item => item.id === target.sprintId)
+  return [project.value?.title, sprint?.name ?? 'Бэклог', creationStory.value?.title].filter(Boolean).join(' · ')
+})
+
+function openTaskCreation(sprintId: string | null, groupId?: string) {
+  if (isCreatingTask.value)
+    return
+  taskCreationError.value = null
+  creationTarget.value = { projectId: projectId.value, sprintId, groupId }
+}
+
+function closeTaskCreation(open: boolean) {
+  if (!open && !isCreatingTask.value)
+    creationTarget.value = null
+}
+
+async function handleCreateTask(data: Omit<Task, 'id' | 'completed' | 'pomodoroCompleted'>) {
+  const target = creationTarget.value
+  if (!target || isCreatingTask.value)
+    return
+  isCreatingTask.value = true
+  taskCreationError.value = null
   try {
-    const story = groupId ? findGroup(groupStore.groupsOf(projectId.value), groupId) : null
-    const releasedStory = releaseStore.releasesOf(projectId.value).some(r => r.id === story?.releaseId && r.status === 'released')
-    await taskStore.createTask({ title, completed: false, projectId: projectId.value, sprintId, ...(groupId ? { groupId } : {}), ...(releasedStory ? { releaseId: null } : {}) })
+    await taskStore.createTask({ ...data, completed: false, projectId: target.projectId, sprintId: target.sprintId, groupId: target.groupId ?? null, ...(isReleasedStory.value ? { releaseId: null } : {}) })
+    if (creationTarget.value === target)
+      creationTarget.value = null
   }
   catch (err) {
-    actionError.value = apiErrorMessage(err, 'Не удалось создать задачу')
+    if (creationTarget.value === target)
+      taskCreationError.value = apiErrorMessage(err, 'Не удалось создать задачу')
+  }
+  finally {
+    isCreatingTask.value = false
   }
 }
 
@@ -173,6 +211,7 @@ onMounted(() => {
 watch(projectId, (id) => {
   epicFilter.value = 'all'
   actionError.value = null
+  creationTarget.value = null
   if (id)
     loadProjectData(id)
 })
@@ -230,8 +269,8 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             @complete="completeTarget = activeSprint"
             @move-task="handleMoveTask"
             @move-story="handleMoveStory"
-            @create-task="handleCreateTask(activeSprint.id, $event)"
-            @create-story-task="(groupId, title) => handleCreateTask(activeSprint!.id, title, groupId)"
+            @create-task="openTaskCreation(activeSprint.id)"
+            @create-story-task="groupId => openTaskCreation(activeSprint!.id, groupId)"
             @open-task="handleOpenTask"
             @toggle-task="handleToggleTask"
           />
@@ -251,8 +290,8 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             @delete="handleDeleteSprint(sprint)"
             @move-task="handleMoveTask"
             @move-story="handleMoveStory"
-            @create-task="handleCreateTask(sprint.id, $event)"
-            @create-story-task="(groupId, title) => handleCreateTask(sprint.id, title, groupId)"
+            @create-task="openTaskCreation(sprint.id)"
+            @create-story-task="groupId => openTaskCreation(sprint.id, groupId)"
             @open-task="handleOpenTask"
             @toggle-task="handleToggleTask"
           />
@@ -271,8 +310,8 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
             :has-active-sprint="!!activeSprint"
             @move-task="handleMoveTask"
             @move-story="handleMoveStory"
-            @create-task="handleCreateTask(null, $event)"
-            @create-story-task="(groupId, title) => handleCreateTask(null, title, groupId)"
+            @create-task="openTaskCreation(null)"
+            @create-story-task="groupId => openTaskCreation(null, groupId)"
             @open-task="handleOpenTask"
             @toggle-task="handleToggleTask"
           />
@@ -280,6 +319,21 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
       </div>
     </template>
   </div>
+  <Dialog :open="!!creationTarget" @update:open="closeTaskCreation">
+    <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-xl" @interact-outside.prevent @escape-key-down="isCreatingTask && $event.preventDefault()">
+      <DialogHeader>
+        <DialogTitle>Новая задача</DialogTitle>
+        <DialogDescription>{{ creationLabel }}</DialogDescription>
+      </DialogHeader>
+      <p v-if="isReleasedStory" class="text-sm text-muted-foreground">
+        Новая задача будет без релиза. Релиз можно выбрать в её карточке.
+      </p>
+      <TaskForm v-if="creationTarget" modal :loading="isCreatingTask" @submit="handleCreateTask" @cancel="closeTaskCreation(false)" />
+      <p v-if="taskCreationError" role="alert" class="text-sm text-destructive">
+        {{ taskCreationError }}
+      </p>
+    </DialogContent>
+  </Dialog>
   <SprintFormDialog
     v-if="formTarget"
     :open="true"

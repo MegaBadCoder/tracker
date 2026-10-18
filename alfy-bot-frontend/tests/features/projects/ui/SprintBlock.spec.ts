@@ -98,15 +98,13 @@ describe('sprintBlock', () => {
     backlog.unmount()
   })
 
-  it('«+ задача» в блоке спринта эмитит createTask с названием', async () => {
+  it('«+ задача» в блоке спринта запрашивает модалку создания', async () => {
     const wrapper = mountBlock({ sprint: makeSprint() })
 
     await buttonByText(wrapper, 'задача')!.trigger('click')
-    const input = wrapper.find('input')
-    await input.setValue('Новая')
-    await input.trigger('keydown.enter')
+    expect(wrapper.find('input').exists()).toBe(false)
 
-    expect(wrapper.emitted('createTask')).toEqual([['Новая']])
+    expect(wrapper.emitted('createTask')).toEqual([[]])
     wrapper.unmount()
   })
 
@@ -114,11 +112,9 @@ describe('sprintBlock', () => {
     const wrapper = mountBlock({ sprint: null })
 
     await buttonByText(wrapper, 'задача')!.trigger('click')
-    const input = wrapper.find('input')
-    await input.setValue('В бэклог')
-    await input.trigger('keydown.enter')
+    expect(wrapper.find('input').exists()).toBe(false)
 
-    expect(wrapper.emitted('createTask')).toEqual([['В бэклог']])
+    expect(wrapper.emitted('createTask')).toEqual([[]])
     wrapper.unmount()
   })
 
