@@ -764,3 +764,20 @@ describe('taskDetailDialog — описание Markdown', () => {
     expect(wrapper.emitted('update')).toBeUndefined()
   })
 })
+
+describe('taskDetailDialog — постоянная ссылка', () => {
+  it('предоставляет ссылку сохранённой задачи в режиме чтения', async () => {
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+    const id = 'e797ece0-197b-452a-8cc1-123456789012'
+    const wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ id }), open: true, editable: false },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(document.querySelector('a[aria-label="Открыть задачу в новой вкладке"]')?.getAttribute('href')).toBe(`${window.location.origin}/tasks/${id}`)
+    expect(document.querySelector('button[aria-label="Копировать ссылку на задачу"]')).not.toBeNull()
+    wrapper.unmount()
+  })
+})

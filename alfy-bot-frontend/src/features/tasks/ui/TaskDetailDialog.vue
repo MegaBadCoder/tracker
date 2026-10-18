@@ -53,7 +53,8 @@
             {{ headerTaskKey }}
           </span>
         </div>
-        <div class="flex items-center gap-0.5">
+        <div class="flex shrink-0 items-center gap-0.5">
+          <TaskLinkActions v-if="task" :key="task.id" :task-id="task.id" />
           <DropdownMenu v-if="effectiveEditable">
             <DropdownMenuTrigger as-child>
               <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground">
@@ -672,6 +673,7 @@ import DeadlinePicker from './DeadlinePicker.vue'
 import PomodoroSettings from './PomodoroSettings.vue'
 import TaskPropertyChips from './TaskPropertyChips.vue'
 import TaskDescription from './TaskDescription.vue'
+import TaskLinkActions from './TaskLinkActions.vue'
 import PriorityPickerContent from './PriorityPickerContent.vue'
 import RecurrencePickerContent from './RecurrencePickerContent.vue'
 import DeadlinePickerContent from './DeadlinePickerContent.vue'
