@@ -109,6 +109,16 @@ export const useTaskStore = defineStore('tasks', () => {
     }
   }
 
+  const fetchTask = async (taskId: string): Promise<Task> => {
+    const { data } = await api.get<Record<string, unknown>>(`/tasks/${encodeURIComponent(taskId)}`)
+    const task = parseTask(data)
+    const index = tasks.value.findIndex(existing => existing.id === task.id)
+    if (index === -1)
+      tasks.value.push(task)
+    else tasks.value[index] = task
+    return task
+  }
+
   const createTask = async (taskData: Omit<Task, 'id' | 'pomodoroCompleted'>) => {
     const tempId = `temp-${Date.now()}`
     const tempTask: Task = {
@@ -433,6 +443,7 @@ export const useTaskStore = defineStore('tasks', () => {
     pomodoroTasks,
     highPriorityTasks,
     fetchTasks,
+    fetchTask,
     createTask,
     updateTask,
     toggleTask,

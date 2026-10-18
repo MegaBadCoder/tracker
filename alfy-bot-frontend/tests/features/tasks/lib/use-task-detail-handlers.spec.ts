@@ -143,4 +143,57 @@ describe('useTaskDetailHandlers', () => {
     expect(selectedTask.value!.isPomodoroTask).toBe(false)
     expect(store.updatePomodoroConfig).toHaveBeenCalledWith('1', null)
   })
+  it.each(['task', 'checklist', 'pomodoro'] as const)('keeps the new selection and rolls back by id after %s failure', async (kind) => {
+    const first = makeTask({ id: '1', checklist: { items: [] }, isPomodoroTask: false })
+    const second = makeTask({ id: '2', title: 'Second' })
+    store = createMockStore([first, second])
+    let reject!: (reason: Error) => void
+    const pending = new Promise((_, fail) => {
+      reject = fail
+    })
+    store.updateTask.mockReturnValue(pending)
+    store.updateChecklist.mockReturnValue(pending)
+    store.updatePomodoroConfig.mockReturnValue(pending)
+    const handlers = setup()
+    handlers.handleOpenTask(first)
+    const result = kind === 'task'
+      ? handlers.handleUpdateTask({ ...first, title: 'Edited' })
+      : kind === 'checklist'
+        ? handlers.handleUpdateChecklist('1', [{ id: 'item', text: 'New', completed: false }] as ChecklistItem[])
+        : handlers.handleUpdatePomodoroConfig('1', { pomodoroCount: 4 })
+    store.tasks.value.reverse()
+    handlers.handleOpenTask(second)
+    reject(new Error('Failed'))
+    await result
+    expect(store.tasks.value.map(task => task.id)).toEqual(['2', '1'])
+    expect(store.tasks.value[0]).toEqual(second)
+    expect(store.tasks.value[1]).toEqual(first)
+    expect(handlers.selectedTask.value).toEqual(second)
+  })
+
+  it.each(['task', 'checklist', 'pomodoro'] as const)('does not resurrect removed task on %s failure', async (kind) => {
+    const first = makeTask({ id: '1' })
+    const second = makeTask({ id: '2', title: 'Second' })
+    store = createMockStore([first, second])
+    let reject!: (reason: Error) => void
+    const pending = new Promise((_, fail) => {
+      reject = fail
+    })
+    store.updateTask.mockReturnValue(pending)
+    store.updateChecklist.mockReturnValue(pending)
+    store.updatePomodoroConfig.mockReturnValue(pending)
+    const handlers = setup()
+    handlers.handleOpenTask(first)
+    const result = kind === 'task'
+      ? handlers.handleUpdateTask({ ...first, title: 'Edited' })
+      : kind === 'checklist'
+        ? handlers.handleUpdateChecklist('1', [])
+        : handlers.handleUpdatePomodoroConfig('1', { pomodoroCount: 4 })
+    store.tasks.value = [second]
+    handlers.handleOpenTask(second)
+    reject(new Error('Failed'))
+    await result
+    expect(store.tasks.value).toEqual([second])
+    expect(handlers.selectedTask.value).toEqual(second)
+  })
 })

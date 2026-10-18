@@ -21,6 +21,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "lucide-vue-next": "^0.574.0",
+    "markdown-it": "^15.0.3",
     "pinia": "^3.0.4",
     "reka-ui": "^2.8.2",
     "tailwind-merge": "^3.5.0",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@antfu/eslint-config": "^7.4.3",
     "@tailwindcss/vite": "^4.2.0",
+    "@types/markdown-it": "^14.2.0",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.2",
     "@vue/test-utils": "^2.4.6",
