@@ -157,7 +157,9 @@ export const useGroupStore = defineStore('groups', () => {
     const firstId = orderedIds[0]
     const isRootLevel = tree.some(node => node.id === firstId)
     const parent = isRootLevel ? undefined : tree.find(epic => epic.children.some(child => child.id === firstId))
-    const previousOrders = new Map((isRootLevel ? tree : parent?.children ?? []).map(node => [node.id, node.order]))
+    const previousSiblings = isRootLevel ? tree : parent?.children ?? []
+    const previousOrders = new Map(previousSiblings.map(node => [node.id, node.order]))
+    const previousRanks = new Map(previousSiblings.map((node, index) => [node.id, index]))
 
     if (isRootLevel) {
       trees.value[projectId] = orderedIds
@@ -187,7 +189,8 @@ export const useGroupStore = defineStore('groups', () => {
     catch (err) {
       const restoreOrder = (nodes: BoardGroupNode[]) => nodes
         .map(node => ({ ...node, order: previousOrders.get(node.id) ?? node.order }))
-        .sort((a, b) => a.order - b.order)
+        .sort((a, b) => a.order - b.order
+          || (previousRanks.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (previousRanks.get(b.id) ?? Number.MAX_SAFE_INTEGER))
       const current = trees.value[projectId] ?? []
       if (isRootLevel)
         trees.value[projectId] = restoreOrder(current)

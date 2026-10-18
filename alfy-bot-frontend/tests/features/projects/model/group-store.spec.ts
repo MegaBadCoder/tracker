@@ -59,6 +59,23 @@ describe('useGroupStore', () => {
     expect(store.groupsOf('proj-a')[0]?.title).toBe('Новое название')
   })
 
+  it.each([false, true])('ошибка восстанавливает порядок соседей с одинаковым order, истории: %s', async (nested) => {
+    const store = useGroupStore()
+    const siblings = [
+      makeGroup({ id: 'a', order: 0 }),
+      makeGroup({ id: 'c', order: 2 }),
+      makeGroup({ id: 'd', order: 2 }),
+    ].map(group => nested ? { ...group, type: 'story' as const, parentId: 'parent' } : group)
+    store.trees['proj-a'] = nested ? [makeGroup({ id: 'parent', children: siblings })] : siblings
+    vi.mocked(groupsApi.reorderGroups).mockRejectedValueOnce(new Error('offline'))
+
+    await expect(store.reorderGroups('proj-a', ['a', 'd', 'c'])).rejects.toThrow('offline')
+
+    const restored = nested ? store.groupsOf('proj-a')[0]!.children : store.groupsOf('proj-a')
+    expect(restored.map(group => group.id)).toEqual(['a', 'c', 'd'])
+    expect(restored.map(group => group.order)).toEqual([0, 2, 2])
+  })
+
   it('загрузка проекта B не меняет groupsOf(A)', async () => {
     const store = useGroupStore()
     const epicA = makeGroup({ id: 'epic-a', projectId: 'proj-a' })
