@@ -781,3 +781,28 @@ describe('taskDetailDialog — постоянная ссылка', () => {
     wrapper.unmount()
   })
 })
+
+describe('taskDetailDialog — поздняя загрузка проекта', () => {
+  it('загружает группы, спринты и релизы после получения agile-проекта', async () => {
+    setActivePinia(createPinia())
+    const ensureGroups = vi.spyOn(useGroupStore(), 'ensureGroups').mockResolvedValue()
+    const ensureSprints = vi.spyOn(useSprintStore(), 'ensureSprints').mockResolvedValue()
+    const ensureReleases = vi.spyOn(useReleaseStore(), 'ensureReleases').mockResolvedValue()
+    const wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile' }), open: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    expect(ensureGroups).not.toHaveBeenCalled()
+    expect(ensureSprints).not.toHaveBeenCalled()
+    expect(ensureReleases).not.toHaveBeenCalled()
+
+    useProjectStore().projects = [makeAgileProject()]
+    await flushPromises()
+
+    expect(ensureGroups).toHaveBeenCalledWith('proj-agile')
+    expect(ensureSprints).toHaveBeenCalledWith('proj-agile')
+    expect(ensureReleases).toHaveBeenCalledWith('proj-agile')
+    wrapper.unmount()
+  })
+})

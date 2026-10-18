@@ -878,8 +878,8 @@ function onReleaseChange(value: string | null) {
   activeDrawer.value = null
 }
 
-watch(localProjectId, (projectId) => {
-  if (isAgileProject.value && projectId) {
+watch([localProjectId, isAgileProject], ([projectId, agile]) => {
+  if (agile && projectId) {
     groupStore.ensureGroups(projectId)
     sprintStore.ensureSprints(projectId)
     releaseStore.ensureReleases(projectId)
