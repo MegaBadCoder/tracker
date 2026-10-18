@@ -184,7 +184,32 @@ export class BoardGroupService {
       throw new BadRequestException('Ordered IDs array cannot be empty');
     }
 
-    const updates = orderedIds.map((id, index) => ({ id, order: index }));
-    await this.groupRepo.reorder(updates);
+    const selectedIds = new Set(orderedIds);
+    if (selectedIds.size !== orderedIds.length) {
+      throw new BadRequestException('Ordered IDs must be unique');
+    }
+
+    const groups = await this.groupRepo.findAllByProject(projectId);
+    const groupsById = new Map(groups.map((group) => [group.id, group]));
+    const selected = orderedIds.map((id) => {
+      const group = groupsById.get(id);
+      if (!group) {
+        throw new BadRequestException('All groups must belong to this project');
+      }
+      return group;
+    });
+    const parentId = selected[0].parentId;
+    if (selected.some((group) => group.parentId !== parentId)) {
+      throw new BadRequestException('Only sibling groups can be reordered');
+    }
+
+    const remaining = groups.filter(
+      (group) => group.parentId === parentId && !selectedIds.has(group.id),
+    );
+    const updates = [...selected, ...remaining].map((group, order) => ({
+      id: group.id,
+      order,
+    }));
+    await this.groupRepo.reorder(projectId, updates);
   }
 }

@@ -7,5 +7,8 @@ export abstract class BoardGroupRepositoryPort {
   abstract create(data: Partial<BoardGroup>): Promise<BoardGroup>;
   abstract save(group: BoardGroup): Promise<BoardGroup>;
   abstract delete(id: string, projectId: string): Promise<boolean>;
-  abstract reorder(updates: { id: string; order: number }[]): Promise<void>;
+  abstract reorder(
+    projectId: string,
+    updates: { id: string; order: number }[],
+  ): Promise<void>;
 }

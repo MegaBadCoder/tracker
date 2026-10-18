@@ -37,6 +37,45 @@ describe('useGroupStore', () => {
     vi.clearAllMocks()
   })
 
+  it('ошибка сортировки восстанавливает только порядок, сохраняя параллельные изменения групп', async () => {
+    const store = useGroupStore()
+    const first = makeGroup({ id: 'first', order: 0 })
+    const second = makeGroup({ id: 'second', order: 1 })
+    store.trees['proj-a'] = [first, second]
+    let rejectSave!: (error: Error) => void
+    vi.mocked(groupsApi.reorderGroups).mockImplementationOnce(() => new Promise((_resolve, reject) => {
+      rejectSave = reject
+    }))
+    const pending = store.reorderGroups('proj-a', ['second', 'first'])
+    const failure = expect(pending).rejects.toThrow('offline')
+    vi.mocked(groupsApi.updateGroup).mockResolvedValueOnce({ data: { ...first, title: 'Новое название' } } as any)
+    await store.updateGroup('proj-a', 'first', { title: 'Новое название' })
+    vi.mocked(groupsApi.createGroup).mockResolvedValueOnce({ data: makeGroup({ id: 'third', order: 2 }) } as any)
+    await store.createGroup('proj-a', { title: 'Третий' })
+    rejectSave(new Error('offline'))
+    await failure
+
+    expect(store.groupsOf('proj-a').map(group => group.id)).toEqual(['first', 'second', 'third'])
+    expect(store.groupsOf('proj-a')[0]?.title).toBe('Новое название')
+  })
+
+  it.each([false, true])('ошибка восстанавливает порядок соседей с одинаковым order, истории: %s', async (nested) => {
+    const store = useGroupStore()
+    const siblings = [
+      makeGroup({ id: 'a', order: 0 }),
+      makeGroup({ id: 'c', order: 2 }),
+      makeGroup({ id: 'd', order: 2 }),
+    ].map(group => nested ? { ...group, type: 'story' as const, parentId: 'parent' } : group)
+    store.trees['proj-a'] = nested ? [makeGroup({ id: 'parent', children: siblings })] : siblings
+    vi.mocked(groupsApi.reorderGroups).mockRejectedValueOnce(new Error('offline'))
+
+    await expect(store.reorderGroups('proj-a', ['a', 'd', 'c'])).rejects.toThrow('offline')
+
+    const restored = nested ? store.groupsOf('proj-a')[0]!.children : store.groupsOf('proj-a')
+    expect(restored.map(group => group.id)).toEqual(['a', 'c', 'd'])
+    expect(restored.map(group => group.order)).toEqual([0, 2, 2])
+  })
+
   it('загрузка проекта B не меняет groupsOf(A)', async () => {
     const store = useGroupStore()
     const epicA = makeGroup({ id: 'epic-a', projectId: 'proj-a' })
