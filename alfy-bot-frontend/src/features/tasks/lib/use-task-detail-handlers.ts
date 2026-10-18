@@ -120,9 +120,11 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
         await store.updateTask(updatedTask.id, updatedTask, false)
       }
     } catch {
-      if (previous && index !== -1) {
-        tasks.value[index] = previous
-        selectedTask.value = previous
+      const currentIndex = tasks.value.findIndex(task => task.id === updatedTask.id)
+      if (previous && currentIndex !== -1) {
+        tasks.value[currentIndex] = previous
+        if (selectedTask.value?.id === updatedTask.id)
+          selectedTask.value = previous
       }
     }
   }
@@ -145,11 +147,12 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
     try {
       await store.updateChecklist(taskId, items)
     } catch {
-      if (index !== -1) {
-        const task = tasks.value[index]
-        tasks.value[index] = { ...task, checklist: previousChecklist } as Task
+      const currentIndex = tasks.value.findIndex(task => task.id === taskId)
+      if (currentIndex !== -1) {
+        const task = tasks.value[currentIndex]
+        tasks.value[currentIndex] = { ...task, checklist: previousChecklist } as Task
       }
-      if (selectedTask.value?.id === taskId) {
+      if (currentIndex !== -1 && selectedTask.value?.id === taskId) {
         selectedTask.value = { ...selectedTask.value, checklist: previousChecklist } as Task
       }
     }
@@ -173,9 +176,11 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
       await store.updatePomodoroConfig(taskId, config)
     }
     catch {
-      if (previous && index !== -1) {
-        tasks.value[index] = previous
-        selectedTask.value = previous
+      const currentIndex = tasks.value.findIndex(task => task.id === taskId)
+      if (previous && currentIndex !== -1) {
+        tasks.value[currentIndex] = previous
+        if (selectedTask.value?.id === taskId)
+          selectedTask.value = previous
       }
     }
   }

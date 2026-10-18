@@ -98,4 +98,21 @@ describe('taskView', () => {
     await nextTick()
     expect(mocks.push).not.toHaveBeenCalled()
   })
+  it('keeps the new task visible when a previous task update fails', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { id: 'one', title: 'First' } })
+    let reject!: (reason: Error) => void
+    vi.mocked(api.patch).mockReturnValueOnce(new Promise((_, fail) => {
+      reject = fail
+    }))
+    const wrapper = render()
+    await flushPromises()
+    wrapper.findComponent({ name: 'TaskDetailDialog' }).vm.$emit('update', { ...useTaskStore().tasks[0], title: 'Edited' })
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { id: 'two', title: 'Second' } })
+    route.params.taskId = 'two'
+    await flushPromises()
+    reject(new Error('Failed'))
+    await flushPromises()
+    expect(wrapper.get('[data-testid="detail"]').text()).toBe('Second')
+    wrapper.unmount()
+  })
 })
