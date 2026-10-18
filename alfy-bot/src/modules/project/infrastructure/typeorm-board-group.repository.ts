@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BoardGroup } from '../../../shared/entities';
@@ -44,9 +44,23 @@ export class TypeOrmBoardGroupRepository extends BoardGroupRepositoryPort {
     return true;
   }
 
-  async reorder(updates: { id: string; order: number }[]): Promise<void> {
-    await Promise.all(
-      updates.map(({ id, order }) => this.repo.update(id, { order })),
-    );
+  async reorder(
+    projectId: string,
+    updates: { id: string; order: number }[],
+  ): Promise<void> {
+    await this.repo.manager.transaction(async (manager) => {
+      for (const { id, order } of updates) {
+        const result = await manager.update(
+          BoardGroup,
+          { id, projectId },
+          { order },
+        );
+        if (result.affected !== 1) {
+          throw new BadRequestException(
+            'Group no longer belongs to this project',
+          );
+        }
+      }
+    });
   }
 }

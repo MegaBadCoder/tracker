@@ -1,4 +1,9 @@
 import request from 'supertest';
+import { randomUUID } from 'node:crypto';
+import { Server } from 'node:http';
+import { DataSource } from 'typeorm';
+import { BoardGroup } from '../src/shared/entities';
+import { BoardGroupRepositoryPort } from '../src/modules/project/domain/board-group-repository.port';
 import { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/test-app';
 
@@ -157,6 +162,145 @@ describe('Board groups (e2e)', () => {
         .send({ status: 'open' })
         .expect(200);
       expect(reopened.completedAt).toBeNull();
+    });
+  });
+
+  describe('порядок соседних групп', () => {
+    let orderingProjectId: string;
+    let otherProjectId: string;
+    let epicIds: string[];
+    let storyIds: string[];
+    let otherStoryId: string;
+    let foreignGroupId: string;
+
+    const createGroup = async (
+      project: string,
+      title: string,
+      parentId?: string,
+    ) => {
+      const response = await request(app.getHttpServer<Server>())
+        .post(`/api/projects/${project}/groups`)
+        .set('Authorization', auth())
+        .send({ title, parentId })
+        .expect(201);
+      return (response.body as { id: string }).id;
+    };
+    const readGroups = async () => {
+      const response = await request(app.getHttpServer<Server>())
+        .get(`/api/projects/${orderingProjectId}/groups`)
+        .set('Authorization', auth())
+        .expect(200);
+      return response.body as (BoardGroup & { children: BoardGroup[] })[];
+    };
+    const reorder = (orderedIds: string[]) =>
+      request(app.getHttpServer<Server>())
+        .patch(`/api/projects/${orderingProjectId}/groups/reorder`)
+        .set('Authorization', auth())
+        .send({ orderedIds });
+
+    beforeAll(async () => {
+      const createProject = async () => {
+        const response = await request(app.getHttpServer<Server>())
+          .post('/api/projects')
+          .set('Authorization', auth())
+          .send({ title: 'Порядок групп', type: 'agile' })
+          .expect(201);
+        return (response.body as { id: string }).id;
+      };
+      orderingProjectId = await createProject();
+      otherProjectId = await createProject();
+      epicIds = [];
+      storyIds = [];
+      for (let i = 0; i < 4; i++) {
+        epicIds.push(await createGroup(orderingProjectId, `Эпик ${i}`));
+      }
+      for (let i = 0; i < 3; i++) {
+        storyIds.push(
+          await createGroup(orderingProjectId, `История ${i}`, epicIds[0]),
+        );
+      }
+      otherStoryId = await createGroup(
+        orderingProjectId,
+        'Другая история',
+        epicIds[1],
+      );
+      foreignGroupId = await createGroup(otherProjectId, 'Чужой эпик');
+    });
+
+    it('сохраняет перестановку эпиков и историй при повторном чтении', async () => {
+      const orderedEpics = [epicIds[2], epicIds[3], epicIds[0], epicIds[1]];
+      await reorder(orderedEpics).expect(200);
+      await reorder([storyIds[2], storyIds[0], storyIds[1]]).expect(200);
+      const tree = await readGroups();
+      expect(tree.map((group) => group.id)).toEqual(orderedEpics);
+      expect(tree[2].children.map((group) => group.id)).toEqual([
+        storyIds[2],
+        storyIds[0],
+        storyIds[1],
+      ]);
+      expect(
+        tree[2].children.every((group) => group.parentId === epicIds[0]),
+      ).toBe(true);
+      expect(tree[3].children.map((group) => group.id)).toEqual([otherStoryId]);
+    });
+
+    it('отклоняет повторы, чужие, неизвестные и несоседние ID без записи', async () => {
+      const before = await readGroups();
+      const foreignBefore = await app
+        .get(DataSource)
+        .getRepository(BoardGroup)
+        .findOneByOrFail({ id: foreignGroupId });
+      for (const orderedIds of [
+        [],
+        [epicIds[0], epicIds[0]],
+        [epicIds[0], foreignGroupId],
+        [epicIds[0], randomUUID()],
+        [epicIds[0], storyIds[0]],
+        [storyIds[0], otherStoryId],
+      ]) {
+        await reorder(orderedIds).expect(400);
+        expect(await readGroups()).toEqual(before);
+      }
+      expect(
+        await app
+          .get(DataSource)
+          .getRepository(BoardGroup)
+          .findOneByOrFail({ id: foreignGroupId }),
+      ).toEqual(foreignBefore);
+    });
+
+    it('откатывает предыдущие обновления при сбое посередине записи', async () => {
+      const before = await readGroups();
+      const dataSource = app.get(DataSource);
+      await dataSource.query(
+        `CREATE TRIGGER fail_group_reorder BEFORE UPDATE OF "order" ON board_groups WHEN NEW.id = '${epicIds[1]}' BEGIN SELECT RAISE(ABORT, 'injected reorder failure'); END`,
+      );
+      try {
+        await reorder(epicIds).expect(500);
+        expect(await readGroups()).toEqual(before);
+      } finally {
+        await dataSource.query('DROP TRIGGER fail_group_reorder');
+      }
+    });
+
+    it('репозиторий не меняет чужой проект и откатывает предшествующую запись', async () => {
+      const before = await readGroups();
+      const repository = app.get(BoardGroupRepositoryPort);
+      await expect(
+        repository.reorder(orderingProjectId, [
+          { id: epicIds[0], order: 40 },
+          { id: foreignGroupId, order: 41 },
+        ]),
+      ).rejects.toThrow();
+      expect(await readGroups()).toEqual(before);
+      expect(
+        (
+          await app
+            .get(DataSource)
+            .getRepository(BoardGroup)
+            .findOneByOrFail({ id: foreignGroupId })
+        ).order,
+      ).toBe(0);
     });
   });
 

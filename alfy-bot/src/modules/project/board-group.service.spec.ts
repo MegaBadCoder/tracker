@@ -474,24 +474,64 @@ describe('BoardGroupService', () => {
   // ── reorder ─────────────────────────────────────────────────────
 
   describe('reorder', () => {
-    it('обновляет порядок групп по переданным ID', async () => {
+    beforeEach(() => {
       projRepo.findById.mockResolvedValue(makeProject());
+      groupRepo.findAllByProject.mockResolvedValue([
+        makeGroup({ id: 'group-1', order: 0 }),
+        makeGroup({ id: 'group-2', order: 1 }),
+        makeGroup({ id: 'group-3', order: 2 }),
+        makeGroup({ id: 'story-1', parentId: 'group-1', type: 'story' }),
+        makeGroup({
+          id: 'story-2',
+          parentId: 'group-1',
+          type: 'story',
+          order: 1,
+        }),
+        makeGroup({ id: 'story-3', parentId: 'group-2', type: 'story' }),
+      ]);
+    });
 
+    it('сохраняет порядок эпиков с ограничением проектом', async () => {
       await service.reorder(1, 'proj-1', ['group-3', 'group-1', 'group-2']);
-
-      expect(groupRepo.reorder).toHaveBeenCalledWith([
+      expect(groupRepo.reorder).toHaveBeenCalledWith('proj-1', [
         { id: 'group-3', order: 0 },
         { id: 'group-1', order: 1 },
         { id: 'group-2', order: 2 },
       ]);
     });
 
-    it('бросает BadRequestException если массив пустой', async () => {
-      projRepo.findById.mockResolvedValue(makeProject());
-
-      await expect(service.reorder(1, 'proj-1', [])).rejects.toThrow(
-        BadRequestException,
-      );
+    it('добавляет пропущенных соседей после переданных ID без совпадений порядка', async () => {
+      await service.reorder(1, 'proj-1', ['group-3']);
+      expect(groupRepo.reorder).toHaveBeenCalledWith('proj-1', [
+        { id: 'group-3', order: 0 },
+        { id: 'group-1', order: 1 },
+        { id: 'group-2', order: 2 },
+      ]);
     });
+
+    it('переставляет только истории одного эпика', async () => {
+      await service.reorder(1, 'proj-1', ['story-2', 'story-1']);
+      expect(groupRepo.reorder).toHaveBeenCalledWith('proj-1', [
+        { id: 'story-2', order: 0 },
+        { id: 'story-1', order: 1 },
+      ]);
+    });
+
+    it.each([
+      [],
+      ['group-1', 'group-1'],
+      ['group-1', 'unknown'],
+      ['group-1', 'foreign-project-id'],
+      ['group-1', 'story-1'],
+      ['story-1', 'story-3'],
+    ])(
+      'отклоняет некорректные ID %j до сохранения',
+      async (...ids: string[]) => {
+        await expect(service.reorder(1, 'proj-1', ids)).rejects.toThrow(
+          BadRequestException,
+        );
+        expect(groupRepo.reorder).not.toHaveBeenCalled();
+      },
+    );
   });
 });
