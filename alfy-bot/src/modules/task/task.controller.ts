@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -101,6 +102,15 @@ export class TaskController {
     @Body() dto: ReorderInboxTasksDto,
   ) {
     return this.taskService.reorderInboxTasks(req.user.sub, dto);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Получить задачу пользователя' })
+  async getOne(
+    @Request() req: AuthRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.taskService.getOne(req.user.sub, id);
   }
 
   @Patch(':id/move-to-inbox')

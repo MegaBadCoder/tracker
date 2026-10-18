@@ -160,6 +160,35 @@ describe('TaskService', () => {
     service = module.get(TaskService);
   });
 
+  describe('getOne', () => {
+    it('возвращает задачу пользователя с конфигурацией и целями', async () => {
+      const task = makeTask({ pomodoroConfig: makePomodoroConfig() });
+      repo.findById.mockResolvedValue(task);
+      linkPort.findGoalIdsByTaskIds.mockResolvedValue(
+        new Map([[task.id, [7, 8]]]),
+      );
+
+      expect(await service.getOne(1, task.id)).toEqual({
+        ...task,
+        goalIds: [7, 8],
+      });
+      expect(repo.findById).toHaveBeenCalledWith(task.id, 1);
+      expect(linkPort.findGoalIdsByTaskIds).toHaveBeenCalledWith(1, [task.id]);
+    });
+
+    it('возвращает пустые цели без связей', async () => {
+      repo.findById.mockResolvedValue(makeTask());
+      expect((await service.getOne(1, 'task-1')).goalIds).toEqual([]);
+    });
+
+    it('отказывает для отсутствующей или чужой задачи до чтения целей', async () => {
+      await expect(service.getOne(1, 'missing')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(linkPort.findGoalIdsByTaskIds).not.toHaveBeenCalled();
+    });
+  });
+
   describe('релиз истории при создании', () => {
     beforeEach(() => {
       boardGroupQuery.getProjectId.mockResolvedValue('proj-1');

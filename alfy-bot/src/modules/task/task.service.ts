@@ -72,6 +72,12 @@ export class TaskService {
     return this.attachGoalIds(userId, tasks);
   }
 
+  async getOne(userId: number, id: string): Promise<Task> {
+    const task = await this.taskRepo.findById(id, userId);
+    if (!task) throw new NotFoundException('Task not found');
+    return this.attachGoalIdsOne(userId, task);
+  }
+
   async create(userId: number, dto: CreateTaskDto): Promise<Task> {
     const {
       isPomodoroTask,
