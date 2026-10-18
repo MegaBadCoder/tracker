@@ -15,6 +15,7 @@ vi.mock('@/features/projects/api/sprints-api', () => ({
   deleteSprint: vi.fn(),
   startSprint: vi.fn(),
   completeSprint: vi.fn(),
+  removeGroupFromSprint: vi.fn(),
 }))
 vi.mock('@/features/projects/api/groups-api', () => ({ setGroupSprint: vi.fn(), fetchGroups: vi.fn() }))
 
@@ -83,6 +84,31 @@ describe('useSprintStore', () => {
 
     await expect(store.setStorySprint('proj-a', 'empty', null)).rejects.toThrow('Изменения сохранены')
     expect(store.error).toContain('Сеть недоступна')
+  })
+
+  it('возвращает группу из выбранного спринта и перечитывает назначения', async () => {
+    vi.mocked(sprintsApi.removeGroupFromSprint).mockResolvedValueOnce({ data: { updated: 3 } } as any)
+    await expect(useSprintStore().removeGroupFromSprint('proj-a', 's1', 'epic')).resolves.toBe(3)
+    expect(sprintsApi.removeGroupFromSprint).toHaveBeenCalledWith('proj-a', 's1', 'epic')
+    expect(useTaskStore().fetchTasks).toHaveBeenCalledOnce()
+    expect(useGroupStore().fetchGroups).toHaveBeenCalledWith('proj-a')
+  })
+
+  it('не меняет назначения и не перечитывает данные при отказе возврата', async () => {
+    useTaskStore().tasks = [makeTask({ sprintId: 's1' })]
+    vi.mocked(sprintsApi.removeGroupFromSprint).mockRejectedValueOnce(new Error('Спринт закрыт'))
+    await expect(useSprintStore().removeGroupFromSprint('proj-a', 's1', 'epic')).rejects.toThrow('Спринт закрыт')
+    expect(useTaskStore().tasks[0]!.sprintId).toBe('s1')
+    expect(useTaskStore().fetchTasks).not.toHaveBeenCalled()
+    expect(useGroupStore().fetchGroups).not.toHaveBeenCalled()
+  })
+
+  it('различает сохранённый возврат и ошибку обновления данных', async () => {
+    vi.mocked(sprintsApi.removeGroupFromSprint).mockResolvedValueOnce({ data: { updated: 1 } } as any)
+    vi.mocked(useTaskStore().fetchTasks).mockImplementationOnce(async () => {
+      useTaskStore().error = 'Сеть недоступна'
+    })
+    await expect(useSprintStore().removeGroupFromSprint('proj-a', 's1', 'story')).rejects.toThrow('Изменения сохранены, но не удалось обновить данные: Сеть недоступна')
   })
 
   it('загрузка проекта B не меняет sprintsOf(A)', async () => {

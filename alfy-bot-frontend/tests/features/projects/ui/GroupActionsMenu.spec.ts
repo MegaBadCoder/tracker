@@ -51,9 +51,9 @@ function makeGroup(overrides: Partial<BoardGroup> = {}): BoardGroup {
   }
 }
 
-async function openMenu(group: BoardGroup) {
+async function openMenu(group: BoardGroup, options = {}) {
   const wrapper = mount(GroupActionsMenu, {
-    props: { group },
+    props: { group, ...options },
     attachTo: document.body,
   })
   await wrapper.find('button').trigger('click')
@@ -75,6 +75,34 @@ describe('groupActionsMenu', () => {
   afterEach(() => {
     document.body.innerHTML = ''
     vi.restoreAllMocks()
+  })
+
+  it('без контекста спринта не предлагает возврат в бэклог', async () => {
+    const wrapper = await openMenu(makeGroup())
+    expect(itemLabels()).not.toContain('Вернуть в бэклог')
+    wrapper.unmount()
+  })
+
+  it.each(['epic', 'story'] as const)('возвращает %s в бэклог из меню доски', async (type) => {
+    const wrapper = await openMenu(makeGroup({ type }), { canReturnToBacklog: true })
+    const item = Array.from(document.querySelectorAll('[data-slot="dropdown-menu-item"]'))
+      .find(el => el.textContent?.trim() === 'Вернуть в бэклог') as HTMLElement
+    expect(item).toBeTruthy()
+    item.click()
+    await flushPromises()
+    expect(wrapper.emitted('returnToBacklog')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('блокирует повторный возврат пока запрос выполняется', async () => {
+    const wrapper = await openMenu(makeGroup(), { canReturnToBacklog: true, returningToBacklog: true })
+    const item = Array.from(document.querySelectorAll('[data-slot="dropdown-menu-item"]'))
+      .find(el => el.textContent?.trim() === 'Вернуть в бэклог') as HTMLElement
+    expect(item?.hasAttribute('data-disabled')).toBe(true)
+    item.click()
+    await flushPromises()
+    expect(wrapper.emitted('returnToBacklog')).toBeUndefined()
+    wrapper.unmount()
   })
 
   it('у истории нет пунктов «Цвет» и «Добавить историю»', async () => {

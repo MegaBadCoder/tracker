@@ -17,9 +17,12 @@ const props = defineProps<{
   canMoveUp?: boolean
   canMoveDown?: boolean
   reordering?: boolean
+  backlogGroupIds?: string[]
+  returningToBacklog?: boolean
 }>()
 
 const emit = defineEmits<{
+  returnToBacklog: [group: BoardGroupNode]
   moveGroup: [group: BoardGroupNode, direction: -1 | 1]
   toggleTask: [id: string]
   openTask: [task: Task]
@@ -90,6 +93,9 @@ function handleCreateTask(title: string) {
         </Button>
         <GroupActionsMenu
           :group="story"
+          :can-return-to-backlog="backlogGroupIds?.includes(story.id)"
+          :returning-to-backlog="returningToBacklog"
+          @return-to-backlog="$emit('returnToBacklog', story)"
           @open="$emit('openGroup', story.id)"
           @rename="renaming = true"
           @set-color="(color) => $emit('setGroupColor', story.id, color)"

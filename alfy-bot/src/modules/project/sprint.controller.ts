@@ -92,4 +92,21 @@ export class SprintController {
   ) {
     return this.sprintService.complete(req.user.sub, projectId, id, dto);
   }
+  @Post(':id/groups/:groupId/backlog')
+  @ApiOperation({
+    summary: 'Вернуть эпик или историю из выбранного спринта в бэклог',
+  })
+  async removeGroupFromSprint(
+    @Request() req: AuthRequest,
+    @Param('projectId') projectId: string,
+    @Param('id') id: string,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.sprintService.removeGroupFromSprint(
+      req.user.sub,
+      projectId,
+      id,
+      groupId,
+    );
+  }
 }

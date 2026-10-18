@@ -27,6 +27,32 @@ describe('sprint tools through MCP', () => {
     await Promise.all([client.close(), server.close()]);
   });
 
+  it('returns a group from only the selected sprint to backlog', async () => {
+    rest.post.mockResolvedValue({ updated: 3 });
+    const result = await client.callTool({ name: 'remove_group_from_sprint', arguments: { projectId: PROJECT, sprintId: SPRINT, groupId: STORY } });
+    expect(result.isError).not.toBe(true);
+    expect(rest.post).toHaveBeenCalledTimes(1);
+    expect(rest.post).toHaveBeenCalledWith(`/projects/${PROJECT}/sprints/${SPRINT}/groups/${STORY}/backlog`);
+    expect(result.content).toEqual([{ type: 'text', text: '{"updated":3}' }]);
+  });
+
+  it.each([
+    { projectId: PROJECT, groupId: STORY },
+    { projectId: PROJECT, sprintId: null, groupId: STORY },
+    { projectId: PROJECT, sprintId: SPRINT, groupId: 'bad' },
+  ])('rejects incomplete removal scope %j', async (args) => {
+    const result = await client.callTool({ name: 'remove_group_from_sprint', arguments: args });
+    expect(result.isError).toBe(true);
+    expect(rest.post).not.toHaveBeenCalled();
+  });
+
+  it('returns closed sprint error instead of a successful removal', async () => {
+    rest.post.mockRejectedValue(new RestError(400, 'Closed sprint cannot be changed'));
+    const result = await client.callTool({ name: 'remove_group_from_sprint', arguments: { projectId: PROJECT, sprintId: SPRINT, groupId: STORY } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain('Closed sprint');
+  });
+
   it('registers planning and lifecycle tools in the server', async () => {
     const { tools } = await client.listTools();
     expect(tools.map(t => t.name)).toEqual(expect.arrayContaining([
