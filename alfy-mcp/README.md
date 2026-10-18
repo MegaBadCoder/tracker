@@ -111,6 +111,16 @@ read -rs ALFY_MCP_TOKEN
 | `delete_project` | Удалить. Нужен `confirm: true`. 409, если есть дочерние проекты или задачи |
 | `reorder_projects` | Порядок: полный массив `orderedIds` |
 
+### Эпики и истории
+
+Все операции принимают `projectId` (UUID проекта); UUID существующих групп доступны через `list_project_groups`.
+
+- `create_project_group` — `title`, необязательные `description`, `color`, `startDate`, `dueDate`. Без `parentId` создаёт эпик; `parentId` (UUID эпика этого проекта) создаёт историю внутри него. Вложенные истории не поддерживаются. Даты `YYYY-MM-DD` допустимы только у эпиков, начало не позже окончания.
+- `update_project_group` — `id` и изменяемые поля: `title`, `description`, `color`, `status` (`open`/`done`), `parentId`, `startDate`, `dueDate`. Пропущенные поля сохраняются; `null` очищает описание, цвет и даты. `parentId` переносит историю в другой эпик этого проекта; группу с дочерними историями переносить нельзя. `parentId: null` не поддерживается.
+- `delete_project_group` — `id` и `confirm: true`. Удаление эпика удаляет и дочерние истории. Задачи сохраняются в проекте без привязки к удалённым группам; их спринты и релизы сохраняются.
+
+Последовательность: создать эпик через `create_project_group({ projectId, title })`, затем историю через `create_project_group({ projectId, parentId: epicId, title })`, затем задачу через `create_task({ projectId, groupId: storyId, title })`. Ответ создания содержит UUID группы. Назначение истории в спринт выполняется отдельным `move_story_to_sprint`.
+
 ### Спринты и планирование историй
 
 Все инструменты работают с правами владельца API-токена и требуют `projectId` (UUID). Тип проекта `agile` выбирается при создании и дальше не меняется.
