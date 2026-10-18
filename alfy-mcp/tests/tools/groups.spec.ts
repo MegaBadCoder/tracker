@@ -37,6 +37,51 @@ describe('эпики и истории через MCP', () => {
     expect(deletion?.description).toContain('все его истории');
   });
 
+  it('публикует перестановку как идемпотентную команду', async () => {
+    const { tools } = await client.listTools();
+    const tool = tools.find(t => t.name === 'reorder_project_groups');
+    expect(tool).toBeDefined();
+    expect(tool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+  });
+
+  it.each([[STORY, EPIC], [EPIC]])('передаёт порядок %j одним PATCH без изменения списка', async (...orderedIds) => {
+    for (let i = 0; i < 2; i++) {
+      const result = await client.callTool({ name: 'reorder_project_groups', arguments: { projectId: PROJECT, orderedIds } });
+      expect(result.isError).not.toBe(true);
+      expect(result.content).toEqual([{ type: 'text', text: '{"ok":true}' }]);
+    }
+    expect(rest.patch).toHaveBeenCalledTimes(2);
+    expect(rest.patch).toHaveBeenLastCalledWith(`/projects/${PROJECT}/groups/reorder`, { orderedIds });
+    expect(rest.get).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {},
+    { projectId: PROJECT },
+    { projectId: 'bad', orderedIds: [EPIC] },
+    { projectId: PROJECT, orderedIds: [] },
+    { projectId: PROJECT, orderedIds: ['bad'] },
+    { projectId: PROJECT, orderedIds: [EPIC, EPIC] },
+    { projectId: PROJECT, orderedIds: null },
+  ])('отклоняет некорректную перестановку %j до REST', async (args) => {
+    const result = await client.callTool({ name: 'reorder_project_groups', arguments: args });
+    expect(result.isError).toBe(true);
+    expect(rest.patch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [400, 'Only sibling groups can be reordered'],
+    [400, 'All groups must belong to this project'],
+    [403, 'Project belongs to another user'],
+    [404, 'Project not found'],
+    [500, 'Storage failure'],
+  ] as const)('не сообщает успех при ошибке REST %s: %s', async (status, message) => {
+    rest.patch.mockRejectedValue(new RestError(status, message));
+    const result = await client.callTool({ name: 'reorder_project_groups', arguments: { projectId: PROJECT, orderedIds: [EPIC] } });
+    expect(result.isError).toBe(true);
+    expect(JSON.stringify(result.content)).toContain(message);
+  });
+
   it('создаёт эпик без родителя и возвращает UUID для дальнейших действий', async () => {
     const data = { id: EPIC, projectId: PROJECT, type: 'epic', title: 'Релиз', parentId: null };
     rest.post.mockResolvedValue(data);

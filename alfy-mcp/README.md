@@ -117,6 +117,7 @@ read -rs ALFY_MCP_TOKEN
 
 - `create_project_group` — `title`, необязательные `description`, `color`, `startDate`, `dueDate`. Без `parentId` создаёт эпик; `parentId` (UUID эпика этого проекта) создаёт историю внутри него. Вложенные истории не поддерживаются. Даты `YYYY-MM-DD` допустимы только у эпиков, начало не позже окончания.
 - `update_project_group` — `id` и изменяемые поля: `title`, `description`, `color`, `status` (`open`/`done`), `parentId`, `startDate`, `dueDate`. Пропущенные поля сохраняются; `null` очищает описание, цвет и даты. `parentId` переносит историю в другой эпик этого проекта; группу с дочерними историями переносить нельзя. `parentId: null` не поддерживается.
+- `reorder_project_groups` — `projectId` и непустой `orderedIds`: UUID эпиков проекта либо историй одного эпика **сверху вниз**, без повторов. Полный список задаёт точную перестановку; частичный поднимает указанных соседей наверх, остальных сохраняет следом в прежнем порядке. Чужие группы, смешение эпиков с историями и истории разных эпиков отклоняются без изменений. Родители, задачи, спринты и релизы сохраняются. Ответ: `{ "ok": true }`; новый порядок доступен в `list_project_groups` и на доске.
 - `delete_project_group` — `id` и `confirm: true`. Удаление эпика удаляет и дочерние истории. Задачи сохраняются в проекте без привязки к удалённым группам; их спринты и релизы сохраняются.
 
 Последовательность: создать эпик через `create_project_group({ projectId, title })`, затем историю через `create_project_group({ projectId, parentId: epicId, title })`, затем задачу через `create_task({ projectId, groupId: storyId, title })`. Ответ создания содержит UUID группы. Назначение истории в спринт выполняется отдельным `move_story_to_sprint`.
@@ -174,3 +175,14 @@ npm run start               # node dist/cli.js
 npm run test                # vitest run
 npm run lint                # eslint .
 ```
+
+### Пример перестановки через MCP
+
+Сначала вызовите `list_project_groups({ projectId })` и используйте UUID из его ответа:
+
+```js
+reorder_project_groups({ projectId, orderedIds: [epic3.id, epic4.id, epic1.id, epic2.id] })
+reorder_project_groups({ projectId, orderedIds: [story3.id, story4.id, story1.id, story2.id] })
+```
+
+Во втором вызове все истории должны принадлежать одному эпику. Повторный `list_project_groups({ projectId })` позволяет проверить сохранённый порядок. Каждый вызов сохраняется отдельно и атомарно.

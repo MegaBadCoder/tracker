@@ -12,7 +12,7 @@ function toText(data: unknown): { content: [{ type: 'text'; text: string }] } {
   return { content: [{ type: 'text', text: JSON.stringify(data) }] };
 }
 
-/** Регистрирует создание, изменение и удаление эпиков и историй через REST API текущего пользователя. */
+/** Регистрирует создание, изменение, перестановку и удаление эпиков и историй через REST API текущего пользователя. */
 export function registerGroupTools(server: McpServer, client: AlfyRestClient): void {
   server.registerTool('create_project_group', {
     description: 'Создать эпик или историю в проекте. Без parentId создаётся эпик; с parentId создаётся история внутри указанного эпика. Вложенные истории запрещены. Для задач внутри созданной группы используйте create_task с groupId из ответа. Для назначения истории в спринт используйте move_story_to_sprint.',
@@ -39,6 +39,20 @@ export function registerGroupTools(server: McpServer, client: AlfyRestClient): v
       dueDate: date,
     },
   }, async ({ projectId, id, ...body }) => toText(await client.patch(`/projects/${projectId}/groups/${id}`, body)));
+
+  server.registerTool('reorder_project_groups', {
+    description: 'Изменить порядок эпиков проекта или историй внутри одного эпика. orderedIds — UUID соседей сверху вниз, без повторов; получите их через list_project_groups. Полный список задаёт точный порядок. Частичный список помещает указанные группы первыми, остальных соседей оставляет следом в прежнем порядке. Нельзя смешивать эпики с историями, истории разных эпиков или группы разных проектов. Родители, задачи, спринты и релизы не меняются. Сохранение атомарно; возвращает {ok:true}.',
+    inputSchema: {
+      projectId,
+      orderedIds: z.array(z.string().uuid()).min(1)
+        .refine(ids => new Set(ids).size === ids.length, 'UUID групп не должны повторяться')
+        .describe('Непустой список UUID эпиков либо историй одного эпика в нужном порядке сверху вниз'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  }, async ({ projectId, orderedIds }) => {
+    await client.patch(`/projects/${projectId}/groups/reorder`, { orderedIds });
+    return toText({ ok: true });
+  });
 
   server.registerTool('delete_project_group', {
     description: 'Удалить эпик или историю при confirm=true. При удалении эпика удаляются также все его истории. Задачи сохраняются в проекте, их привязка к удалённым группам очищается; назначения спринтов и релизов задач сохраняются.',
