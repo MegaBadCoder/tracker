@@ -27,9 +27,8 @@ describe('строка истории', () => {
     expect(row.find('[data-task-id]').exists()).toBe(false)
     await row.get('button[aria-label="Добавить задачу в историю Оплата"]').trigger('click')
     expect(row.find('[data-task-id="task"]').exists()).toBe(true)
-    await row.get('input[placeholder="Название задачи в истории"]').setValue('Проверка оплаты')
-    await row.get('input[placeholder="Название задачи в истории"]').trigger('keydown.enter')
-    expect(row.emitted('createTask')).toEqual([['story', 'Проверка оплаты']])
+    expect(row.find('input[placeholder="Название задачи в истории"]').exists()).toBe(false)
+    expect(row.emitted('createTask')).toEqual([['story']])
     row.unmount()
   })
 
