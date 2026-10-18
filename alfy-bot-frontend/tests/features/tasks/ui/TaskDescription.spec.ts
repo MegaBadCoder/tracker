@@ -19,6 +19,7 @@ describe('taskDescription', () => {
   it('читает Markdown без включения редактора по нажатию на текст', async () => {
     const wrapper = mountDescription()
     expect(wrapper.get('a').text()).toBe('Схема')
+    wrapper.get('a').element.addEventListener('click', event => event.preventDefault(), { once: true })
     await wrapper.get('a').trigger('click')
     expect(wrapper.find('textarea').exists()).toBe(false)
     expect(wrapper.emitted('save')).toBeUndefined()
