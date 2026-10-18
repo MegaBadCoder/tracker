@@ -99,46 +99,12 @@
             @keydown.escape="cancelEditTitle"
           />
 
-          <!-- Description -->
-          <div class="space-y-1.5">
-            <div
-              :class="[
-                'relative overflow-hidden transition-[max-height] duration-200',
-                !descriptionExpanded && !descriptionFocused && descriptionOverflows
-                  ? 'max-h-[calc(0.875rem*1.625*10+0.5rem)]'
-                  : 'max-h-none',
-              ]"
-            >
-              <ContentEditableInput
-                ref="descriptionRef"
-                v-model="localDescription"
-                :editable="effectiveEditable"
-                multiline
-                placeholder="Добавить описание..."
-                :class="[
-                  'text-sm leading-relaxed rounded-md py-1 transition-colors empty:before:italic',
-                  localDescription ? 'text-foreground/80' : '',
-                  effectiveEditable && 'cursor-text',
-                ]"
-                aria-label="Описание задачи"
-                @focus="descriptionFocused = true"
-                @blur="onDescriptionBlur"
-                @keydown.escape="cancelEditDescription"
-              />
-              <div
-                v-if="!descriptionExpanded && !descriptionFocused && descriptionOverflows"
-                class="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent"
-              />
-            </div>
-            <button
-              v-if="descriptionOverflows && !descriptionFocused"
-              type="button"
-              class="text-xs text-primary hover:underline cursor-pointer"
-              @click="descriptionExpanded = !descriptionExpanded"
-            >
-              {{ descriptionExpanded ? 'Свернуть' : 'Подробнее' }}
-            </button>
-          </div>
+          <TaskDescription
+            :key="task.id"
+            :description="task.description || ''"
+            :editable="effectiveEditable"
+            @save="emitUpdate({ description: $event })"
+          />
 
           <!-- Pomodoro section -->
           <div v-if="task.isPomodoroTask || effectiveEditable" class="space-y-3">
@@ -705,6 +671,7 @@ import PriorityPicker from './PriorityPicker.vue'
 import DeadlinePicker from './DeadlinePicker.vue'
 import PomodoroSettings from './PomodoroSettings.vue'
 import TaskPropertyChips from './TaskPropertyChips.vue'
+import TaskDescription from './TaskDescription.vue'
 import PriorityPickerContent from './PriorityPickerContent.vue'
 import RecurrencePickerContent from './RecurrencePickerContent.vue'
 import DeadlinePickerContent from './DeadlinePickerContent.vue'
@@ -773,30 +740,7 @@ const emit = defineEmits<{
 
 // Contenteditable refs
 const titleRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
-const descriptionRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
 const localTitle = ref('')
-const localDescription = ref('')
-
-// Description expand/collapse
-const DESCRIPTION_MAX_LINES = 10
-const descriptionExpanded = ref(false)
-const descriptionFocused = ref(false)
-const descriptionOverflows = ref(false)
-
-function checkDescriptionOverflow() {
-  const el = descriptionRef.value?.el
-  if (!el) {
-    descriptionOverflows.value = false
-    return
-  }
-  const lineHeight = parseFloat(getComputedStyle(el).lineHeight)
-  if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-    descriptionOverflows.value = false
-    return
-  }
-  const threshold = lineHeight * DESCRIPTION_MAX_LINES + 8
-  descriptionOverflows.value = el.scrollHeight > threshold + 1
-}
 
 // Checklist state
 const localChecklist = ref<ChecklistItem[]>([])
@@ -1014,7 +958,6 @@ watch(() => props.task, (task) => {
   if (task) {
     isInitializing.value = true
     localTitle.value = task.title
-    localDescription.value = task.description || ''
     localChecklist.value = task.checklist?.items
       ? task.checklist.items.map(item => ({ ...item }))
       : []
@@ -1036,18 +979,14 @@ watch(() => props.task, (task) => {
     localShortBreak.value = task.shortBreak ?? POMODORO_DEFAULTS.shortBreak
     localLongBreak.value = task.longBreak ?? POMODORO_DEFAULTS.longBreak
     localLongBreakInterval.value = task.longBreakInterval ?? POMODORO_DEFAULTS.longBreakInterval
-    descriptionExpanded.value = false
     nextTick(() => {
-      checkDescriptionOverflow()
       isInitializing.value = false
     })
   }
 }, { immediate: true })
 
-watch(localDescription, () => nextTick(checkDescriptionOverflow))
 watch(() => props.open, (open) => {
   if (open) {
-    nextTick(checkDescriptionOverflow)
     if (props.autofocusTitle) {
       nextTick(() => titleRef.value?.el?.focus())
     }
@@ -1120,24 +1059,6 @@ function commitTitle() {
 function cancelEditTitle() {
   localTitle.value = props.task?.title || ''
   titleRef.value?.el?.blur()
-}
-
-// Description
-function commitDescription() {
-  if (props.task && localDescription.value !== (props.task.description || '')) {
-    emitUpdate({ description: localDescription.value })
-  }
-}
-
-function onDescriptionBlur() {
-  descriptionFocused.value = false
-  commitDescription()
-  nextTick(checkDescriptionOverflow)
-}
-
-function cancelEditDescription() {
-  localDescription.value = props.task?.description || ''
-  descriptionRef.value?.el?.blur()
 }
 
 // Checklist
