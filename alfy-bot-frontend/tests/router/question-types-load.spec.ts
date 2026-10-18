@@ -51,4 +51,18 @@ describe('router guard — загрузка типов вопросов', () => 
     expect(router.currentRoute.value.name).toBe('login')
     expect(loadMock).not.toHaveBeenCalled()
   })
+  it('preserves the full task URL when authentication is required', async () => {
+    isAuthenticatedMock.mockReturnValue(false)
+    await router.push('/tasks/5b17360c-285f-49e5-bc70-4b974ba3d86a?mode=full#description')
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/tasks/5b17360c-285f-49e5-bc70-4b974ba3d86a?mode=full#description')
+  })
+
+  it('resolves task permalinks without shadowing static task views', () => {
+    expect(router.resolve('/tasks/5b17360c-285f-49e5-bc70-4b974ba3d86a').name).toBe('task')
+    expect(router.resolve('/tasks/today').name).toBe('tasks-today')
+    expect(router.resolve('/tasks/calendar').name).toBe('tasks-calendar')
+    expect(router.resolve('/tasks/project/project-id').name).toBe('tasks-project')
+  })
+
 })

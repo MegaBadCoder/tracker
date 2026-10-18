@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { authorize, authorizeWithWidget, loginWithEmail, register } from '../api/auth'
 import { useUserStore } from '@/stores/user-store'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { safeAuthRedirect } from '@/lib/auth-redirect'
 
 const router = useRouter()
+const route = useRoute()
+const redirect = () => safeAuthRedirect(route.query.redirect)
 const userStore = useUserStore()
 
 const mode = ref<'login' | 'register'>('login')
@@ -32,19 +35,19 @@ async function handleEmailSubmit() {
         return
       }
       const result = await register(email.value, password.value, confirmPassword.value, firstName.value, lastName.value || undefined)
-      router.push({ name: 'verify-email', query: { email: result.email } })
+      router.push({ name: 'verify-email', query: { email: result.email, redirect: redirect() } })
       return
     }
     await loginWithEmail(email.value, password.value)
     await userStore.fetchMe()
-    router.replace('/')
+    router.replace(redirect())
   } catch (err: any) {
     const status = err?.response?.status
     const msg = err?.response?.data?.message
     if (mode.value === 'register' && status === 409) {
       error.value = 'Этот email уже зарегистрирован'
     } else if (mode.value === 'login' && status === 401 && msg === 'Email not verified') {
-      router.push({ name: 'verify-email', query: { email: email.value } })
+      router.push({ name: 'verify-email', query: { email: email.value, redirect: redirect() } })
       return
     } else if (mode.value === 'login' && status === 401) {
       error.value = 'Неверный email или пароль'
@@ -70,7 +73,7 @@ onMounted(async () => {
       const { user } = await authorize()
       if (user) userStore.setUser(user)
       await userStore.fetchMe()
-      router.replace('/')
+      router.replace(redirect())
       return
     } catch {
       error.value = 'Ошибка авторизации через WebApp'
@@ -82,7 +85,7 @@ onMounted(async () => {
       const { user } = await authorizeWithWidget(tgUser)
       if (user) userStore.setUser(user)
       await userStore.fetchMe()
-      router.replace('/')
+      router.replace(redirect())
     } catch {
       error.value = 'Ошибка авторизации'
     }
@@ -173,7 +176,7 @@ onMounted(async () => {
           <button
             type="button"
             class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            @click="router.push('/reset-password')"
+            @click="router.push({ path: '/reset-password', query: { redirect: redirect() } })"
           >
             Забыли пароль?
           </button>
