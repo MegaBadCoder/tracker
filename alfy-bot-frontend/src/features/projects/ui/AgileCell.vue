@@ -31,7 +31,7 @@ function handleChange(event: any) {
       :group="{ name: 'agile-tasks' }"
       :animation="150"
       ghost-class="opacity-30"
-      class="flex-1 space-y-1 min-h-[20px]"
+      class="flex-1 space-y-3 min-h-[20px]"
       @change="handleChange"
     >
       <template #item="{ element }">
