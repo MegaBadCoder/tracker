@@ -39,6 +39,13 @@ export const useSprintStore = defineStore('sprints', () => {
     return data.updated
   }
 
+  /** Возвращает группу из указанного спринта в бэклог и обновляет назначения; возвращает число задач. */
+  async function removeGroupFromSprint(projectId: string, sprintId: string, groupId: string): Promise<number> {
+    const { data } = await sprintsApi.removeGroupFromSprint(projectId, sprintId, groupId)
+    await refreshAssignments(projectId)
+    return data.updated
+  }
+
   /** Все спринты проекта, включая завершённые, в порядке `order`. Для незагруженного проекта — `[]`. */
   function sprintsOf(projectId: string): Sprint[] {
     return lists.value[projectId] ?? []
@@ -215,6 +222,7 @@ export const useSprintStore = defineStore('sprints', () => {
   }
 
   return {
+    removeGroupFromSprint,
     setStorySprint,
     lists,
     error,

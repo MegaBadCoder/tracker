@@ -61,6 +61,7 @@ describe('SprintService', () => {
       delete: jest.fn().mockResolvedValue(true),
       closeAndMoveUnfinished: jest.fn().mockResolvedValue(undefined),
       setGroupSprint: jest.fn().mockResolvedValue(0),
+      removeGroupFromSprint: jest.fn().mockResolvedValue(3),
     };
 
     projRepo = {
@@ -404,6 +405,61 @@ describe('SprintService', () => {
       await expect(service.delete(1, 'proj-1', 'x')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+  describe('removeGroupFromSprint', () => {
+    beforeEach(() => {
+      projRepo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+      sprintRepo.findById.mockResolvedValue(makeSprint());
+      groupRepo.findById.mockResolvedValue({ id: 'group-1', type: 'epic' });
+    });
+
+    it.each(['epic', 'story'])(
+      'возвращает %s из выбранного спринта',
+      async (type) => {
+        groupRepo.findById.mockResolvedValue({ id: 'group-1', type });
+        await expect(
+          service.removeGroupFromSprint(1, 'proj-1', 'sprint-1', 'group-1'),
+        ).resolves.toEqual({ updated: 3 });
+        expect(sprintRepo.removeGroupFromSprint).toHaveBeenCalledWith(
+          1,
+          'proj-1',
+          'sprint-1',
+          'group-1',
+        );
+      },
+    );
+
+    it('не пишет при недоступном проекте', async () => {
+      projRepo.findById.mockResolvedValue(null);
+      await expect(
+        service.removeGroupFromSprint(1, 'proj-1', 'sprint-1', 'group-1'),
+      ).rejects.toThrow(NotFoundException);
+      expect(sprintRepo.removeGroupFromSprint).not.toHaveBeenCalled();
+    });
+
+    it('не пишет при простом проекте', async () => {
+      projRepo.findById.mockResolvedValue(makeProject({ type: 'simple' }));
+      await expect(
+        service.removeGroupFromSprint(1, 'proj-1', 'sprint-1', 'group-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(sprintRepo.removeGroupFromSprint).not.toHaveBeenCalled();
+    });
+
+    it('не пишет при закрытом спринте', async () => {
+      sprintRepo.findById.mockResolvedValue(makeSprint({ status: 'closed' }));
+      await expect(
+        service.removeGroupFromSprint(1, 'proj-1', 'sprint-1', 'group-1'),
+      ).rejects.toThrow(BadRequestException);
+      expect(sprintRepo.removeGroupFromSprint).not.toHaveBeenCalled();
+    });
+
+    it('не пишет при чужой или отсутствующей группе', async () => {
+      groupRepo.findById.mockResolvedValue(null);
+      await expect(
+        service.removeGroupFromSprint(1, 'proj-1', 'sprint-1', 'group-1'),
+      ).rejects.toThrow(NotFoundException);
+      expect(sprintRepo.removeGroupFromSprint).not.toHaveBeenCalled();
     });
   });
 });

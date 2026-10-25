@@ -39,4 +39,11 @@ export abstract class SprintRepositoryPort {
     groupId: string,
     sprintId: string | null,
   ): Promise<number>;
+  /** Атомарно возвращает эпик с дочерними историями либо историю из заданного спринта в бэклог; проверяет доступ и возвращает число перенесённых задач. При ошибке изменения откатываются. */
+  abstract removeGroupFromSprint(
+    userId: number,
+    projectId: string,
+    sprintId: string,
+    groupId: string,
+  ): Promise<number>;
 }

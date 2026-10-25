@@ -9,6 +9,7 @@ import { groupTasksByColumn } from '../lib/agile-layout'
 import AgileCell from './AgileCell.vue'
 import AgileStoryBlock from './AgileStoryBlock.vue'
 import GroupActionsMenu from './GroupActionsMenu.vue'
+import GroupOrderControls from './GroupOrderControls.vue'
 import InlineTitleInput from './InlineTitleInput.vue'
 
 const props = defineProps<{
@@ -16,9 +17,16 @@ const props = defineProps<{
   stories: AgileStoryRow[]
   epicTasks: Task[]
   lanes: ProjectColumn[]
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  reordering?: boolean
+  backlogGroupIds?: string[]
+  returningToBacklog?: boolean
 }>()
 
 const emit = defineEmits<{
+  returnToBacklog: [group: BoardGroupNode]
+  moveGroup: [group: BoardGroupNode, direction: -1 | 1]
   toggleTask: [id: string]
   openTask: [task: Task]
   taskChange: [event: any, columnId: string, groupId: string | null, tasks: Task[]]
@@ -109,6 +117,13 @@ function handleCreateStory(title: string) {
       <span class="text-xs text-muted-foreground shrink-0">{{ totalCount }}</span>
       <span class="text-xs text-muted-foreground shrink-0">{{ doneCount }} из {{ totalCount }} готово</span>
       <div class="flex items-center gap-0.5 shrink-0">
+        <GroupOrderControls
+          :label="`эпик ${epic.title}`"
+          :can-move-up="!!canMoveUp"
+          :can-move-down="!!canMoveDown"
+          :pending="!!reordering"
+          @move="direction => $emit('moveGroup', epic, direction)"
+        />
         <Button
           variant="ghost"
           size="icon-sm"
@@ -120,6 +135,9 @@ function handleCreateStory(title: string) {
         </Button>
         <GroupActionsMenu
           :group="epic"
+          :can-return-to-backlog="backlogGroupIds?.includes(epic.id)"
+          :returning-to-backlog="returningToBacklog"
+          @return-to-backlog="$emit('returnToBacklog', epic)"
           @open="$emit('openGroup', epic.id)"
           @rename="renaming = true"
           @set-color="(color) => $emit('setGroupColor', epic.id, color)"
@@ -132,11 +150,18 @@ function handleCreateStory(title: string) {
 
     <template v-if="!collapsed">
       <AgileStoryBlock
-        v-for="storyRow in stories"
+        v-for="(storyRow, index) in stories"
         :key="storyRow.story.id"
         :story="storyRow.story"
         :tasks="storyRow.tasks"
         :lanes="lanes"
+        :can-move-up="index > 0"
+        :can-move-down="index < stories.length - 1"
+        :reordering="reordering"
+        :backlog-group-ids="backlogGroupIds"
+        :returning-to-backlog="returningToBacklog"
+        @return-to-backlog="$emit('returnToBacklog', $event)"
+        @move-group="(group, direction) => $emit('moveGroup', group, direction)"
         @toggle-task="$emit('toggleTask', $event)"
         @open-task="$emit('openTask', $event)"
         @task-change="(...args) => $emit('taskChange', ...args)"

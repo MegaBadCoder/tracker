@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { buildAgileRows, groupTasksByColumn } from '../lib/agile-layout'
+import { apiErrorMessage } from '../lib/api-error'
 import { useAgileDnd } from '../lib/use-agile-dnd'
 import { useGroupDeletion } from '../lib/use-group-deletion'
 import { useColumnStore } from '../model/column-store'
@@ -42,7 +43,12 @@ const { onTaskChange } = useAgileDnd(taskStore)
 const { deleteGroupWithConfirm } = useGroupDeletion()
 const groupDetail = useGroupDetail()
 
+const returningToBacklog = ref(false)
+const backlogError = ref<string | null>(null)
+const creationNotice = ref<string | null>(null)
 const addingEpic = ref(false)
+const reordering = ref(false)
+const reorderError = ref<string | null>(null)
 
 const sortedColumns = computed(() =>
   [...columnStore.columns].sort((a, b) => a.order - b.order),
@@ -57,6 +63,41 @@ const sprintBoardTasks = computed(() => {
   return tasks.value.filter(t => t.projectId === props.projectId && t.sprintId === sprintId)
 })
 
+const backlogGroupIds = computed(() => {
+  const sprintId = activeSprint.value?.id
+  if (!sprintId)
+    return []
+  const ids = new Set(sprintBoardTasks.value.map(task => task.groupId))
+  for (const epic of groupStore.groupsOf(props.projectId)) {
+    for (const story of epic.children) {
+      if (story.sprintId === sprintId)
+        ids.add(story.id)
+      if (ids.has(story.id))
+        ids.add(epic.id)
+    }
+  }
+  return [...ids].filter((id): id is string => typeof id === 'string')
+})
+
+async function handleReturnToBacklog(group: BoardGroupNode) {
+  const sprintId = activeSprint.value?.id
+  if (!sprintId || returningToBacklog.value || !backlogGroupIds.value.includes(group.id))
+    return
+  const projectId = props.projectId
+  returningToBacklog.value = true
+  backlogError.value = null
+  try {
+    await sprintStore.removeGroupFromSprint(projectId, sprintId, group.id)
+  }
+  catch (err) {
+    if (props.projectId === projectId && activeSprint.value?.id === sprintId)
+      backlogError.value = apiErrorMessage(err, 'Не удалось вернуть группу в бэклог')
+  }
+  finally {
+    returningToBacklog.value = false
+  }
+}
+
 const projectTasks = computed(() =>
   sprintBoardTasks.value.filter(t =>
     (props.showCompleted || !t.completed)
@@ -66,7 +107,11 @@ const projectTasks = computed(() =>
 
 const lanes = computed<ProjectColumn[]>(() => sortedColumns.value)
 
-const rows = computed(() => buildAgileRows(groupStore.groupsOf(props.projectId), projectTasks.value))
+const sprintGroups = computed(() => groupStore.groupsOf(props.projectId)
+  .filter(epic => backlogGroupIds.value.includes(epic.id))
+  .map(epic => ({ ...epic, children: epic.children.filter(story => backlogGroupIds.value.includes(story.id)) })))
+
+const rows = computed(() => buildAgileRows(sprintGroups.value, projectTasks.value))
 
 const epicRows = computed(() =>
   rows.value.filter((row): row is AgileEpicRow => row.kind === 'epic'),
@@ -82,6 +127,40 @@ const projectTasksByColumn = computed(() => groupTasksByColumn(projectTasks.valu
 
 function laneTaskCount(lane: ProjectColumn): number {
   return projectTasksByColumn.value.get(lane.id)?.length ?? 0
+}
+
+async function handleMoveGroup(group: BoardGroupNode, direction: -1 | 1) {
+  if (reordering.value)
+    return
+
+  const projectId = props.projectId
+  const tree = groupStore.groupsOf(projectId)
+  const siblings = [...(group.parentId ? tree.find(epic => epic.id === group.parentId)?.children ?? [] : tree)]
+    .sort((a, b) => a.order - b.order)
+  const index = siblings.findIndex(sibling => sibling.id === group.id)
+  const visibleSiblings = siblings.filter(sibling => backlogGroupIds.value.includes(sibling.id))
+  const visibleIndex = visibleSiblings.findIndex(sibling => sibling.id === group.id)
+  const target = visibleSiblings[visibleIndex + direction]
+  if (index < 0 || visibleIndex < 0 || !target)
+    return
+
+  const targetIndex = siblings.findIndex(sibling => sibling.id === target.id)
+  const orderedIds = siblings.map(sibling => sibling.id)
+  const targetId = target.id
+  orderedIds[targetIndex] = group.id
+  orderedIds[index] = targetId
+  reordering.value = true
+  reorderError.value = null
+  try {
+    await groupStore.reorderGroups(projectId, orderedIds)
+  }
+  catch {
+    if (props.projectId === projectId)
+      reorderError.value = 'Не удалось сохранить порядок. Прежний порядок восстановлен. Попробуйте ещё раз.'
+  }
+  finally {
+    reordering.value = false
+  }
 }
 
 async function handleToggleGroupDone(group: BoardGroupNode) {
@@ -101,12 +180,41 @@ async function handleSetGroupColor(id: string, color: string | null) {
 }
 
 async function handleCreateStory(epicId: string, title: string) {
-  await groupStore.createGroup(props.projectId, { title, parentId: epicId })
+  const sprintId = activeSprint.value?.id
+  if (!sprintId)
+    return
+  const projectId = props.projectId
+  backlogError.value = null
+  let created = false
+  try {
+    const story = await groupStore.createGroup(projectId, { title, parentId: epicId })
+    created = true
+    await sprintStore.setStorySprint(projectId, story.id, sprintId)
+  }
+  catch (err) {
+    if (props.projectId === projectId) {
+      const reason = apiErrorMessage(err, 'Попробуйте ещё раз')
+      backlogError.value = created ? `История создана. ${reason}. Проверьте её назначение в бэклоге.` : `Не удалось создать историю: ${reason}`
+    }
+  }
 }
 
 async function handleCreateEpic(title: string) {
   addingEpic.value = false
-  await groupStore.createGroup(props.projectId, { title })
+  const projectId = props.projectId
+  backlogError.value = null
+  creationNotice.value = null
+  try {
+    const epic = await groupStore.createGroup(projectId, { title })
+    if (props.projectId === projectId) {
+      creationNotice.value = 'Эпик создан в бэклоге. Добавьте его задачи или истории в спринт, чтобы он появился на доске.'
+      groupDetail.open(projectId, epic.id)
+    }
+  }
+  catch (err) {
+    if (props.projectId === projectId)
+      backlogError.value = apiErrorMessage(err, 'Не удалось создать эпик')
+  }
 }
 
 async function handleCreateTask(groupId: string, title: string) {
@@ -133,6 +241,9 @@ function handleTaskChange(event: any, columnId: string, groupId: string | null, 
 }
 
 watch(() => props.projectId, (id) => {
+  reorderError.value = null
+  backlogError.value = null
+  creationNotice.value = null
   if (id) {
     columnStore.fetchColumns(id)
     groupStore.fetchGroups(id)
@@ -145,6 +256,15 @@ watch(() => props.projectId, (id) => {
     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
   </div>
   <div v-else class="overflow-x-auto pb-4 h-full">
+    <p v-if="creationNotice" role="status" class="sticky left-0 mb-3 text-sm text-muted-foreground">
+      {{ creationNotice }}
+    </p>
+    <p v-if="backlogError" role="alert" class="sticky left-0 mb-3 text-sm text-destructive">
+      {{ backlogError }}
+    </p>
+    <p v-if="reorderError" role="alert" class="sticky left-0 mb-3 text-sm text-destructive">
+      {{ reorderError }}
+    </p>
     <div class="grid gap-x-2" :style="{ gridTemplateColumns: `repeat(${lanes.length}, ${COLUMN_WIDTH_PX}px)` }">
       <div class="contents">
         <div
@@ -163,12 +283,19 @@ watch(() => props.projectId, (id) => {
       </div>
 
       <AgileEpicBlock
-        v-for="row in epicRows"
+        v-for="(row, index) in epicRows"
         :key="row.epic.id"
         :epic="row.epic"
         :stories="row.stories"
         :epic-tasks="row.epicTasks"
         :lanes="lanes"
+        :can-move-up="index > 0"
+        :can-move-down="index < epicRows.length - 1"
+        :reordering="reordering"
+        :backlog-group-ids="backlogGroupIds"
+        :returning-to-backlog="returningToBacklog"
+        @return-to-backlog="handleReturnToBacklog"
+        @move-group="handleMoveGroup"
         @toggle-task="$emit('toggleTask', $event)"
         @open-task="$emit('openTask', $event)"
         @task-change="handleTaskChange"

@@ -676,3 +676,133 @@ describe('taskDetailDialog — релиз agile-задачи', () => {
     expect(updates[0]![0].projectId).toBe('proj-agile-2')
   })
 })
+
+describe('taskDetailDialog — описание Markdown', () => {
+  let wrapper: ReturnType<typeof mount> | null = null
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+  })
+
+  function clickButton(text: string) {
+    const button = Array.from(document.querySelectorAll('button')).find(item => item.textContent?.trim() === text)
+    expect(button).toBeDefined()
+    button!.click()
+    return flushPromises()
+  }
+
+  it('отправляет только ожидаемое описание по явному сохранению', async () => {
+    const task = makeTask({ description: '[Схема](https://example.com)' })
+    wrapper = mount(TaskDetailDialog, {
+      props: { task, open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    await clickButton('Редактировать')
+    const textarea = document.querySelector('textarea[aria-label="Описание задачи"]') as HTMLTextAreaElement
+    textarea.value = '**Новый текст**'
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    textarea.dispatchEvent(new Event('blur', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.emitted('update')).toBeUndefined()
+    await clickButton('Сохранить')
+    expect(wrapper.emitted('update')).toEqual([[{ ...task, description: '**Новый текст**' }]])
+  })
+
+  it('escape отменяет описание, оставляя карточку открытой', async () => {
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ description: 'Исходник' }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    await clickButton('Редактировать')
+    const textarea = document.querySelector('textarea[aria-label="Описание задачи"]') as HTMLTextAreaElement
+    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    await flushPromises()
+    expect(document.querySelector('textarea[aria-label="Описание задачи"]')).toBeNull()
+    expect(wrapper.emitted('update')).toBeUndefined()
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+  })
+
+  it('не переносит черновик при смене задачи', async () => {
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ description: 'Первая' }), open: true },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    await clickButton('Редактировать')
+    const textarea = document.querySelector('textarea[aria-label="Описание задачи"]') as HTMLTextAreaElement
+    textarea.value = 'Чужой черновик'
+    textarea.dispatchEvent(new Event('input', { bubbles: true }))
+    await wrapper.setProps({ task: makeTask({ id: 'task-2', description: 'Вторая' }) })
+    await flushPromises()
+    expect(document.querySelector('textarea[aria-label="Описание задачи"]')).toBeNull()
+    expect(document.body.textContent).toContain('Вторая')
+    expect(wrapper.emitted('update')).toBeUndefined()
+    await clickButton('Редактировать')
+    expect((document.querySelector('textarea[aria-label="Описание задачи"]') as HTMLTextAreaElement).value).toBe('Вторая')
+  })
+
+  it.each([{ editable: false }, { isOverdue: true }])('сохраняет readonly для %s', async (mode) => {
+    wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ description: '[Ссылка](https://example.com)', isOverdue: mode.isOverdue }), open: true, editable: mode.editable },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(document.body.textContent).not.toContain('Редактировать')
+    expect(document.querySelector('a[href="https://example.com"]')).not.toBeNull()
+    expect(wrapper.emitted('update')).toBeUndefined()
+  })
+})
+
+describe('taskDetailDialog — постоянная ссылка', () => {
+  it('предоставляет ссылку сохранённой задачи в режиме чтения', async () => {
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+    const id = 'e797ece0-197b-452a-8cc1-123456789012'
+    const wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ id }), open: true, editable: false },
+      global: { stubs },
+      attachTo: document.body,
+    })
+    await flushPromises()
+    expect(document.querySelector('a[aria-label="Открыть задачу в новой вкладке"]')?.getAttribute('href')).toBe(`${window.location.origin}/tasks/${id}`)
+    expect(document.querySelector('button[aria-label="Копировать ссылку на задачу"]')).not.toBeNull()
+    wrapper.unmount()
+  })
+})
+
+describe('taskDetailDialog — поздняя загрузка проекта', () => {
+  it('загружает группы, спринты и релизы после получения agile-проекта', async () => {
+    setActivePinia(createPinia())
+    const ensureGroups = vi.spyOn(useGroupStore(), 'ensureGroups').mockResolvedValue()
+    const ensureSprints = vi.spyOn(useSprintStore(), 'ensureSprints').mockResolvedValue()
+    const ensureReleases = vi.spyOn(useReleaseStore(), 'ensureReleases').mockResolvedValue()
+    const wrapper = mount(TaskDetailDialog, {
+      props: { task: makeTask({ projectId: 'proj-agile' }), open: true },
+      global: { stubs },
+    })
+    await flushPromises()
+    expect(ensureGroups).not.toHaveBeenCalled()
+    expect(ensureSprints).not.toHaveBeenCalled()
+    expect(ensureReleases).not.toHaveBeenCalled()
+
+    useProjectStore().projects = [makeAgileProject()]
+    await flushPromises()
+
+    expect(ensureGroups).toHaveBeenCalledWith('proj-agile')
+    expect(ensureSprints).toHaveBeenCalledWith('proj-agile')
+    expect(ensureReleases).toHaveBeenCalledWith('proj-agile')
+    wrapper.unmount()
+  })
+})

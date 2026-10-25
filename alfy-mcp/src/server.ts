@@ -5,7 +5,7 @@ import { registerTaskTools } from './tools/tasks.js';
 import { registerQuestionTools } from './tools/questions.js';
 import { registerProgressTools } from './tools/progress.js';
 import { registerProjectTools } from './tools/projects.js';
-import { registerProjectGroupTools } from './tools/project-groups.js';
+import { registerGroupTools } from './tools/groups.js';
 import { registerSprintTools } from './tools/sprints.js';
 
 /**
@@ -24,7 +24,7 @@ export function createServer(client: AlfyRestClient): McpServer {
   registerProgressTools(server, client);
   registerProjectTools(server, client);
   registerSprintTools(server, client);
-  registerProjectGroupTools(server, client);
+  registerGroupTools(server, client);
 
   return server;
 }

@@ -7,15 +7,23 @@ import { Button } from '@/components/ui/button'
 import { groupTasksByColumn } from '../lib/agile-layout'
 import AgileCell from './AgileCell.vue'
 import GroupActionsMenu from './GroupActionsMenu.vue'
+import GroupOrderControls from './GroupOrderControls.vue'
 import InlineTitleInput from './InlineTitleInput.vue'
 
 const props = defineProps<{
   story: BoardGroupNode
   tasks: Task[]
   lanes: ProjectColumn[]
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  reordering?: boolean
+  backlogGroupIds?: string[]
+  returningToBacklog?: boolean
 }>()
 
 const emit = defineEmits<{
+  returnToBacklog: [group: BoardGroupNode]
+  moveGroup: [group: BoardGroupNode, direction: -1 | 1]
   toggleTask: [id: string]
   openTask: [task: Task]
   taskChange: [event: any, columnId: string, groupId: string | null, tasks: Task[]]
@@ -67,6 +75,13 @@ function handleCreateTask(title: string) {
       </button>
       <span class="text-[11px] text-muted-foreground/60 shrink-0">{{ tasks.length }}</span>
       <div class="flex items-center gap-0.5 shrink-0">
+        <GroupOrderControls
+          :label="`историю ${story.title}`"
+          :can-move-up="!!canMoveUp"
+          :can-move-down="!!canMoveDown"
+          :pending="!!reordering"
+          @move="direction => $emit('moveGroup', story, direction)"
+        />
         <Button
           variant="ghost"
           size="icon-sm"
@@ -78,6 +93,9 @@ function handleCreateTask(title: string) {
         </Button>
         <GroupActionsMenu
           :group="story"
+          :can-return-to-backlog="backlogGroupIds?.includes(story.id)"
+          :returning-to-backlog="returningToBacklog"
+          @return-to-backlog="$emit('returnToBacklog', story)"
           @open="$emit('openGroup', story.id)"
           @rename="renaming = true"
           @set-color="(color) => $emit('setGroupColor', story.id, color)"

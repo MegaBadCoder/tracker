@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import {
   BoardGroup,
+  Project,
   ProjectColumn,
   Sprint,
   Task,
@@ -138,6 +143,73 @@ export class TypeOrmSprintRepository extends SprintRepositoryPort {
         })
         .andWhere(eligible, { closed: 'closed' })
         .execute();
+      return result.affected ?? 0;
+    });
+  }
+  async removeGroupFromSprint(
+    userId: number,
+    projectId: string,
+    sprintId: string,
+    groupId: string,
+  ): Promise<number> {
+    return this.dataSource.transaction(async (manager) => {
+      const project = await manager.findOneBy(Project, {
+        id: projectId,
+        userId,
+      });
+      if (!project)
+        throw new NotFoundException(`Project #${projectId} not found`);
+      if (project.type !== 'agile') {
+        throw new BadRequestException(
+          'Sprint planning requires an Agile project',
+        );
+      }
+      const sprint = await manager.findOneBy(Sprint, {
+        id: sprintId,
+        projectId,
+        userId,
+      });
+      if (!sprint) throw new NotFoundException(`Sprint #${sprintId} not found`);
+      if (sprint.status === 'closed') {
+        throw new BadRequestException('Closed sprint cannot be changed');
+      }
+      const group = await manager.findOneBy(BoardGroup, {
+        id: groupId,
+        projectId,
+        userId,
+      });
+      if (!group) throw new NotFoundException(`Group #${groupId} not found`);
+      const children =
+        group.type === 'epic'
+          ? await manager.findBy(BoardGroup, {
+              parentId: groupId,
+              projectId,
+              userId,
+              type: 'story',
+            })
+          : [];
+      const groupIds = [groupId, ...children.map((child) => child.id)];
+      await manager.update(
+        BoardGroup,
+        {
+          id: In(groupIds),
+          projectId,
+          userId,
+          sprintId,
+          type: 'story',
+        },
+        { sprintId: null },
+      );
+      const result = await manager.update(
+        Task,
+        {
+          groupId: In(groupIds),
+          projectId,
+          userId,
+          sprintId,
+        },
+        { sprintId: null },
+      );
       return result.affected ?? 0;
     });
   }

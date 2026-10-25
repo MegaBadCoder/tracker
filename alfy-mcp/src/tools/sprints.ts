@@ -61,10 +61,20 @@ export function registerSprintTools(server: McpServer, client: AlfyRestClient): 
   });
 
   server.registerTool('list_project_groups', {
-    description: 'Дерево эпиков и историй проекта с UUID, статусами и назначениями спринтов и релизов. Используйте UUID истории в move_story_to_sprint.',
+    description: 'Дерево эпиков и историй проекта с UUID, статусами и назначениями спринтов и релизов. Для создания, изменения и удаления используйте create_project_group, update_project_group и delete_project_group. Для изменения порядка эпиков или историй внутри эпика используйте reorder_project_groups. Используйте UUID истории в move_story_to_sprint.',
     inputSchema: { projectId },
     annotations: { readOnlyHint: true },
   }, async ({ projectId }) => toText(await client.get(`/projects/${projectId}/groups`)));
+
+  server.registerTool('remove_group_from_sprint', {
+    description: 'Вернуть историю или эпик целиком из выбранного незакрытого спринта в бэклог. У эпика учитываются прямые задачи и дочерние истории с задачами. Меняется только sprintId записей выбранного спринта, включая выполненные задачи. Группы, родительские связи, статусы, колонки и релизы сохраняются; другие спринты не затрагиваются. Атомарно; повторный вызов безопасен. Возвращает updated — число перенесённых задач.',
+    inputSchema: {
+      projectId,
+      sprintId: z.string().uuid().describe('UUID исходного незакрытого спринта этого проекта'),
+      groupId: z.string().uuid().describe('UUID эпика или истории этого проекта из list_project_groups'),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  }, async ({ projectId, sprintId, groupId }) => toText(await client.post(`/projects/${projectId}/sprints/${sprintId}/groups/${groupId}/backlog`)));
 
   server.registerTool('move_story_to_sprint', {
     description: 'Атомарно перенести историю и все её задачи вне закрытых спринтов в незакрытый спринт этого проекта. sprintId=null переносит в бэклог. Пустые истории поддерживаются; задачи закрытых спринтов сохраняются. Возвращает число перенесённых задач updated.',

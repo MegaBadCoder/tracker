@@ -30,3 +30,8 @@ export function startSprint(projectId: string, id: string, data: StartSprintPayl
 export function completeSprint(projectId: string, id: string, data: CompleteSprintPayload) {
   return api.post<Sprint>(`/projects/${projectId}/sprints/${id}/complete`, data)
 }
+
+/** Возвращает задачи и назначения группы из указанного спринта в бэклог; updated — число задач. */
+export function removeGroupFromSprint(projectId: string, sprintId: string, groupId: string) {
+  return api.post<{ updated: number }>(`/projects/${projectId}/sprints/${sprintId}/groups/${groupId}/backlog`)
+}

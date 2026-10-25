@@ -218,4 +218,32 @@ export class SprintService {
     );
     return { updated };
   }
+
+  /** Возвращает группу и её задачи только из указанного незакрытого спринта в бэклог; сохраняет структуру и возвращает число перенесённых задач. */
+  async removeGroupFromSprint(
+    userId: number,
+    projectId: string,
+    sprintId: string,
+    groupId: string,
+  ): Promise<{ updated: number }> {
+    const project = await this.validateProjectAccess(userId, projectId);
+    if (project.type !== 'agile') {
+      throw new BadRequestException(
+        'Sprint planning requires an Agile project',
+      );
+    }
+    const sprint = await this.getSprint(sprintId, projectId);
+    if (sprint.status === 'closed') {
+      throw new BadRequestException('Closed sprint cannot be changed');
+    }
+    const group = await this.groupRepo.findById(groupId, projectId);
+    if (!group) throw new NotFoundException(`Group #${groupId} not found`);
+    const updated = await this.sprintRepo.removeGroupFromSprint(
+      userId,
+      projectId,
+      sprintId,
+      groupId,
+    );
+    return { updated };
+  }
 }

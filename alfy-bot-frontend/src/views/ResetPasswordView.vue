@@ -6,6 +6,7 @@ import { useUserStore } from '@/stores/user-store'
 import { useCooldown } from '@/composables/useCooldown'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { safeAuthRedirect } from '@/lib/auth-redirect'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,7 +48,7 @@ async function handleReset() {
   try {
     await resetPassword(email.value, code.value, newPassword.value, confirmPassword.value)
     await userStore.fetchMe()
-    router.replace('/')
+    router.replace(safeAuthRedirect(route.query.redirect))
   } catch (err: any) {
     const msg = err?.response?.data?.message
     if (msg === 'Code expired') {
@@ -153,7 +154,7 @@ onMounted(() => {
         <button
           type="button"
           class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          @click="router.push('/login')"
+          @click="router.push({ path: '/login', query: { redirect: safeAuthRedirect(route.query.redirect) } })"
         >
           Назад к входу
         </button>

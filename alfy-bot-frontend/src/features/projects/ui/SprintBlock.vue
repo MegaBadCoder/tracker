@@ -20,7 +20,6 @@ import { useGroupStore } from '../model/group-store'
 import { useSprintStore } from '../model/sprint-store'
 import BacklogStoryRow from './BacklogStoryRow.vue'
 import BacklogTaskRow from './BacklogTaskRow.vue'
-import InlineTitleInput from './InlineTitleInput.vue'
 
 /**
  * Блок вкладки «Бэклог»: один спринт проекта или сам бэклог (`sprint = null`).
@@ -64,10 +63,10 @@ const emit = defineEmits<{
   /** Задача перенесена в этот блок или выбрана в меню «В спринт…»: id задачи и id спринта (`null` — бэклог). */
   moveTask: [taskId: string, sprintId: string | null]
   moveStory: [storyId: string, sprintId: string | null]
-  /** Введено название новой задачи. */
-  createTask: [title: string]
+  /** Запрошено создание задачи в текущем блоке. */
+  createTask: []
   /** Создание задачи с группой истории в спринте текущего блока. */
-  createStoryTask: [groupId: string, title: string]
+  createStoryTask: [groupId: string]
   /** Клик по строке задачи. */
   openTask: [task: Task]
   /** Смена отметки выполнения задачи. */
@@ -83,7 +82,6 @@ const planningTasks = computed(() => taskStore.tasks.filter(t => t.projectId ===
 const stories = computed(() => backlogStories(tree.value, props.tasks, planningTasks.value, props.sprint?.id ?? null, props.epicFilter, props.showCompleted))
 const standaloneTasks = computed(() => standaloneBacklogTasks(props.tasks, tree.value))
 
-const addingTask = ref(false)
 const keepFocusOnClose = ref(false)
 
 const showStart = computed(() =>
@@ -134,11 +132,6 @@ function onCloseAutoFocus(event: Event) {
     return
   keepFocusOnClose.value = false
   event.preventDefault()
-}
-
-function handleCreateTask(taskTitle: string) {
-  addingTask.value = false
-  emit('createTask', taskTitle)
 }
 </script>
 
@@ -204,7 +197,7 @@ function handleCreateTask(taskTitle: string) {
           :entry="entry"
           :sprint-id="sprint?.id ?? null"
           :sprints="moveTargets"
-          @create-task="(groupId, taskTitle) => emit('createStoryTask', groupId, taskTitle)"
+          @create-task="groupId => emit('createStoryTask', groupId)"
           @open-task="emit('openTask', $event)"
           @toggle-task="emit('toggleTask', $event)"
           @move-task="(taskId, sprintId) => emit('moveTask', taskId, sprintId)"
@@ -246,19 +239,12 @@ function handleCreateTask(taskTitle: string) {
 
     <div class="border-t border-border px-3 py-2">
       <button
-        v-if="!addingTask"
         class="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        @click="addingTask = true"
+        @click="emit('createTask')"
       >
         <Plus :size="14" />
         задача
       </button>
-      <InlineTitleInput
-        v-else
-        placeholder="Название задачи"
-        @submit="handleCreateTask"
-        @cancel="addingTask = false"
-      />
     </div>
   </section>
 </template>

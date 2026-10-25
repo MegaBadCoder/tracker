@@ -25,9 +25,12 @@ import { useReleaseStore } from '../model/release-store'
  */
 const props = defineProps<{
   group: BoardGroup
+  canReturnToBacklog?: boolean
+  returningToBacklog?: boolean
 }>()
 
 const emit = defineEmits<{
+  returnToBacklog: []
   open: []
   rename: []
   setColor: [color: string | null]
@@ -135,6 +138,14 @@ function onCloseAutoFocus(event: Event) {
         <RotateCcw v-if="group.status === 'done'" :size="14" class="mr-2" />
         <CircleCheck v-else :size="14" class="mr-2" />
         {{ toggleDoneLabel }}
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        v-if="canReturnToBacklog"
+        :disabled="returningToBacklog"
+        @click="!returningToBacklog && $emit('returnToBacklog')"
+      >
+        <RotateCcw :size="14" class="mr-2" />
+        Вернуть в бэклог
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem

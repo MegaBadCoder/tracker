@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { safeAuthRedirect } from '@/lib/auth-redirect'
 import { clearToken, getToken } from './tokenStorage'
 
 const USER_PROFILE_KEY = 'user_profile'
@@ -26,7 +27,8 @@ api.interceptors.response.use(
       clearToken()
       localStorage.removeItem(USER_PROFILE_KEY)
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+        const redirect = safeAuthRedirect(window.location.pathname + window.location.search + window.location.hash)
+        window.location.href = `/login?redirect=${encodeURIComponent(redirect)}`
       }
     }
     return Promise.reject(error)

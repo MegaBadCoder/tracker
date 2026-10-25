@@ -16,6 +16,7 @@ import SprintBlock from '@/features/projects/ui/SprintBlock.vue'
 import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
 import SprintFormDialog from '@/features/projects/ui/SprintFormDialog.vue'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskForm from '@/features/tasks/ui/TaskForm.vue'
 import ProjectBacklogView from '@/views/ProjectBacklogView.vue'
 
 vi.mock('@/api/client', () => ({
@@ -105,6 +106,7 @@ function rawTask(overrides: Record<string, unknown> = {}) {
 }
 
 const stubs = {
+  TaskForm: true,
   TaskDetailDialog: true,
   TaskListOptionsMenu: true,
   BacklogEpicsPanel: true,
@@ -185,13 +187,65 @@ describe('projectBacklogView', () => {
     vi.mocked(api.post).mockImplementation(async (_url, body: any) => ({ data: { id: `srv-${body.title}`, ...body } }))
 
     const blocks = wrapper.findAllComponents(SprintBlock)
-    blocks[0]!.vm.$emit('createTask', 'В спринт')
-    blocks[1]!.vm.$emit('createTask', 'В бэклог')
+    blocks[0]!.vm.$emit('createTask')
+    await flushPromises()
+    expect(api.post).not.toHaveBeenCalled()
+    wrapper.getComponent(TaskForm).vm.$emit('submit', { title: 'В спринт', description: 'Подробности', priority: 'high' })
+    await flushPromises()
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
+    blocks[1]!.vm.$emit('createTask')
+    await flushPromises()
+    wrapper.getComponent(TaskForm).vm.$emit('submit', { title: 'В бэклог' })
     await flushPromises()
 
     const bodies = vi.mocked(api.post).mock.calls.map(c => c[1] as Record<string, unknown>)
-    expect(bodies).toContainEqual(expect.objectContaining({ title: 'В спринт', sprintId: 'active', projectId: 'proj-1' }))
+    expect(bodies).toContainEqual(expect.objectContaining({ title: 'В спринт', description: 'Подробности', priority: 'high', sprintId: 'active', projectId: 'proj-1' }))
     expect(bodies).toContainEqual(expect.objectContaining({ title: 'В бэклог', sprintId: null, projectId: 'proj-1' }))
+    wrapper.unmount()
+  })
+
+  it('отмена закрывает форму без создания задачи', async () => {
+    const wrapper = await mountView([])
+    wrapper.getComponent(SprintBlock).vm.$emit('createTask')
+    await flushPromises()
+    wrapper.getComponent(TaskForm).vm.$emit('cancel')
+    await flushPromises()
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
+    expect(api.post).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('сбой сохранения оставляет форму открытой и показывает ошибку', async () => {
+    const wrapper = await mountView([])
+    vi.mocked(api.post).mockRejectedValueOnce(new Error('Сеть недоступна'))
+    wrapper.getComponent(SprintBlock).vm.$emit('createTask')
+    await flushPromises()
+    wrapper.getComponent(TaskForm).vm.$emit('submit', { title: 'Сохранить черновик' })
+    await flushPromises()
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(true)
+    expect(document.body.textContent).toContain('Сеть недоступна')
+    expect(wrapper.getComponent(TaskForm).props('loading')).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('блокирует повторное создание и закрытие во время запроса', async () => {
+    const wrapper = await mountView([])
+    let finish!: (value: unknown) => void
+    vi.mocked(api.post).mockReturnValueOnce(new Promise((resolve) => {
+      finish = resolve
+    }) as any)
+    wrapper.getComponent(SprintBlock).vm.$emit('createTask')
+    await flushPromises()
+    const form = wrapper.getComponent(TaskForm)
+    form.vm.$emit('submit', { title: 'Один запрос' })
+    form.vm.$emit('submit', { title: 'Один запрос' })
+    form.vm.$emit('cancel')
+    await flushPromises()
+    expect(api.post).toHaveBeenCalledTimes(1)
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(true)
+    finish({ data: rawTask({ title: 'Один запрос' }) })
+    await flushPromises()
+    expect(wrapper.findComponent(TaskForm).exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -212,7 +266,9 @@ describe('projectBacklogView', () => {
   it('создание из истории передаёт группу и спринт без явного релиза', async () => {
     const wrapper = await mountView([makeSprint({ id: 'active' })])
     vi.mocked(api.post).mockImplementation(async (_url, body: any) => ({ data: { id: 'new-task', ...body } }))
-    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('createStoryTask', 'story-1', 'Новая в истории')
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('createStoryTask', 'story-1')
+    await flushPromises()
+    wrapper.getComponent(TaskForm).vm.$emit('submit', { title: 'Новая в истории' })
     await flushPromises()
     const payload = vi.mocked(api.post).mock.calls.find(call => call[0] === '/tasks')?.[1] as Record<string, unknown>
     expect(payload).toMatchObject({ groupId: 'story-1', sprintId: 'active', projectId: 'proj-1' })
@@ -225,7 +281,9 @@ describe('projectBacklogView', () => {
     useGroupStore().trees['proj-1'] = [{ id: 'story-1', releaseId: 'shipped', children: [] } as unknown as BoardGroupNode]
     useReleaseStore().lists['proj-1'] = [{ id: 'shipped', status: 'released' } as any]
     vi.mocked(api.post).mockImplementation(async (_url, body: any) => ({ data: { id: 'new-task', ...body } }))
-    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('createStoryTask', 'story-1', 'Новая работа')
+    wrapper.findAllComponents(SprintBlock)[0]!.vm.$emit('createStoryTask', 'story-1')
+    await flushPromises()
+    wrapper.getComponent(TaskForm).vm.$emit('submit', { title: 'Новая работа' })
     await flushPromises()
     expect(vi.mocked(api.post).mock.calls.find(call => call[0] === '/tasks')?.[1]).toMatchObject({ groupId: 'story-1', releaseId: null })
     wrapper.unmount()

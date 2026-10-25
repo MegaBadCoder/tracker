@@ -34,6 +34,11 @@ const router = createRouter({
           meta: { sectionNav: 'tasks' },
           children: [
             {
+              path: ':taskId',
+              name: 'task',
+              component: () => import('../views/TaskView.vue'),
+            },
+            {
               path: '',
               name: 'tasks',
               component: () => import('../views/TasksView.vue'),
@@ -125,7 +130,7 @@ const router = createRouter({
 
 router.beforeEach((to, from) => {
   if (!to.meta.public && !isAuthenticated()) {
-    return { name: 'login' }
+    return { name: 'login', query: { redirect: to.fullPath } }
   }
   // Гарантируем загрузку справочника типов вопросов на ЛЮБОМ входе в
   // авторизованную часть (cold boot с токеном, свежий логин через LoginView,

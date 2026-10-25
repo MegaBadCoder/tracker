@@ -11,7 +11,6 @@ import { releaseLabel } from '../lib/release'
 import { useReleaseStore } from '../model/release-store'
 import { useGroupDetail } from '../model/use-group-detail'
 import BacklogTaskRow from './BacklogTaskRow.vue'
-import InlineTitleInput from './InlineTitleInput.vue'
 import ReleasePickerContent from './ReleasePickerContent.vue'
 
 const props = defineProps<{
@@ -21,7 +20,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  createTask: [groupId: string, title: string]
+  createTask: [groupId: string]
   openTask: [task: Task]
   toggleTask: [id: string]
   moveTask: [taskId: string, sprintId: string | null]
@@ -29,7 +28,6 @@ const emit = defineEmits<{
 }>()
 
 const expanded = ref(false)
-const addingTask = ref(false)
 const releaseOpen = ref(false)
 const savingRelease = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -39,14 +37,9 @@ const story = computed(() => props.entry.story)
 const label = computed(() => releaseLabel(releaseStore.releasesOf(story.value.projectId), story.value.releaseId))
 const released = computed(() => releaseStore.releasesOf(story.value.projectId).some(r => r.id === story.value.releaseId && r.status === 'released'))
 
-function createTask(title: string) {
-  emit('createTask', story.value.id, title)
-  addingTask.value = false
-}
-
 function startAddingTask() {
   expanded.value = true
-  addingTask.value = true
+  emit('createTask', story.value.id)
 }
 
 async function setRelease(releaseId: string | null) {
@@ -136,11 +129,7 @@ function handleChange(event: { added?: { element: Task } }) {
         </template>
       </draggable>
       <div class="px-3 pb-2">
-        <p v-if="addingTask && released" class="py-1 text-xs text-muted-foreground">
-          Новая задача будет без релиза. Релиз можно выбрать в её карточке.
-        </p>
-        <InlineTitleInput v-if="addingTask" placeholder="Название задачи в истории" @submit="createTask" @cancel="addingTask = false" />
-        <button v-else class="flex cursor-pointer items-center gap-1 py-1 text-xs text-muted-foreground hover:text-foreground" @click="startAddingTask">
+        <button class="flex cursor-pointer items-center gap-1 py-1 text-xs text-muted-foreground hover:text-foreground" @click="startAddingTask">
           <Plus :size="13" /> Задача в истории
         </button>
       </div>
