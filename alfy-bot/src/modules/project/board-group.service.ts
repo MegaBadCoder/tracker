@@ -9,6 +9,17 @@ import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
+import { StoryWorkflowService } from './story-workflow.service';
+import {
+  dependencyIssue,
+  normalizeStoryGroup,
+  storyStatusId,
+  storyWorkflow,
+} from './domain/story-workflow';
+import type {
+  Project,
+  StoryWorkflowStatus,
+} from '../../shared/entities/project.entity';
 
 export interface BoardGroupNode extends BoardGroup {
   children: BoardGroupNode[];
@@ -19,6 +30,7 @@ export class BoardGroupService {
   constructor(
     private readonly groupRepo: BoardGroupRepositoryPort,
     private readonly projectRepo: ProjectRepositoryPort,
+    private readonly workflow: StoryWorkflowService,
   ) {}
 
   private assertDates(
@@ -44,12 +56,16 @@ export class BoardGroupService {
   }
 
   async getTree(userId: number, projectId: string): Promise<BoardGroupNode[]> {
-    await this.validateProjectAccess(userId, projectId);
+    const project = await this.validateProjectAccess(userId, projectId);
+    const statuses = storyWorkflow(project);
     const groups = await this.groupRepo.findAllByProject(projectId);
 
     const nodeById = new Map<string, BoardGroupNode>();
     for (const group of groups) {
-      nodeById.set(group.id, { ...group, children: [] });
+      nodeById.set(group.id, {
+        ...normalizeStoryGroup(group, statuses),
+        children: [],
+      });
     }
 
     const roots: BoardGroupNode[] = [];
@@ -71,7 +87,17 @@ export class BoardGroupService {
     projectId: string,
     dto: CreateGroupDto,
   ): Promise<BoardGroup> {
-    await this.validateProjectAccess(userId, projectId);
+    return this.workflow.exclusive(projectId, () =>
+      this.createGroup(userId, projectId, dto),
+    );
+  }
+
+  private async createGroup(
+    userId: number,
+    projectId: string,
+    dto: CreateGroupDto,
+  ): Promise<BoardGroup> {
+    const project = await this.validateProjectAccess(userId, projectId);
 
     let type: 'epic' | 'story' = 'epic';
     let parentId: string | null = null;
@@ -106,6 +132,17 @@ export class BoardGroupService {
       order: nextOrder,
       startDate,
       dueDate,
+      workflowStatusId:
+        type === 'story'
+          ? storyStatusId(
+              { workflowStatusId: null, status: 'open' },
+              storyWorkflow(project),
+            )
+          : null,
+      blockedReason: null,
+      deferredUntil: null,
+      archived: false,
+      dependencyIds: [],
     });
   }
 
@@ -115,10 +152,21 @@ export class BoardGroupService {
     id: string,
     dto: UpdateGroupDto,
   ): Promise<BoardGroup> {
-    await this.validateProjectAccess(userId, projectId);
+    return this.workflow.exclusive(projectId, () =>
+      this.updateGroup(userId, projectId, id, dto),
+    );
+  }
 
-    const group = await this.groupRepo.findById(id, projectId);
-    if (!group) throw new NotFoundException(`Group #${id} not found`);
+  private async updateGroup(
+    userId: number,
+    projectId: string,
+    id: string,
+    dto: UpdateGroupDto,
+  ): Promise<BoardGroup> {
+    const project = await this.validateProjectAccess(userId, projectId);
+    const current = await this.groupRepo.findById(id, projectId);
+    if (!current) throw new NotFoundException(`Group #${id} not found`);
+    const group = { ...current };
 
     if (dto.parentId !== undefined && dto.parentId !== group.parentId) {
       if (dto.parentId === id) {
@@ -158,17 +206,115 @@ export class BoardGroupService {
     if (dto.description !== undefined) group.description = dto.description;
     if (dto.color !== undefined) group.color = dto.color;
 
-    if (dto.status !== undefined) {
-      group.status = dto.status;
-      group.completedAt = dto.status === 'done' ? new Date() : null;
-    }
+    await this.applyStoryFields(group, dto, project);
+    return this.groupRepo.save(
+      normalizeStoryGroup(group, storyWorkflow(project)),
+    );
+  }
 
-    return this.groupRepo.save(group);
+  private async applyStoryFields(
+    group: BoardGroup,
+    dto: UpdateGroupDto,
+    project: Project,
+  ): Promise<void> {
+    const storyFields = [
+      'workflowStatusId',
+      'blockedReason',
+      'deferredUntil',
+      'archived',
+      'dependencyIds',
+    ] as const;
+    if (
+      group.type !== 'story' &&
+      storyFields.some((field) => dto[field] !== undefined)
+    ) {
+      throw new BadRequestException(
+        'Поля жизненного цикла доступны только историям',
+      );
+    }
+    if (group.type === 'story') {
+      this.applyStoryStatus(group, dto, storyWorkflow(project));
+      if (dto.blockedReason !== undefined)
+        group.blockedReason = dto.blockedReason?.trim() ?? null;
+      if (dto.deferredUntil !== undefined)
+        group.deferredUntil = dto.deferredUntil;
+      if (dto.archived !== undefined) group.archived = dto.archived;
+      if (dto.dependencyIds !== undefined) {
+        const groups = await this.groupRepo.findAllByProject(project.id);
+        const issue = dependencyIssue(group.id, dto.dependencyIds, groups);
+        if (issue) throw new BadRequestException(issue);
+        group.dependencyIds = [...dto.dependencyIds];
+      }
+    } else if (dto.status !== undefined) {
+      group.status = dto.status;
+    }
+    if (dto.status !== undefined || dto.workflowStatusId !== undefined) {
+      group.completedAt =
+        group.status === 'done' ? (group.completedAt ?? new Date()) : null;
+    }
+  }
+
+  private applyStoryStatus(
+    group: BoardGroup,
+    dto: UpdateGroupDto,
+    statuses: StoryWorkflowStatus[],
+  ): void {
+    let id = storyStatusId(group, statuses);
+    if (dto.status !== undefined) {
+      id = storyStatusId(
+        { workflowStatusId: null, status: dto.status },
+        statuses,
+      );
+    }
+    if (dto.workflowStatusId !== undefined) id = dto.workflowStatusId;
+    const selected = statuses.find((status) => status.id === id);
+    if (!selected)
+      throw new BadRequestException(
+        'Статус истории не найден в каталоге проекта',
+      );
+    const status = selected.category === 'done' ? 'done' : 'open';
+    if (dto.status !== undefined && dto.status !== status) {
+      throw new BadRequestException(
+        'Статус истории противоречит признаку выполнения',
+      );
+    }
+    group.workflowStatusId = selected.id;
+    group.status = status;
   }
 
   async delete(userId: number, projectId: string, id: string): Promise<void> {
+    return this.workflow.exclusive(projectId, () =>
+      this.deleteGroup(userId, projectId, id),
+    );
+  }
+
+  private async deleteGroup(
+    userId: number,
+    projectId: string,
+    id: string,
+  ): Promise<void> {
     await this.validateProjectAccess(userId, projectId);
 
+    const groups = await this.groupRepo.findAllByProject(projectId);
+    const removed = new Set([
+      id,
+      ...groups
+        .filter((group) => group.parentId === id)
+        .map((group) => group.id),
+    ]);
+    if (
+      groups.some(
+        (group) =>
+          !removed.has(group.id) &&
+          (group.dependencyIds ?? []).some((dependency) =>
+            removed.has(dependency),
+          ),
+      )
+    ) {
+      throw new BadRequestException(
+        'Сначала удалите зависимости других историй от этой группы',
+      );
+    }
     const deleted = await this.groupRepo.delete(id, projectId);
     if (!deleted) throw new NotFoundException(`Group #${id} not found`);
   }

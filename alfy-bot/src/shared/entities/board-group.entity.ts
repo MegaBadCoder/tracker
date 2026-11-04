@@ -69,6 +69,21 @@ export class BoardGroup {
   @Column({ type: 'text', default: 'open' })
   status: 'open' | 'done';
 
+  @Column({ type: 'text', nullable: true })
+  workflowStatusId: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  blockedReason: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  deferredUntil: string | null;
+
+  @Column({ default: false })
+  archived: boolean;
+
+  @Column({ type: 'simple-json', default: '[]' })
+  dependencyIds: string[];
+
   @Column({ type: 'datetime', nullable: true })
   completedAt: Date | null;
 

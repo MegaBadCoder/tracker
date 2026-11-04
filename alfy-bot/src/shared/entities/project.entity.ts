@@ -12,6 +12,20 @@ import {
 import { User } from './user.entity';
 import { ProjectColumn } from './project-column.entity';
 
+export type StoryWorkflowCategory =
+  | 'open'
+  | 'ready'
+  | 'in_progress'
+  | 'review'
+  | 'done';
+
+export interface StoryWorkflowStatus {
+  id: string;
+  name: string;
+  category: StoryWorkflowCategory;
+  color: string;
+}
+
 @Entity('projects')
 @Index('IDX_project_task_key_prefix', ['userId', 'taskKeyPrefix'], {
   unique: true,
@@ -53,6 +67,9 @@ export class Project {
 
   @Column({ type: 'integer', default: 0 })
   order: number;
+
+  @Column({ type: 'simple-json', nullable: true })
+  storyWorkflow: StoryWorkflowStatus[] | null;
 
   @CreateDateColumn()
   createdAt: Date;
