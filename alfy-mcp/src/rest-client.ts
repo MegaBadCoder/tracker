@@ -63,6 +63,16 @@ export class AlfyRestClient {
     }
   }
 
+  /** Заменяет ресурс по относительному пути API и возвращает тело ответа; ошибки HTTP передаёт как RestError. */
+  async put<T>(path: string, body: unknown): Promise<T> {
+    try {
+      const res = await this.http.put<T>(path, body);
+      return res.data;
+    } catch (err) {
+      throw this.#wrapError(err);
+    }
+  }
+
   #wrapError(err: unknown): unknown {
     if (isAxiosError(err) && err.response) {
       const { status, data } = err.response;

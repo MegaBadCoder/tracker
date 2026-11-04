@@ -86,9 +86,36 @@ Baseline: existing sprint/group unit tests and frontend sprint/backlog tests in 
 - RK2 — История через разные пути обновления может быть неполной: проверить обычный PATCH task, перенос истории, массовые операции и удаление; прежние спринты явно incomplete.
 - RK3 — Большой объём пересекает несколько приложений: отдельные владельцы файлов, сериализованные коммиты и интеграционная проверка контрактов. Откат фаз через revert; существующие данные не удалять.
 
+## Progress
+- PH1: committed a57ecb0 — workflow и совместимость проверены unit и SQLite HTTP.
+- PH2: committed def8e27 — 732 backend unit и 157 HTTP e2e passed; обнаруженная гонка с обычным сохранением задачи исправляется отдельно.
+- PH3: committed c932aa3 — 1057 frontend tests passed, build/vue-tsc, браузер desktop и 390px: статусы, перенос/undo, запуск, фокус, закрытие и сохранённые итоги.
+- PH4: 216 MCP tests, build/lint и все 8 новых инструментов на реальном HTTP/SQLite passed.
+
+## Verify
+
+Result: failed — CK6 в исправлении.
+
+- CK1 (IV1/IF1) — чужой проект, некорректные даты, цикл зависимостей и удаление занятого статуса: held, SQLite HTTP regression suites.
+- CK2 (IV2/IV3) — статус истории теряется при переносе/закрытии или автоматически завершается по задачам: held, service/e2e и браузер.
+- CK3 (IV4) — неизвестная оценка становится бесплатной, бюджет удваивает время, выполненные задачи освобождают первоначальный бюджет: held, регрессии + UI контекста.
+- CK4 (IV5) — обычный PATCH или удаление задачи искажает отчёт: held, реальный API полный цикл и immutable snapshots.
+- CK5 (IV6/IF3) — предложение меняет задачи или отмена затирает новую правку: held, HTTP negative cases; MCP client → REST → SQLite, все 8 tools.
+- CK6 (IV6) — обычное устаревшее сохранение отменяет параллельный перенос: broke, gated findById воспроизвёл для title/checklist/board move; требуется исключительный scope от первого чтения до записи.
+- CK7 (IV7) — мобильные элементы недоступны или undo исчезает после обновления: held после исправления unmount и мобильной строки, браузер 390px/desktop и регрессия.
+
+Smoke: локальный сервер + Chrome — настройка «Приёмка», перенос/отмена, запуск, фокус, завершение с ретроспективой и просмотр сохранённого состава; MCP все 8 новых tools прошли на том же API.
+Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-experimental-webstorage из-за существующей коллизии happy-dom/localStorage (8 старых timer tests). Полный backend HTTP suite прошёл 157 tests, но оставил открытый handle Jest; завершение процесса проверяется отдельно.
+
 ## Conclusion
+### Deviations from plan
+- Setup: baseline backend npm ci failed at f9af7e8 because lockfile iconv-lite 0.7.2 did not satisfy dependency 0.7.3; corrected six lockfile lines and clean install passed (d0f45e1).
+- PH2: reuse serialized SQLite data source helper from existing calendar fix to isolate transaction writes; no calendar functionality included. This is required for atomic planning against concurrent task updates.
 ### Hands-off decisions
 - make: весь согласованный объём, включая статусы историй, принят; dedicated worktree от актуального origin/main, чужие незакоммиченные изменения сохранены.
 - udesign: совместимое status + workflowStatusId выбрано для существующих MCP/релизов; AI через уже доступный MCP без нового платного провайдера.
 - udesign: независимые части разделены на фазы одного общего результата; автоапрув разрешает выполнить все без выбора первой вручную.
 - uplan: plan auto-approved; параллельные implementers по контракту uexecute, коммиты контроллером.
+
+- PH2 compatibility: legacy setGroupSprint may reassign a story from a closed sprint while preserving its closed tasks, as required by existing story-sprint.e2e-spec.ts; frozen report snapshots remain unchanged. New bulk planning rejects closed sources.
+- IF3 additive fields: today (user timezone), remainingEffortMinutes and otherProjectsUnestimatedCount make UI dates and unknown workload explicit; historical samples require equal sprint duration.

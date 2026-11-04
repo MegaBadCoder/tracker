@@ -7,6 +7,7 @@ vi.mock('axios', () => {
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
+    put: vi.fn(),
     delete: vi.fn(),
   };
   return {
@@ -25,6 +26,7 @@ function makeAxiosMock() {
     get: ReturnType<typeof vi.fn>;
     post: ReturnType<typeof vi.fn>;
     patch: ReturnType<typeof vi.fn>;
+    put: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
 }
@@ -138,6 +140,20 @@ describe('AlfyRestClient', () => {
       const err = await client.patch('/tasks/1', {}).catch((e) => e);
       expect(err).toBeInstanceOf(RestError);
       expect(err.status).toBe(422);
+    });
+  });
+
+  describe('PUT', () => {
+    it('заменяет каталог и возвращает ответ сервера', async () => {
+      const body = { statuses: [] };
+      mock.put.mockResolvedValueOnce(makeAxiosResponse(body));
+      expect(await client.put('/projects/1/story-workflow', body)).toEqual(body);
+      expect(mock.put).toHaveBeenCalledWith('/projects/1/story-workflow', body);
+    });
+
+    it('сохраняет конфликт сервера при замене каталога', async () => {
+      mock.put.mockRejectedValueOnce(makeAxiosError(409, { message: 'Status is in use' }));
+      await expect(client.put('/projects/1/story-workflow', {})).rejects.toMatchObject({ status: 409 });
     });
   });
 

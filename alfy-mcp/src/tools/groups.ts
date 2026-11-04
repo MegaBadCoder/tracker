@@ -27,7 +27,7 @@ export function registerGroupTools(server: McpServer, client: AlfyRestClient): v
   }, async ({ projectId, ...body }) => toText(await client.post(`/projects/${projectId}/groups`, body)));
 
   server.registerTool('update_project_group', {
-    description: 'Редактировать эпик или историю: название, описание, цвет, статус open/done и даты эпика. null очищает описание, цвет или дату. parentId переносит историю в другой эпик того же проекта; группу с дочерними историями переносить нельзя. Пропущенные поля сохраняются. Для спринта используйте move_story_to_sprint.',
+    description: 'Редактировать эпик или историю. Для статуса истории используйте workflowStatusId из get_story_workflow; open/done остаётся совместимым кратким статусом. blockedReason задаёт причину блокировки, dependencyIds — истории этого проекта, deferredUntil — дату возвращения, archived — архив с возможностью восстановления. null очищает описание, блокер или дату. parentId переносит историю в другой эпик того же проекта. Пропущенные поля сохраняются. Для спринта используйте move_story_to_sprint.',
     inputSchema: {
       projectId, id,
       title: title.optional(),
@@ -35,6 +35,11 @@ export function registerGroupTools(server: McpServer, client: AlfyRestClient): v
       description: z.string().nullable().optional().describe('Описание или null для очистки'),
       color: z.string().nullable().optional().describe('Цвет или null для очистки'),
       status: z.enum(['open', 'done']).optional().describe('Открыть или завершить эпик/историю'),
+      workflowStatusId: z.string().trim().min(1).optional().describe('ID статуса истории из get_story_workflow'),
+      blockedReason: z.string().nullable().optional().describe('Причина блокировки или null'),
+      deferredUntil: z.string().date().nullable().optional().describe('Вернуться к истории в YYYY-MM-DD или null'),
+      archived: z.boolean().optional().describe('Архивировать или восстановить историю'),
+      dependencyIds: z.array(z.string().uuid()).optional().describe('UUID историй, от которых зависит эта история; [] очищает'),
       startDate: date,
       dueDate: date,
     },
