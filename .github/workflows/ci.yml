@@ -68,6 +68,19 @@ jobs:
           VITE_API_URL: http://localhost:3002
           VITE_BOT_USERNAME: ci
 
+  frontend-image:
+    name: Frontend Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: |
+          docker build \
+            --build-arg VITE_API_URL=http://localhost:3002 \
+            --build-arg VITE_BOT_USERNAME=ci \
+            ./alfy-bot-frontend
+
   mcp:
     name: MCP server (alfy-mcp)
     runs-on: ubuntu-latest
