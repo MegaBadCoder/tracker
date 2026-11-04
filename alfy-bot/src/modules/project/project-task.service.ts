@@ -28,6 +28,17 @@ export class ProjectTaskService {
     taskId: string,
     dto: MoveTaskDto,
   ) {
+    return this.taskRepo.exclusive(() =>
+      this.moveTaskInUnit(userId, currentProjectId, taskId, dto),
+    );
+  }
+
+  private async moveTaskInUnit(
+    userId: number,
+    currentProjectId: string,
+    taskId: string,
+    dto: MoveTaskDto,
+  ) {
     const order = dto.order ?? 0;
 
     if (order < 0) {
@@ -162,6 +173,16 @@ export class ProjectTaskService {
   }
 
   async reorderTasks(userId: number, projectId: string, dto: ReorderTasksDto) {
+    return this.taskRepo.exclusive(() =>
+      this.reorderTasksInUnit(userId, projectId, dto),
+    );
+  }
+
+  private async reorderTasksInUnit(
+    userId: number,
+    projectId: string,
+    dto: ReorderTasksDto,
+  ) {
     if (dto.orderedIds.length === 0) {
       throw new BadRequestException('Ordered IDs array cannot be empty');
     }

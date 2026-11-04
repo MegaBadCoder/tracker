@@ -8,6 +8,9 @@ import type {
 export type { ChecklistItem, ChecklistData };
 
 export abstract class TaskRepositoryPort {
+  /** Выполняет полное чтение, проверку и изменение задач без вмешательства других операций БД; вложенные вызовы используют ту же очередь. */
+  abstract exclusive<T>(work: () => Promise<T>): Promise<T>;
+
   abstract findAllByUser(userId: number): Promise<Task[]>;
   abstract findById(id: string, userId: number): Promise<Task | null>;
   abstract findByIds(userId: number, ids: string[]): Promise<Task[]>;

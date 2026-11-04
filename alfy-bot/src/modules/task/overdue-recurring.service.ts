@@ -47,6 +47,16 @@ export class OverdueRecurringService {
     tz: string,
     nowUtc: Date,
   ): Promise<void> {
+    return this.taskRepo.exclusive(() =>
+      this.processForUserInUnit(userId, tz, nowUtc),
+    );
+  }
+
+  private async processForUserInUnit(
+    userId: number,
+    tz: string,
+    nowUtc: Date,
+  ): Promise<void> {
     const nowLocal = shiftToUserWallClock(nowUtc, tz);
     const startOfTodayLocal = new Date(nowLocal);
     startOfTodayLocal.setUTCHours(0, 0, 0, 0);
