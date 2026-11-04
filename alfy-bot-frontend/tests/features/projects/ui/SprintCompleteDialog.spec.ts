@@ -81,6 +81,20 @@ describe('sprintCompleteDialog', () => {
     document.body.innerHTML = ''
   })
 
+  it('сохраняет оценку достижения цели при завершении', async () => {
+    const store = useSprintStore()
+    const complete = vi.spyOn(store, 'completeSprint').mockResolvedValue(undefined)
+    const wrapper = setup([makeSprint()], [])
+    await flushPromises()
+    const select = document.querySelector<HTMLSelectElement>('[aria-label="Достижение цели спринта"]')
+    expect(select).not.toBeNull()
+    select!.value = 'partial'
+    select!.dispatchEvent(new Event('change', { bubbles: true }))
+    await click(findButtonByText('Завершить'))
+    expect(complete).toHaveBeenCalledWith('proj-1', 'active', 'backlog', { goalOutcome: 'partial' })
+    wrapper.unmount()
+  })
+
   it('показывает счётчики «Выполнено N, не выполнено M»', async () => {
     const wrapper = setup(
       [makeSprint(), planned('p1', 1)],

@@ -24,6 +24,9 @@ import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
 import SprintBlock from '@/features/projects/ui/SprintBlock.vue'
 import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
 import SprintFormDialog from '@/features/projects/ui/SprintFormDialog.vue'
+import SprintPlanningWorkspace from '@/features/projects/ui/SprintPlanningWorkspace.vue'
+import SprintReportPanel from '@/features/projects/ui/SprintReportPanel.vue'
+import StoryBoardView from '@/features/projects/ui/StoryBoardView.vue'
 import { useHideOverdue } from '@/features/tasks/lib/use-hide-overdue'
 import { useShowCompleted } from '@/features/tasks/lib/use-show-completed'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
@@ -44,6 +47,8 @@ const isAgileProject = computed(() => project.value?.type === 'agile')
 const showCompleted = useShowCompleted(projectId)
 const hideOverdue = useHideOverdue(projectId)
 const epicFilter = ref<EpicFilter>('all')
+const workspaceMode = ref<'list' | 'planning' | 'stories' | 'reports'>('list')
+
 const actionError = ref<string | null>(null)
 
 const columnStore = useColumnStore()
@@ -65,14 +70,21 @@ const {
   handleDeleteFromDialog,
 } = useTaskDetailHandlers(taskStore, confirm)
 
+function openTaskById(id: string) {
+  const task = taskStore.tasks.find(task => task.id === id)
+  if (task)
+    handleOpenTask(task)
+}
+
 const activeSprint = computed(() => sprintStore.activeSprintOf(projectId.value))
 const plannedSprints = computed(() => sprintStore.plannedSprintsOf(projectId.value))
 
 const sprintsPending = computed(() =>
-  sprintStore.isLoading(projectId.value)
-  || (!(projectId.value in sprintStore.lists) && !sprintStore.error),
+  !(projectId.value in sprintStore.lists)
+  && (sprintStore.isLoading(projectId.value) || !sprintStore.error),
 )
-const initialLoading = computed(() => sprintsPending.value || (loading.value && tasks.value.length === 0))
+const initialTasksLoaded = ref(false)
+const initialLoading = computed(() => sprintsPending.value || (!initialTasksLoaded.value && loading.value && tasks.value.length === 0))
 const loadError = computed(() => actionError.value || error.value || sprintStore.error || groupStore.error || releaseStore.error)
 
 function blockTasks(sprintId: string | null): Task[] {
@@ -156,7 +168,7 @@ async function handleToggleTask(taskId: string) {
     await taskStore.toggleTask(taskId)
   }
   catch (err) {
-    console.error('Ошибка обновления задачи:', err)
+    actionError.value = apiErrorMessage(err, 'Не удалось обновить задачу')
   }
 }
 
@@ -165,7 +177,7 @@ async function handleCreateSprint() {
     await sprintStore.createSprint(projectId.value, {})
   }
   catch (err) {
-    console.error('Ошибка создания спринта:', err)
+    actionError.value = apiErrorMessage(err, 'Не удалось создать спринт')
   }
 }
 
@@ -188,7 +200,7 @@ async function handleDeleteSprint(sprint: Sprint) {
     await sprintStore.deleteSprint(projectId.value, sprint.id)
   }
   catch (err) {
-    console.error('Ошибка удаления спринта:', err)
+    actionError.value = apiErrorMessage(err, 'Не удалось удалить спринт')
   }
 }
 
@@ -204,7 +216,9 @@ watch(() => groupStore.groupsOf(projectId.value), (tree) => {
 })
 
 onMounted(() => {
-  taskStore.fetchTasks()
+  taskStore.fetchTasks().finally(() => {
+    initialTasksLoaded.value = true
+  })
   loadProjectData(projectId.value)
 })
 
@@ -237,6 +251,9 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
 
     <div class="px-4 py-3">
       <ProjectTabs :project-id="projectId" />
+      <div class="mt-3 flex flex-wrap gap-1" role="group" aria-label="Режим бэклога">
+        <Button v-for="mode in [{ id: 'list' as const, label: 'Спринты' }, { id: 'planning' as const, label: 'Планирование' }, { id: 'stories' as const, label: 'Истории' }, { id: 'reports' as const, label: 'Итоги' }]" :key="mode.id" size="sm" :variant="workspaceMode === mode.id ? 'secondary' : 'ghost'" :aria-pressed="workspaceMode === mode.id" @click="workspaceMode = mode.id">{{ mode.label }}</Button>
+      </div>
     </div>
 
     <div v-if="initialLoading" class="py-8 text-center">
@@ -253,7 +270,12 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
         </p>
       </div>
 
-      <div class="flex flex-col gap-4 px-4 pb-6 md:flex-row md:items-start">
+      <div v-if="workspaceMode !== 'list'" class="px-4 pb-6">
+        <SprintPlanningWorkspace v-if="workspaceMode === 'planning'" :project-id="projectId" @open-task="openTaskById" @create-sprint="handleCreateSprint" />
+        <StoryBoardView v-else-if="workspaceMode === 'stories'" :project-id="projectId" :sprint-id="null" :show-completed="showCompleted" />
+        <SprintReportPanel v-else :project-id="projectId" />
+      </div>
+      <div v-else class="flex flex-col gap-4 px-4 pb-6 md:flex-row md:items-start">
         <BacklogEpicsPanel v-model="epicFilter" :project-id="projectId" />
 
         <div class="flex min-w-0 flex-1 flex-col gap-4">

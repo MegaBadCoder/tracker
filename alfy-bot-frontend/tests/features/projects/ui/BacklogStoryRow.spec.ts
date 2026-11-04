@@ -5,6 +5,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import draggable from 'vuedraggable'
 import { useReleaseStore } from '@/features/projects/model/release-store'
+import { useStoryWorkflowStore } from '@/features/projects/model/story-workflow-store'
 import BacklogStoryRow from '@/features/projects/ui/BacklogStoryRow.vue'
 import ReleasePickerContent from '@/features/projects/ui/ReleasePickerContent.vue'
 
@@ -20,7 +21,16 @@ const mountRow = () => mount(BacklogStoryRow, { props: { entry, sprintId: 's1', 
 const sprint = { id: 's2', name: 'Спринт 2', status: 'planned' } as Sprint
 
 describe('строка истории', () => {
-  beforeEach(() => setActivePinia(createPinia()))
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    useStoryWorkflowStore().catalogs.project = [{ id: 'open', name: 'К проработке', category: 'open', color: '#999999' }]
+  })
+
+  it('даёт сменить статус истории прямо из строки', () => {
+    const row = mountRow()
+    expect(row.find('[aria-label="Статус истории Оплата"]').exists()).toBe(true)
+    row.unmount()
+  })
 
   it('раскрывает задачи и создаёт задачу в своей истории', async () => {
     const row = mountRow()

@@ -9,6 +9,7 @@ import AgileCell from './AgileCell.vue'
 import GroupActionsMenu from './GroupActionsMenu.vue'
 import GroupOrderControls from './GroupOrderControls.vue'
 import InlineTitleInput from './InlineTitleInput.vue'
+import StoryStatusPicker from './StoryStatusPicker.vue'
 
 const props = defineProps<{
   story: BoardGroupNode
@@ -73,6 +74,7 @@ function handleCreateTask(title: string) {
       >
         {{ story.title }}
       </button>
+      <StoryStatusPicker :story="story" />
       <span class="text-[11px] text-muted-foreground/60 shrink-0">{{ tasks.length }}</span>
       <div class="flex items-center gap-0.5 shrink-0">
         <GroupOrderControls
