@@ -88,13 +88,13 @@ Baseline: existing sprint/group unit tests and frontend sprint/backlog tests in 
 
 ## Progress
 - PH1: committed a57ecb0 — workflow и совместимость проверены unit и SQLite HTTP.
-- PH2: committed def8e27 — 732 backend unit и 162 HTTP e2e passed; гонка с обычным сохранением задачи исправлена в 29193a4.
-- PH3: committed c932aa3 — 1057 frontend tests passed, build/vue-tsc, браузер desktop и 390px: статусы, перенос/undo, запуск, фокус, закрытие и сохранённые итоги.
+- PH2: committed def8e27 — 732 backend unit и 165 HTTP e2e passed; гонка с обычным сохранением задачи исправлена в 29193a4.
+- PH3: committed c932aa3 — 1066 frontend tests passed, build/vue-tsc, браузер desktop и 390px: статусы, перенос/undo, запуск, фокус, закрытие и сохранённые итоги.
 - PH4: 216 MCP tests, build/lint и все 8 новых инструментов на реальном HTTP/SQLite passed.
 
 ## Verify
 
-Result: passed.
+Result: passed — четыре замечания ревью исправлены и перепроверены.
 
 - CK1 (IV1/IF1) — чужой проект, некорректные даты, цикл зависимостей и удаление занятого статуса: held, SQLite HTTP regression suites.
 - CK2 (IV2/IV3) — статус истории теряется при переносе/закрытии или автоматически завершается по задачам: held, service/e2e и браузер.
@@ -105,10 +105,10 @@ Result: passed.
 - CK7 (IV7) — мобильные элементы недоступны или undo исчезает после обновления: held после исправления unmount и мобильной строки, браузер 390px/desktop и регрессия.
 
 Smoke: локальный сервер + Chrome — настройка «Приёмка», перенос/отмена, запуск, фокус, завершение с ретроспективой и просмотр сохранённого состава; MCP все 8 новых tools прошли на том же API.
-Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-experimental-webstorage из-за существующей коллизии happy-dom/localStorage (8 старых timer tests). Полный backend HTTP suite прошёл 162 tests и завершился с exit 0 после app.close() в старом app.e2e. Один промежуточный запрос story-sprint дал socket hang up, отдельный и полный повторные прогоны прошли.
+Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-experimental-webstorage из-за существующей коллизии happy-dom/localStorage (8 старых timer tests). Полный backend HTTP suite прошёл 165 tests и завершился с exit 0 после app.close() в старом app.e2e. Один промежуточный запрос story-sprint дал socket hang up, отдельный и полный повторные прогоны прошли.
 
 ## Conclusion
-Независимое ревью ожидается; полный API smoke повторён на финальной сборке успешно.
+Независимое ревью 399fd50: 4 important, 0 critical; все подтверждены контроллером, исправлены и переданы на повторное ревью.
 ### Deviations from plan
 - Setup: baseline backend npm ci failed at f9af7e8 because lockfile iconv-lite 0.7.2 did not satisfy dependency 0.7.3; corrected six lockfile lines and clean install passed (d0f45e1).
 - PH2: reuse serialized SQLite data source helper from existing calendar fix to isolate transaction writes; no calendar functionality included. This is required for atomic planning against concurrent task updates.
@@ -123,3 +123,14 @@ Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-e
 
 - uverify: исправлена подтверждённая гонка полного сохранения задачи с planner через repo-port exclusive; покрыты соседние мутации и повторения.
 - uverify: добавлен app.close() в существующий root e2e, чтобы полный прогон освобождал приложение и завершался.
+
+- ureview: fixed — обновлять контекст после успешных внешних правок задач/историй, удалять недействительный выбор, сохранять undo; тест на изменение оценки и удаление.
+- ureview: fixed — исключать архивные/отложенные истории из ближайших действий, сохраняя учёт нагрузки и видимость причины.
+- ureview: fixed — задавать перенос дочерних задач открытой истории через саму историю, включая общий default.
+- ureview: fixed — proposal и неявный перенос через storyIds включают незавершённые задачи; explicit taskIds остаются осознанным выбором, legacy setGroupSprint не меняется. Выполненное внутри целевого спринта продолжает занимать бюджет.
+
+- CK8 (IV4/IF3) — ready story с done90 + open10 и budget10: held после a79559c; completed вне target остаётся на месте, внутри target занимает бюджет, preview/apply completion и undo проверены HTTP.
+- CK9 (IV7) — внешняя правка/удаление оставляет старый context или поздний proposal: held, регрессии после store action + CUA переименование без reload; selection очищается, undo сохраняется.
+- CK10 (IV7) — архив/отсрочка предлагаются в focus: held, компонентная регрессия и CUA с датой 2026-11-20.
+- CK11 (IF2) — дочерней задаче доступно несовместимое назначение: held, компонентная регрессия и CUA disabled selector при default истории.
+- Финальные проверки после ревью: backend 165 HTTP tests, frontend 1066 tests/build/vue-tsc/lint новых файлов, MCP 216 tests/build/lint; все passed.

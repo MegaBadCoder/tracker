@@ -47,7 +47,7 @@ export function registerPlanningTools(server: McpServer, client: AlfyRestClient)
   }, async ({ projectId, ...body }) => toText(await client.post(`/projects/${projectId}/planning/proposal`, body)));
 
   server.registerTool('apply_sprint_plan', {
-    description: 'Атомарно перенести явно выбранные задачи и истории целиком в спринт либо бэклог (sprintId=null). Передавайте рассмотренный пользователем состав; не применяйте автоматически сразу после предложения. Пустые массивы обязательны для отсутствующего вида элементов. Возвращает updated и undoToken для отмены. Статусы историй сохраняются.',
+    description: 'Атомарно перенести явно выбранные задачи и истории с незавершёнными задачами в спринт либо бэклог (sprintId=null). Передавайте рассмотренный пользователем состав; не применяйте автоматически сразу после предложения. Пустые массивы обязательны для отсутствующего вида элементов. Возвращает updated и undoToken для отмены. Статусы историй сохраняются.',
     inputSchema: { projectId, sprintId: sprintId.nullable(), taskIds: ids, storyIds: ids },
     annotations: command,
   }, async ({ projectId, ...body }) => toText(await client.post(`/projects/${projectId}/planning/move`, body)));
