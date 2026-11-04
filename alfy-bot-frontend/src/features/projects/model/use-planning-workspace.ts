@@ -6,6 +6,7 @@ import * as planningApi from '../api/planning-api'
 import { apiErrorMessage } from '../lib/api-error'
 import { useGroupStore } from './group-store'
 import { useSprintStore } from './sprint-store'
+import { usePlanningInvalidation } from './use-planning-invalidation'
 
 export function usePlanningWorkspace(projectId: Ref<string>, sprintId: Ref<string | null>) {
   const context = ref<PlanningContext | null>(null)
@@ -26,12 +27,18 @@ export function usePlanningWorkspace(projectId: Ref<string>, sprintId: Ref<strin
 
   async function load() {
     const version = ++request
+    proposal.value = null
     loading.value = true
     error.value = ''
     try {
       const { data } = await planningApi.fetchPlanning(projectId.value, sprintId.value)
-      if (version === request)
+      if (version === request) {
         context.value = data
+        const taskIds = new Set(data.tasks.map(task => task.id))
+        const storyIds = new Set(data.stories.map(story => story.id))
+        selectedTaskIds.value = selectedTaskIds.value.filter(id => taskIds.has(id))
+        selectedStoryIds.value = selectedStoryIds.value.filter(id => storyIds.has(id))
+      }
       return version === request
     }
     catch (err) {
@@ -116,9 +123,10 @@ export function usePlanningWorkspace(projectId: Ref<string>, sprintId: Ref<strin
       return
     const project = projectId.value
     const scope = scopeVersion
+    const contextVersion = request
     await run(async () => {
       const { data } = await planningApi.proposePlan(project, { sprintId: id, budgetMinutes, goal })
-      if (scope !== scopeVersion)
+      if (scope !== scopeVersion || contextVersion !== request)
         return
       proposal.value = data
       selectedTaskIds.value = [...data.taskIds]
@@ -135,6 +143,11 @@ export function usePlanningWorkspace(projectId: Ref<string>, sprintId: Ref<strin
       await refresh(id, scope)
     })
   }
+
+  usePlanningInvalidation(projectId, async () => {
+    proposal.value = null
+    await load()
+  })
 
   watch([projectId, sprintId], () => {
     scopeVersion++

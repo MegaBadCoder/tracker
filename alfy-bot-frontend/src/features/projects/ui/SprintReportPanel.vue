@@ -15,7 +15,7 @@ const error = ref('')
 let request = 0
 const closed = computed(() => sprints.sprintsOf(props.projectId).filter(s => s.status === 'closed').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? '')))
 const outcomeLabels: Record<string, string> = { achieved: 'Цель достигнута', partial: 'Цель достигнута частично', missed: 'Цель не достигнута' }
-const eventLabels: Record<string, string> = { added: 'Добавлена', removed: 'Исключена', completed: 'Выполнена', reopened: 'Открыта снова', deleted: 'Удалена', updated: 'Изменена', moved_in: 'Добавлена', moved_out: 'Перенесена' }
+const eventLabels: Record<string, string> = { added: 'Добавлена', removed: 'Исключена', completed: 'Выполнена', reopened: 'Открыта снова', deleted: 'Удалена', updated: 'Изменена', moved_in: 'Добавлена', moved_out: 'Перенесена', story_added: 'История добавлена', story_removed: 'История исключена', story_status: 'Статус истории изменён', estimate_changed: 'Оценка изменена' }
 watch([() => props.projectId, closed], () => {
   if (!closed.value.some(s => s.id === selectedId.value))
     selectedId.value = closed.value[0]?.id ?? ''

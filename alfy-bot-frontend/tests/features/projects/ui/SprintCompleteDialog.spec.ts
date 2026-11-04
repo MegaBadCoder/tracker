@@ -1,9 +1,10 @@
-import type { Sprint } from '@/features/projects/model/types'
+import type { BoardGroupNode, Sprint } from '@/features/projects/model/types'
 import type { Task } from '@/features/tasks/model/types'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
+import { useGroupStore } from '@/features/projects/model/group-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -79,6 +80,25 @@ describe('sprintCompleteDialog', () => {
 
   afterEach(() => {
     document.body.innerHTML = ''
+  })
+
+  it('задачи открытой истории следуют за ней даже без отдельного выбора направления', async () => {
+    const story = { id: 'story', type: 'story', parentId: 'epic', projectId: 'proj-1', title: 'История', status: 'open', sprintId: 'active', children: [] } as unknown as BoardGroupNode
+    useGroupStore().trees['proj-1'] = [{ id: 'epic', children: [story] } as BoardGroupNode]
+    const complete = vi.spyOn(useSprintStore(), 'completeSprint').mockResolvedValue(undefined)
+    const wrapper = setup([makeSprint(), planned('next', 1)], [{ ...makeTask('child', false), groupId: 'story' }, makeTask('own', false)])
+    await flushPromises()
+    const child = document.querySelector<HTMLSelectElement>('[aria-label="Перенести задачу child"]')!
+    const own = document.querySelector<HTMLSelectElement>('[aria-label="Перенести задачу own"]')!
+    expect(child.disabled).toBe(true)
+    expect(own.disabled).toBe(false)
+    child.value = 'backlog'
+    child.dispatchEvent(new Event('change', { bubbles: true }))
+    own.value = 'backlog'
+    own.dispatchEvent(new Event('change', { bubbles: true }))
+    await click(findButtonByText('Завершить'))
+    expect(complete).toHaveBeenCalledWith('proj-1', 'active', 'next', { taskDestinations: [{ taskId: 'own', sprintId: null }] })
+    wrapper.unmount()
   })
 
   it('сохраняет оценку достижения цели при завершении', async () => {

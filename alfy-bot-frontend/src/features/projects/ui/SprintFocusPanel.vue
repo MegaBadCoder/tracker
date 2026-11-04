@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { PlanningContext } from '../model/planning-types'
 import { Play } from 'lucide-vue-next'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { getTaskTimerState, toTimerTask, useTimerStore } from '@/features/task-timer'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -11,6 +11,7 @@ import { useGroupStore } from '../model/group-store'
 import { useSprintStore } from '../model/sprint-store'
 import { useStoryWorkflowStore } from '../model/story-workflow-store'
 import { useGroupDetail } from '../model/use-group-detail'
+import { usePlanningInvalidation } from '../model/use-planning-invalidation'
 import SprintCapacityBar from './SprintCapacityBar.vue'
 import StoryStatusPicker from './StoryStatusPicker.vue'
 
@@ -30,12 +31,13 @@ const stories = computed(() => groups.groupsOf(props.projectId).flatMap(epic => 
 const activeStories = computed(() => stories.value.filter(story => story.sprintId === sprint.value?.id || context.value?.tasks.some(task => task.groupId === story.id && task.sprintId === sprint.value?.id)))
 const blockedStories = computed(() => activeStories.value.filter(story => story.blockedReason || story.archived || (story.deferredUntil && context.value?.today && story.deferredUntil > context.value.today) || story.dependencyIds?.some(id => stories.value.find(dependency => dependency.id === id)?.status !== 'done')))
 const inProgress = computed(() => activeStories.value.filter(story => workflow.statusesOf(props.projectId).find(status => status.id === story.workflowStatusId)?.category === 'in_progress'))
-const next = computed(() => (context.value?.tasks ?? []).filter(task => task.sprintId === sprint.value?.id && !task.completed && !task.blocked).sort((a, b) => a.order - b.order))
+const blockedStoryIds = computed(() => new Set(blockedStories.value.map(story => story.id)))
+const next = computed(() => (context.value?.tasks ?? []).filter(task => task.sprintId === sprint.value?.id && !task.completed && !task.blocked && (!task.groupId || !blockedStoryIds.value.has(task.groupId))).sort((a, b) => a.order - b.order))
 watch(() => props.projectId, (id) => {
   workflow.ensure(id)
   groups.ensureGroups(id)
 }, { immediate: true })
-watch([() => props.projectId, () => sprint.value?.id, () => tasks.tasks, () => groups.trees[props.projectId]], async () => {
+async function load() {
   const version = ++request
   context.value = null
   error.value = ''
@@ -50,7 +52,9 @@ watch([() => props.projectId, () => sprint.value?.id, () => tasks.tasks, () => g
     if (version === request)
       error.value = apiErrorMessage(err, 'Не удалось загрузить фокус спринта')
   }
-}, { immediate: true })
+}
+watch([() => props.projectId, () => sprint.value?.id], load, { immediate: true })
+usePlanningInvalidation(toRef(props, 'projectId'), load)
 
 function canStart(id: string) {
   const task = tasks.tasks.find(task => task.id === id)
@@ -120,7 +124,17 @@ function start(id: string) {
               {{ story.blockedReason }}
             </p><p v-for="dependency in stories.filter(s => story.dependencyIds?.includes(s.id) && s.status !== 'done')" :key="dependency.id" class="text-xs text-muted-foreground">
               Ожидает: {{ dependency.title }}
-            </p><StoryStatusPicker :story="story" />
+            </p>
+            <p v-if="story.archived" class="text-xs text-muted-foreground">
+              История в архиве
+            </p>
+            <p v-if="story.deferredUntil && context?.today && story.deferredUntil > context.today" class="text-xs text-muted-foreground">
+              Отложена до {{ story.deferredUntil }}
+            </p>
+            <p v-if="story.dependencyIds?.some(id => !stories.some(dependency => dependency.id === id))" class="text-xs text-destructive">
+              Зависимая история удалена. Откройте карточку и пересмотрите зависимость.
+            </p>
+            <StoryStatusPicker :story="story" />
           </article>
         </section>
       </div>

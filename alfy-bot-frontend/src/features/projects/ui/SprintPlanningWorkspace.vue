@@ -109,7 +109,7 @@ const backlogTasks = computed(() => tasksFor(null, true))
 const backlogStories = computed(() => storiesFor(null, true))
 const sprintTasks = computed(() => selectedSprintId.value ? tasksFor(selectedSprintId.value, false) : [])
 const sprintStories = computed(() => selectedSprintId.value ? storiesFor(selectedSprintId.value, false) : [])
-const selectedTasks = computed(() => (context.value?.tasks ?? []).filter(task => selectedTaskIds.value.includes(task.id) || (task.groupId && selectedStoryIds.value.includes(task.groupId))))
+const selectedTasks = computed(() => (context.value?.tasks ?? []).filter(task => selectedTaskIds.value.includes(task.id) || (!task.completed && task.groupId && selectedStoryIds.value.includes(task.groupId))))
 const selectionMinutes = computed(() => selectedTasks.value.reduce((sum, task) => sum + (task.estimateMinutes ?? 0), 0))
 const selectionUnestimated = computed(() => selectedTasks.value.filter(task => task.estimateMinutes === null).length)
 const missingDates = computed(() => unchangedSince.value ? (context.value?.tasks ?? []).filter(t => !t.updatedAt).length : 0)
@@ -189,6 +189,9 @@ function titleOf(id: string) {
         Укажите целое неотрицательное число минут. Резерв не должен превышать бюджет.
       </p>
     </form>
+    <p class="text-xs text-muted-foreground">
+      Истории переносятся с незавершёнными задачами. Выполненные задачи можно выбрать отдельно.
+    </p>
     <div class="sticky top-0 z-10 space-y-2 bg-background/95 py-2 backdrop-blur-sm">
       <SprintCapacityBar v-if="context" :context="context" />
       <div class="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-2">

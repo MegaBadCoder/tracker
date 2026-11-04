@@ -66,7 +66,7 @@ function taskPosition(id: string) {
         </div>
         <ul class="mt-2 space-y-1 pl-6">
           <li v-for="task in tasks.filter(task => task.groupId === story.id)" :key="task.id" class="flex items-center gap-2 rounded-md py-1 hover:bg-muted/40">
-            <input type="checkbox" :checked="taskSelection.includes(task.id)" :disabled="busy || storySelection.includes(story.id)" :aria-label="`Выбрать задачу ${task.title}`" class="size-4 shrink-0 accent-primary" @change="select(task.id, 'task', ($event.target as HTMLInputElement).checked)">
+            <input type="checkbox" :checked="taskSelection.includes(task.id) || (!task.completed && storySelection.includes(story.id))" :disabled="busy || (!task.completed && storySelection.includes(story.id))" :aria-label="`Выбрать задачу ${task.title}`" class="size-4 shrink-0 accent-primary" @change="select(task.id, 'task', ($event.target as HTMLInputElement).checked)">
             <button class="min-w-0 flex-1 truncate text-left text-sm hover:underline" :class="task.completed && 'line-through text-muted-foreground'" @click="emit('openTask', task.id)">
               {{ task.title }}
             </button>

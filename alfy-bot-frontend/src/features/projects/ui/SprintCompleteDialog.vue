@@ -52,6 +52,7 @@ const taskTargets = ref<Record<string, string>>({})
 const storyTargets = ref<Record<string, string>>({})
 const unfinishedTasks = computed(() => taskStore.tasks.filter(task => task.sprintId === props.sprint.id && !task.completed))
 const unfinishedStories = computed(() => groups.groupsOf(props.projectId).flatMap(epic => epic.children).filter(story => story.sprintId === props.sprint.id && story.status !== 'done'))
+const unfinishedStoryIds = computed(() => new Set(unfinishedStories.value.map(story => story.id)))
 
 const moveTo = ref<'backlog' | string>(BACKLOG)
 const submitting = ref(false)
@@ -97,7 +98,7 @@ async function submit() {
       details.improvement = improvement.value.trim()
     if (carryoverReason.value.trim())
       details.carryoverReason = carryoverReason.value.trim()
-    const taskDestinations = Object.entries(taskTargets.value).filter(([id, target]) => typeof target === 'string' && target !== '' && !storyTargets.value[unfinishedTasks.value.find(task => task.id === id)?.groupId ?? '']).map(([taskId, target]) => ({ taskId, sprintId: target === BACKLOG ? null : target }))
+    const taskDestinations = Object.entries(taskTargets.value).filter(([id, target]) => typeof target === 'string' && target !== '' && !unfinishedStoryIds.value.has(unfinishedTasks.value.find(task => task.id === id)?.groupId ?? '')).map(([taskId, target]) => ({ taskId, sprintId: target === BACKLOG ? null : target }))
     const storyDestinations = Object.entries(storyTargets.value).filter(([, target]) => typeof target === 'string' && target !== '').map(([storyId, target]) => ({ storyId, sprintId: target === BACKLOG ? null : target }))
     if (taskDestinations.length)
       details.taskDestinations = taskDestinations
@@ -151,13 +152,18 @@ async function submit() {
       </fieldset>
 
       <details v-if="unfinishedTasks.length || unfinishedStories.length" class="rounded-lg border border-border p-3 text-sm">
-        <summary class="cursor-pointer">Распределить остаток по отдельности</summary>
+        <summary class="cursor-pointer">
+          Распределить остаток по отдельности
+        </summary>
+        <p class="mt-2 text-xs text-muted-foreground">
+          Незавершённые задачи открытой истории переносятся вместе с ней.
+        </p>
         <div class="mt-3 space-y-3">
           <label v-for="story in unfinishedStories" :key="story.id" class="grid gap-1.5 text-xs">История: {{ story.title }}
             <select v-model="storyTargets[story.id]" :aria-label="`Перенести историю ${story.title}`" class="min-h-9 rounded-md border border-input bg-background px-2"><option :value="undefined">По общему правилу</option><option value="backlog">Бэклог</option><option v-for="target in plannedSprints" :key="target.id" :value="target.id">{{ target.name }}</option></select>
           </label>
           <label v-for="task in unfinishedTasks" :key="task.id" class="grid gap-1.5 text-xs">{{ task.title }}
-            <select v-model="taskTargets[task.id]" :disabled="!!task.groupId && !!storyTargets[task.groupId]" :aria-label="`Перенести задачу ${task.title}`" class="min-h-9 rounded-md border border-input bg-background px-2 disabled:opacity-50"><option :value="undefined">Вместе с историей / по общему правилу</option><option value="backlog">Бэклог</option><option v-for="target in plannedSprints" :key="target.id" :value="target.id">{{ target.name }}</option></select>
+            <select v-model="taskTargets[task.id]" :disabled="!!task.groupId && unfinishedStoryIds.has(task.groupId)" :aria-label="`Перенести задачу ${task.title}`" class="min-h-9 rounded-md border border-input bg-background px-2 disabled:opacity-50"><option :value="undefined">Вместе с историей / по общему правилу</option><option value="backlog">Бэклог</option><option v-for="target in plannedSprints" :key="target.id" :value="target.id">{{ target.name }}</option></select>
           </label>
         </div>
       </details>
