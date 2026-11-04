@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Pause, Play, Square } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { Maximize2, Minimize2, PanelTop } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { useSse } from '@/composables/useSse'
 import { useTimerStore } from '../model/timer-store'
+import { useTimerDisplayStore } from '../model/timer-display-store'
+import TimerControls from './TimerControls.vue'
 
 const store = useTimerStore()
-const isFullscreen = ref(false)
+const display = useTimerDisplayStore()
+const { isFullscreen } = storeToRefs(display)
 let wakeLock: WakeLockSentinel | null = null
 
 const formattedTime = computed(() => {
@@ -41,7 +45,7 @@ watch(
   (shouldLock) => shouldLock ? requestWakeLock() : releaseWakeLock()
 )
 
-document.addEventListener('visibilitychange', async () => {
+const handleVisibilityChange = async () => {
   if (document.visibilityState === 'visible') {
     if (store.phase > 0) {
       store.recalcTimeBlock()
@@ -51,9 +55,10 @@ document.addEventListener('visibilitychange', async () => {
       await requestWakeLock()
     }
   }
-})
+}
 
 onMounted(() => {
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   store.restoreSession()
 })
 
@@ -63,6 +68,8 @@ useSse('/events', (event) => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  isFullscreen.value = false
   releaseWakeLock()
 })
 </script>
@@ -75,27 +82,35 @@ onUnmounted(() => {
     leave-to-class="timer-leave-to"
   >
     <div
-      v-if="store.phase > 0"
+      v-if="store.phase > 0 && (!display.isQuiet || isFullscreen)"
       :class="[
         'timer-block z-[1000] pointer-events-auto',
         timerColorClass,
         isFullscreen ? 'timer-fullscreen' : 'timer-compact group'
       ]"
     >
-    <button
+    <Button
       v-if="!isFullscreen"
-      @click="toggleFullscreen"
-      class="absolute top-[5px] left-[5px] z-10 w-5 h-5 bg-muted rounded cursor-pointer transition-all duration-200 opacity-0 group-hover:opacity-100 hover:bg-muted-foreground/20 flex items-center justify-center"
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label="Свернуть таймер в шапку"
+      title="Свернуть в шапку"
+      @click="display.isQuiet = true"
     >
-      <span class="text-muted-foreground text-[10px] leading-none">□</span>
-    </button>
-    <button
+      <PanelTop :size="16" />
+    </Button>
+    <Button
       v-if="isFullscreen"
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label="Выйти из полноэкранного таймера"
       @click="toggleFullscreen"
-      class="absolute z-10 top-4 left-4 text-white hover:opacity-70 cursor-pointer transition-all duration-200"
+      class="absolute z-10 top-4 left-4 text-white"
     >
-      −
-    </button>
+      <Minimize2 :size="20" />
+    </Button>
 
     <div v-if="isFullscreen" class="phase-name">{{ store.namePhase }}</div>
 
@@ -115,21 +130,17 @@ onUnmounted(() => {
       </div>
 
       <div class="flex gap-2 items-center">
+        <TimerControls />
         <Button
-          @click="store.toggleTimer"
-          variant="outline"
+          v-if="!isFullscreen"
+          type="button"
+          variant="ghost"
           size="icon"
+          aria-label="Открыть таймер на весь экран"
+          title="На весь экран"
+          @click="toggleFullscreen"
         >
-          <Play v-if="!store.isActive" :size="16" />
-          <Pause v-else :size="16" />
-        </Button>
-        <Button
-          v-if="store.phase > 0"
-          @click="store.isActive || !store.isStartTimeBlock() ? store.stopTimeBlock(true) : store.resetToInitialState()"
-          variant="outline"
-          size="icon"
-        >
-          <Square :size="16" />
+          <Maximize2 :size="16" />
         </Button>
       </div>
     </div>
@@ -185,12 +196,12 @@ onUnmounted(() => {
 
 /* Light */
 .timer-work.timer-compact {
-  background-color: oklch(0.95 0.03 25);
-  border-color: oklch(0.88 0.05 25);
+  background-color: oklch(0.97 0.008 25);
+  border-color: oklch(0.88 0.02 25);
 }
 
 .timer-work.timer-fullscreen {
-  background-color: oklch(0.18 0.06 25 / 0.96);
+  background-color: oklch(0.18 0.012 25 / 0.96);
 }
 
 /* ── Break phase — soft blue ── */
@@ -207,8 +218,8 @@ onUnmounted(() => {
 
 /* ── Dark mode overrides ── */
 .dark .timer-work.timer-compact {
-  background-color: oklch(0.25 0.06 25);
-  border-color: oklch(0.35 0.08 25);
+  background-color: oklch(0.22 0.012 25);
+  border-color: oklch(0.35 0.025 25);
 }
 
 .dark .timer-break.timer-compact {
