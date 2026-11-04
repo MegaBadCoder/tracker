@@ -3,6 +3,7 @@ import { ArrowLeft, Target, PanelLeftOpen } from 'lucide-vue-next'
 import { inject, ref, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
+import HeaderTimer from '@/features/task-timer/ui/HeaderTimer.vue'
 
 const props = defineProps<{
   title: string
@@ -13,6 +14,7 @@ const props = defineProps<{
 
 const router = useRouter()
 const desktopSidebarCollapsed = inject<Ref<boolean>>('desktopSidebarCollapsed', ref(false))
+const taskTimerAvailable = inject('taskTimerAvailable', false)
 </script>
 
 <template>
@@ -49,6 +51,7 @@ const desktopSidebarCollapsed = inject<Ref<boolean>>('desktopSidebarCollapsed', 
 
       <!-- right slot -->
       <slot name="right" />
+      <HeaderTimer v-if="taskTimerAvailable" />
     </div>
   </header>
 </template>
