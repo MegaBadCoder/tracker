@@ -1,3 +1,4 @@
+import type { SprintCompletion } from './planning';
 import { Sprint } from '../../../shared/entities';
 
 export abstract class SprintRepositoryPort {
@@ -31,6 +32,7 @@ export abstract class SprintRepositoryPort {
   abstract closeAndMoveUnfinished(
     sprintId: string,
     moveToSprintId: string | null,
+    completion?: SprintCompletion,
   ): Promise<void>;
 
   /** Атомарно назначает спринт истории проекта и её задачам вне закрытых спринтов; возвращает число обновлённых задач. */

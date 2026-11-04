@@ -30,6 +30,12 @@ import { ProjectColumnController } from './project-column.controller';
 import { BoardGroupController } from './board-group.controller';
 import { ProjectTaskController } from './project-task.controller';
 import { SprintController } from './sprint.controller';
+import { StoryWorkflowController } from './story-workflow.controller';
+import { StoryWorkflowService } from './story-workflow.service';
+import { PlanningService } from './planning.service';
+import { PlanningController } from './planning.controller';
+import { PlanningRepositoryPort } from './domain/planning-repository.port';
+import { TypeOrmPlanningRepository } from './infrastructure/typeorm-planning.repository';
 import { ReleaseController } from './release.controller';
 
 @Module({
@@ -51,6 +57,8 @@ import { ReleaseController } from './release.controller';
     ProjectTaskController,
     SprintController,
     ReleaseController,
+    StoryWorkflowController,
+    PlanningController,
   ],
   providers: [
     { provide: ProjectRepositoryPort, useClass: TypeOrmProjectRepository },
@@ -73,6 +81,9 @@ import { ReleaseController } from './release.controller';
     ProjectService,
     ProjectColumnService,
     BoardGroupService,
+    StoryWorkflowService,
+    PlanningService,
+    { provide: PlanningRepositoryPort, useClass: TypeOrmPlanningRepository },
     ProjectTaskService,
     SprintService,
     ReleaseService,

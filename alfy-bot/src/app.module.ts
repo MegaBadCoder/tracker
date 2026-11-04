@@ -32,6 +32,8 @@ import {
   ProjectColumn,
   BoardGroup,
   Sprint,
+  SprintEvent,
+  PlanningUndo,
   Release,
   ApiToken,
   Link,
@@ -44,6 +46,7 @@ import { TaskNumberMigrationService } from './shared/database/task-number-migrat
 import { QuestionMigrationService } from './shared/database/question-migration.service';
 import { AuthMethodMigrationService } from './shared/database/auth-method-migration.service';
 import { RecurringSeriesRepairService } from './shared/database/recurring-series-repair.service';
+import { SprintHistoryService } from './shared/database/sprint-history.service';
 import { SharedModule } from './shared/shared.module';
 
 const telegramImports = isTelegramEnabled()
@@ -79,6 +82,8 @@ const telegramImports = isTelegramEnabled()
           ProjectColumn,
           BoardGroup,
           Sprint,
+      SprintEvent,
+      PlanningUndo,
           Release,
           ApiToken,
           Link,
@@ -114,6 +119,7 @@ const telegramImports = isTelegramEnabled()
     AuthMethodMigrationService,
     RecurringSeriesRepairService,
     BoardGroupConstraintsMigrationService,
+    SprintHistoryService,
     ProjectTypeMigrationService,
     TaskNumberMigrationService,
   ],

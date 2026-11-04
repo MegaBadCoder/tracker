@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { SPRINT_HISTORY_TRIGGER_NAMES } from './sprint-history.service';
 
 /**
  * Имена всех триггеров, охраняющих инварианты `board_groups`/`tasks`:
@@ -28,7 +29,7 @@ export const BOARD_GROUP_TRIGGER_NAMES = [
 export async function dropBoardGroupTriggers(
   dataSource: DataSource,
 ): Promise<void> {
-  for (const name of BOARD_GROUP_TRIGGER_NAMES) {
+  for (const name of [...BOARD_GROUP_TRIGGER_NAMES, ...SPRINT_HISTORY_TRIGGER_NAMES]) {
     await dataSource.query(`DROP TRIGGER IF EXISTS ${name}`);
   }
 }

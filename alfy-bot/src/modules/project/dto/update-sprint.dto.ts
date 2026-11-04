@@ -1,4 +1,7 @@
 import {
+  IsInt,
+  Min,
+  Max,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -28,4 +31,22 @@ export class UpdateSprintDto {
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   endDate?: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Доступное время в минутах; null — бюджет не задан',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
+  capacityMinutes?: number | null;
+
+  @ApiPropertyOptional({ description: 'Резерв времени в минутах' })
+  @ValidateIf(
+    (o: { reserveMinutes?: number }) => o.reserveMinutes !== undefined,
+  )
+  @IsInt()
+  @Min(0)
+  @Max(Number.MAX_SAFE_INTEGER)
+  reserveMinutes?: number;
 }

@@ -12,6 +12,10 @@ import {
   Sprint,
   Task,
 } from '../../../shared/entities';
+import { planningSnapshot, type SprintCompletion } from '../domain/planning';
+import { storyWorkflow, normalizeStoryGroup } from '../domain/story-workflow';
+import { mutableSprint } from './planning-access';
+import { completeSprintInTransaction } from './sprint-completion';
 import { SprintRepositoryPort } from '../domain/sprint-repository.port';
 
 @Injectable()
@@ -46,7 +50,43 @@ export class TypeOrmSprintRepository extends SprintRepositoryPort {
   }
 
   async save(sprint: Sprint): Promise<Sprint> {
-    return this.repo.save(sprint);
+    return this.dataSource.transaction(async (manager) => {
+      const current = await manager.findOneByOrFail(Sprint, { id: sprint.id });
+      if (
+        current.status === 'closed' ||
+        (current.status !== sprint.status &&
+          !(current.status === 'planned' && sprint.status === 'active'))
+      )
+        throw new BadRequestException(
+          'Состояние спринта изменилось; обновите данные',
+        );
+      sprint.initialSnapshot = current.initialSnapshot;
+      sprint.finalSnapshot = current.finalSnapshot;
+      sprint.retrospective = current.retrospective;
+      if (current.status === 'planned' && sprint.status === 'active') {
+        const active = await manager.findOneBy(Sprint, {
+          projectId: sprint.projectId,
+          status: 'active',
+        });
+        if (active)
+          throw new BadRequestException('Another sprint is already active');
+        const tasks = await manager.findBy(Task, { sprintId: sprint.id });
+        const stories = await manager.findBy(BoardGroup, {
+          sprintId: sprint.id,
+          type: 'story',
+        });
+        const project = await manager.findOneByOrFail(Project, {
+          id: sprint.projectId,
+        });
+        const statuses = storyWorkflow(project);
+        sprint.initialSnapshot = planningSnapshot(
+          tasks,
+          stories.map((s) => normalizeStoryGroup(s, statuses)),
+          new Date().toISOString(),
+        );
+      }
+      return manager.save(Sprint, sprint);
+    });
   }
 
   async delete(id: string, projectId: string): Promise<boolean> {
@@ -59,23 +99,16 @@ export class TypeOrmSprintRepository extends SprintRepositoryPort {
   async closeAndMoveUnfinished(
     sprintId: string,
     moveToSprintId: string | null,
+    completion: SprintCompletion = {},
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
-      await manager.update(Sprint, sprintId, {
-        status: 'closed',
-        completedAt: new Date(),
-      });
-      await manager.update(
-        Task,
-        { sprintId, completed: false },
-        { sprintId: moveToSprintId },
-      );
-      await manager.update(
-        BoardGroup,
-        { sprintId, status: 'open', type: 'story' },
-        { sprintId: moveToSprintId },
-      );
-    });
+    await this.dataSource.transaction((manager) =>
+      completeSprintInTransaction(
+        manager,
+        sprintId,
+        moveToSprintId,
+        completion,
+      ),
+    );
   }
 
   async setGroupSprint(
@@ -84,6 +117,13 @@ export class TypeOrmSprintRepository extends SprintRepositoryPort {
     sprintId: string | null,
   ): Promise<number> {
     return this.dataSource.transaction(async (manager) => {
+      const group = await manager.findOneBy(BoardGroup, {
+        id: groupId,
+        projectId,
+        type: 'story',
+      });
+      if (!group) throw new BadRequestException('История не найдена в проекте');
+      await mutableSprint(manager, projectId, sprintId);
       const eligible =
         '(sprintId IS NULL OR sprintId NOT IN (SELECT id FROM sprints WHERE status = :closed))';
       await manager

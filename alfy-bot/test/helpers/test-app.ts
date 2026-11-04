@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource, Repository } from 'typeorm';
+import { createSerializedSqliteDataSource } from '../../src/shared/database/serialized-sqlite';
 import { AppModule } from '../../src/app.module';
 import {
   User,
@@ -17,6 +18,8 @@ import {
   ProjectColumn,
   BoardGroup,
   Sprint,
+  SprintEvent,
+  PlanningUndo,
   Release,
   AuthMethod,
   PushSubscription,
@@ -35,7 +38,7 @@ export async function createTestApp(): Promise<TestContext> {
   process.env.BOT_TOKEN = 'test-bot-token';
   process.env.ENABLE_TELEGRAM = 'false';
 
-  const testDataSource = new DataSource({
+  const testDataSource = createSerializedSqliteDataSource({
     type: 'sqlite',
     database: ':memory:',
     entities: [
@@ -51,6 +54,8 @@ export async function createTestApp(): Promise<TestContext> {
       ProjectColumn,
       BoardGroup,
       Sprint,
+      SprintEvent,
+      PlanningUndo,
       Release,
       AuthMethod,
       PushSubscription,

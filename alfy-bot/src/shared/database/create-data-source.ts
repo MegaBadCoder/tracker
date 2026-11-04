@@ -1,4 +1,5 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
+import { createSerializedSqliteDataSource } from './serialized-sqlite';
 import { dropBoardGroupTriggers } from './board-group-constraints.service';
 
 /**
@@ -14,7 +15,8 @@ import { dropBoardGroupTriggers } from './board-group-constraints.service';
 export async function initializeWithSchemaSync(
   options: DataSourceOptions,
 ): Promise<DataSource> {
-  const dataSource = new DataSource({ ...options, synchronize: false });
+  if (options.type !== 'sqlite') throw new Error('Expected SQLite data source');
+  const dataSource = createSerializedSqliteDataSource({ ...options, synchronize: false });
   await dataSource.initialize();
   await dropBoardGroupTriggers(dataSource);
   await dataSource.synchronize();

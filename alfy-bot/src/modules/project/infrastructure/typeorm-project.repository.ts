@@ -82,7 +82,7 @@ export class TypeOrmProjectRepository extends ProjectRepositoryPort {
       const projects = await repository.find({ where: { userId }, order: { order: 'ASC', createdAt: 'DESC' } });
       const updated = transform(projects);
       const previous = new Map(projects.map(project => [project.id, project]));
-      const fields = ['parentId', 'order', 'title', 'description', 'viewMode', 'icon', 'color', 'taskKeyPrefix'] as const;
+      const fields = ['parentId', 'order', 'title', 'description', 'viewMode', 'icon', 'color', 'taskKeyPrefix', 'storyWorkflow'] as const;
       for (const project of updated) {
         const old = previous.get(project.id)!;
         const changes = Object.fromEntries(fields.filter(field => old[field] !== project[field]).map(field => [field, project[field]]));
