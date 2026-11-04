@@ -1,6 +1,6 @@
 # Планирование спринтов и жизненный цикл историй
 
-**Status:** executing
+**Status:** reviewing
 **Branch:** codex/sprint-planning
 **Worktree:** /Users/v/projects/Alfy/.worktrees/sprint-planning
 **Base:** f9af7e8
@@ -88,26 +88,27 @@ Baseline: existing sprint/group unit tests and frontend sprint/backlog tests in 
 
 ## Progress
 - PH1: committed a57ecb0 — workflow и совместимость проверены unit и SQLite HTTP.
-- PH2: committed def8e27 — 732 backend unit и 157 HTTP e2e passed; обнаруженная гонка с обычным сохранением задачи исправляется отдельно.
+- PH2: committed def8e27 — 732 backend unit и 162 HTTP e2e passed; гонка с обычным сохранением задачи исправлена в 29193a4.
 - PH3: committed c932aa3 — 1057 frontend tests passed, build/vue-tsc, браузер desktop и 390px: статусы, перенос/undo, запуск, фокус, закрытие и сохранённые итоги.
 - PH4: 216 MCP tests, build/lint и все 8 новых инструментов на реальном HTTP/SQLite passed.
 
 ## Verify
 
-Result: failed — CK6 в исправлении.
+Result: passed.
 
 - CK1 (IV1/IF1) — чужой проект, некорректные даты, цикл зависимостей и удаление занятого статуса: held, SQLite HTTP regression suites.
 - CK2 (IV2/IV3) — статус истории теряется при переносе/закрытии или автоматически завершается по задачам: held, service/e2e и браузер.
 - CK3 (IV4) — неизвестная оценка становится бесплатной, бюджет удваивает время, выполненные задачи освобождают первоначальный бюджет: held, регрессии + UI контекста.
 - CK4 (IV5) — обычный PATCH или удаление задачи искажает отчёт: held, реальный API полный цикл и immutable snapshots.
 - CK5 (IV6/IF3) — предложение меняет задачи или отмена затирает новую правку: held, HTTP negative cases; MCP client → REST → SQLite, все 8 tools.
-- CK6 (IV6) — обычное устаревшее сохранение отменяет параллельный перенос: broke, gated findById воспроизвёл для title/checklist/board move; требуется исключительный scope от первого чтения до записи.
+- CK6 (IV6) — обычное устаревшее сохранение отменяет параллельный перенос: broke → held после 29193a4; gated findById регрессии для title/checklist/board/overdue и вложенного Pomodoro, исключительный scope от первого чтения до записи.
 - CK7 (IV7) — мобильные элементы недоступны или undo исчезает после обновления: held после исправления unmount и мобильной строки, браузер 390px/desktop и регрессия.
 
 Smoke: локальный сервер + Chrome — настройка «Приёмка», перенос/отмена, запуск, фокус, завершение с ретроспективой и просмотр сохранённого состава; MCP все 8 новых tools прошли на том же API.
-Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-experimental-webstorage из-за существующей коллизии happy-dom/localStorage (8 старых timer tests). Полный backend HTTP suite прошёл 157 tests, но оставил открытый handle Jest; завершение процесса проверяется отдельно.
+Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-experimental-webstorage из-за существующей коллизии happy-dom/localStorage (8 старых timer tests). Полный backend HTTP suite прошёл 162 tests и завершился с exit 0 после app.close() в старом app.e2e. Один промежуточный запрос story-sprint дал socket hang up, отдельный и полный повторные прогоны прошли.
 
 ## Conclusion
+Независимое ревью ожидается; полный API smoke повторён на финальной сборке успешно.
 ### Deviations from plan
 - Setup: baseline backend npm ci failed at f9af7e8 because lockfile iconv-lite 0.7.2 did not satisfy dependency 0.7.3; corrected six lockfile lines and clean install passed (d0f45e1).
 - PH2: reuse serialized SQLite data source helper from existing calendar fix to isolate transaction writes; no calendar functionality included. This is required for atomic planning against concurrent task updates.
@@ -119,3 +120,6 @@ Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-e
 
 - PH2 compatibility: legacy setGroupSprint may reassign a story from a closed sprint while preserving its closed tasks, as required by existing story-sprint.e2e-spec.ts; frozen report snapshots remain unchanged. New bulk planning rejects closed sources.
 - IF3 additive fields: today (user timezone), remainingEffortMinutes and otherProjectsUnestimatedCount make UI dates and unknown workload explicit; historical samples require equal sprint duration.
+
+- uverify: исправлена подтверждённая гонка полного сохранения задачи с planner через repo-port exclusive; покрыты соседние мутации и повторения.
+- uverify: добавлен app.close() в существующий root e2e, чтобы полный прогон освобождал приложение и завершался.
