@@ -51,7 +51,9 @@ async function selectedRows(
     ...new Map(
       [
         ...explicitTasks,
-        ...children.filter((t) => !t.sprintId || !closed.has(t.sprintId)),
+        ...children.filter(
+          (t) => !t.completed && (!t.sprintId || !closed.has(t.sprintId)),
+        ),
       ].map((t) => [t.id, t]),
     ).values(),
   ];
@@ -60,7 +62,7 @@ async function selectedRows(
   return { stories, tasks };
 }
 
-/** Атомарно переносит явный выбор и незакрытые задачи выбранных историй; возвращает одноразовую отмену. */
+/** Атомарно переносит явный выбор и незавершённые задачи выбранных историй вне закрытых спринтов; возвращает одноразовую отмену. */
 export async function movePlanning(
   manager: EntityManager,
   userId: number,

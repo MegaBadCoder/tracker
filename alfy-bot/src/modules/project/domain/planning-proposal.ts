@@ -11,7 +11,7 @@ type Candidate = {
   title: string;
 };
 
-/** Предлагает состав в пределах явного бюджета, включая незавершённые зависимости; неизвестные оценки остаются вне предложения. Записей не выполняет. */
+/** Предлагает незавершённые задачи и зависимости в пределах бюджета с учётом всего текущего состава спринта; неизвестные оценки остаются вне предложения. Записей не выполняет. */
 export function proposePlan(data: PlanningData, input: PlanningProposal) {
   const statuses = storyWorkflow(data.project);
   const existing = data.tasks.filter((t) => t.sprintId === input.sprintId);
@@ -40,7 +40,9 @@ export function proposePlan(data: PlanningData, input: PlanningProposal) {
       story,
       tasks: data.tasks.filter(
         (t) =>
-          t.groupId === story.id && (!t.sprintId || !closed.has(t.sprintId)),
+          t.groupId === story.id &&
+          (!t.completed || t.sprintId === input.sprintId) &&
+          (!t.sprintId || !closed.has(t.sprintId)),
       ),
       order: story.order,
       title: story.title,

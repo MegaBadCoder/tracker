@@ -476,7 +476,7 @@ describe("Планирование и история спринта (SQLite HTTP
     );
   });
 
-  it("предложение оценивает тот же полный набор задач истории, который переносит команда", async () => {
+  it("предложение и перенос истории выбирают только незавершённые задачи, отмена сохраняет выполненные", async () => {
     const s = await sprint();
     const other = await sprint();
     const epic = (await post(`${url()}/groups`, { title: "Эпик" }).expect(201))
@@ -490,26 +490,178 @@ describe("Планирование и история спринта (SQLite HTTP
     await patch(`${url()}/groups/${story.id}`, {
       workflowStatusId: "ready",
     }).expect(200);
-    const done = await task({ groupId: story.id, durationMinutes: 300 });
+    const done = await task({ groupId: story.id, durationMinutes: 90 });
+    const unknownDone = await task({ groupId: story.id });
+    const otherDone = await task({
+      groupId: story.id,
+      sprintId: other.id,
+      durationMinutes: 90,
+    });
+    for (const t of [done, unknownDone, otherDone]) {
+      await patch(`/api/tasks/${t.id}`, { completed: true }).expect(200);
+    }
+    const open = await task({ groupId: story.id, durationMinutes: 10 });
+    const { body: proposal } = await post(`${url()}/planning/proposal`, {
+      sprintId: s.id,
+      budgetMinutes: 10,
+      goal: "",
+    }).expect(201);
+    expect(proposal.storyIds).toEqual([story.id]);
+    expect(proposal.taskIds).toEqual([]);
+    expect(proposal.totalMinutes).toBe(10);
+    expect(proposal.unestimatedIds).not.toContain(unknownDone.id);
+    const { body: move } = await post(`${url()}/planning/move`, {
+      sprintId: s.id,
+      taskIds: proposal.taskIds,
+      storyIds: proposal.storyIds,
+    }).expect(201);
+    expect(move.updated).toBe(1);
+    expect(
+      (await db.getRepository(Task).findOneByOrFail({ id: open.id })).sprintId,
+    ).toBe(s.id);
+    for (const t of [done, unknownDone]) {
+      expect(
+        (await db.getRepository(Task).findOneByOrFail({ id: t.id })).sprintId,
+      ).toBeNull();
+    }
+    expect(
+      (await db.getRepository(Task).findOneByOrFail({ id: otherDone.id }))
+        .sprintId,
+    ).toBe(other.id);
+    await post(`${url()}/planning/undo`, { undoToken: move.undoToken }).expect(
+      201,
+    );
+    expect(
+      (await db.getRepository(Task).findOneByOrFail({ id: open.id })).sprintId,
+    ).toBeNull();
+    expect(
+      (await db.getRepository(BoardGroup).findOneByOrFail({ id: story.id }))
+        .sprintId,
+    ).toBeNull();
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: done.id }),
+    ).toMatchObject({ completed: true, sprintId: null });
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: unknownDone.id }),
+    ).toMatchObject({ completed: true, sprintId: null });
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: otherDone.id }),
+    ).toMatchObject({ completed: true, sprintId: other.id });
+  });
+
+  it("выполненная задача истории в целевом спринте остаётся в бюджете предложения", async () => {
+    const s = await sprint();
+    const epic = (await post(`${url()}/groups`, { title: "Эпик" }).expect(201))
+      .body;
+    const story = (
+      await post(`${url()}/groups`, {
+        title: "История",
+        parentId: epic.id,
+      }).expect(201)
+    ).body;
+    await patch(`${url()}/groups/${story.id}`, {
+      workflowStatusId: "ready",
+    }).expect(200);
+    const done = await task({
+      groupId: story.id,
+      sprintId: s.id,
+      durationMinutes: 90,
+    });
     await patch(`/api/tasks/${done.id}`, { completed: true }).expect(200);
-    await task({ groupId: story.id, durationMinutes: 60 });
-    const small = (
-      await post(`${url()}/planning/proposal`, {
-        sprintId: s.id,
-        budgetMinutes: 60,
-        goal: "",
+    await task({ groupId: story.id, durationMinutes: 10 });
+    const { body: full } = await post(`${url()}/planning/proposal`, {
+      sprintId: s.id,
+      budgetMinutes: 90,
+      goal: "",
+    }).expect(201);
+    expect(full.totalMinutes).toBe(90);
+    expect(full.storyIds).toEqual([]);
+    const { body: available } = await post(`${url()}/planning/proposal`, {
+      sprintId: s.id,
+      budgetMinutes: 100,
+      goal: "",
+    }).expect(201);
+    expect(available.totalMinutes).toBe(100);
+    expect(available.storyIds).toEqual([story.id]);
+    const { body: move } = await post(`${url()}/planning/move`, {
+      sprintId: s.id,
+      taskIds: available.taskIds,
+      storyIds: available.storyIds,
+    }).expect(201);
+    expect(move.updated).toBe(1);
+    await post(`${url()}/planning/undo`, { undoToken: move.undoToken }).expect(
+      201,
+    );
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: done.id }),
+    ).toMatchObject({ completed: true, sprintId: s.id });
+  });
+
+  it("задача, выполненная после предложения, остаётся на месте при переносе истории", async () => {
+    const s = await sprint();
+    const epic = (await post(`${url()}/groups`, { title: "Эпик" }).expect(201))
+      .body;
+    const story = (
+      await post(`${url()}/groups`, {
+        title: "История",
+        parentId: epic.id,
       }).expect(201)
     ).body;
-    expect(small.storyIds).not.toContain(story.id);
-    await patch(`/api/tasks/${done.id}`, { sprintId: other.id }).expect(200);
-    const large = (
-      await post(`${url()}/planning/proposal`, {
-        sprintId: s.id,
-        budgetMinutes: 1000,
-        goal: "",
-      }).expect(201)
-    ).body;
-    expect(large.storyIds).not.toContain(story.id);
+    await patch(`${url()}/groups/${story.id}`, {
+      workflowStatusId: "ready",
+    }).expect(200);
+    const t = await task({ groupId: story.id, durationMinutes: 10 });
+    const { body: proposal } = await post(`${url()}/planning/proposal`, {
+      sprintId: s.id,
+      budgetMinutes: 10,
+      goal: "",
+    }).expect(201);
+    expect(proposal.storyIds).toEqual([story.id]);
+    await patch(`/api/tasks/${t.id}`, { completed: true }).expect(200);
+    const { body: move } = await post(`${url()}/planning/move`, {
+      sprintId: s.id,
+      taskIds: proposal.taskIds,
+      storyIds: proposal.storyIds,
+    }).expect(201);
+    expect(move.updated).toBe(0);
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: t.id }),
+    ).toMatchObject({ completed: true, sprintId: null });
+    expect(
+      (await db.getRepository(BoardGroup).findOneByOrFail({ id: story.id }))
+        .sprintId,
+    ).toBe(s.id);
+    await post(`${url()}/planning/undo`, { undoToken: move.undoToken }).expect(
+      201,
+    );
+    expect(
+      (await db.getRepository(BoardGroup).findOneByOrFail({ id: story.id }))
+        .sprintId,
+    ).toBeNull();
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: t.id }),
+    ).toMatchObject({ completed: true, sprintId: null });
+  });
+
+  it("явный выбор выполненной задачи разрешает её перенос и отмену", async () => {
+    const s = await sprint();
+    const t = await task({ durationMinutes: 90 });
+    await patch(`/api/tasks/${t.id}`, { completed: true }).expect(200);
+    const { body: move } = await post(`${url()}/planning/move`, {
+      sprintId: s.id,
+      taskIds: [t.id],
+      storyIds: [],
+    }).expect(201);
+    expect(move.updated).toBe(1);
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: t.id }),
+    ).toMatchObject({ completed: true, sprintId: s.id });
+    await post(`${url()}/planning/undo`, { undoToken: move.undoToken }).expect(
+      201,
+    );
+    expect(
+      await db.getRepository(Task).findOneByOrFail({ id: t.id }),
+    ).toMatchObject({ completed: true, sprintId: null });
   });
 
   it("повторные переносы в отчёте сохраняют баланс состава", async () => {
@@ -589,22 +741,18 @@ describe("Планирование и история спринта (SQLite HTTP
       const project = await source
         .getRepository("Project")
         .save({ userId: user.id, title: "Restart", type: "agile" });
-      const started = await source
-        .getRepository(Sprint)
-        .save({
-          userId: user.id,
-          projectId: project.id,
-          name: "Restart",
-          status: "active",
-        });
-      await source
-        .getRepository(Task)
-        .save({
-          userId: user.id,
-          projectId: project.id,
-          sprintId: started.id,
-          title: "После старта",
-        });
+      const started = await source.getRepository(Sprint).save({
+        userId: user.id,
+        projectId: project.id,
+        name: "Restart",
+        status: "active",
+      });
+      await source.getRepository(Task).save({
+        userId: user.id,
+        projectId: project.id,
+        sprintId: started.id,
+        title: "После старта",
+      });
       const events: { kind: string }[] = await source.query(
         "SELECT kind FROM sprint_events WHERE sprintId = ?",
         [started.id],
