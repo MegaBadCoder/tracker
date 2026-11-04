@@ -1,6 +1,6 @@
 # Планирование спринтов и жизненный цикл историй
 
-**Status:** reviewing
+**Status:** done
 **Branch:** codex/sprint-planning
 **Worktree:** /Users/v/projects/Alfy/.worktrees/sprint-planning
 **Base:** f9af7e8
@@ -104,14 +104,29 @@ Result: passed — четыре замечания ревью исправлен
 - CK6 (IV6) — обычное устаревшее сохранение отменяет параллельный перенос: broke → held после 29193a4; gated findById регрессии для title/checklist/board/overdue и вложенного Pomodoro, исключительный scope от первого чтения до записи.
 - CK7 (IV7) — мобильные элементы недоступны или undo исчезает после обновления: held после исправления unmount и мобильной строки, браузер 390px/desktop и регрессия.
 
+- CK8 (IV4/IF3) — ready story с done90 + open10 и budget10: held после a79559c; completed вне target остаётся на месте, внутри target занимает бюджет, preview/apply completion и undo проверены HTTP.
+- CK9 (IV7) — внешняя правка/удаление оставляет старый context или поздний proposal: held, регрессии после store action + CUA переименование без reload; selection очищается, undo сохраняется.
+- CK10 (IV7) — архив/отсрочка предлагаются в focus: held, компонентная регрессия и CUA с датой 2026-11-20.
+- CK11 (IF2) — дочерней задаче доступно несовместимое назначение: held, компонентная регрессия и CUA disabled selector при default истории.
+- Финальные проверки после ревью: backend 165 HTTP tests, frontend 1066 tests/build/vue-tsc/lint новых файлов, MCP 216 tests/build/lint; все passed.
+
 Smoke: локальный сервер + Chrome — настройка «Приёмка», перенос/отмена, запуск, фокус, завершение с ретроспективой и просмотр сохранённого состава; MCP все 8 новых tools прошли на том же API.
 Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-experimental-webstorage из-за существующей коллизии happy-dom/localStorage (8 старых timer tests). Полный backend HTTP suite прошёл 165 tests и завершился с exit 0 после app.close() в старом app.e2e. Один промежуточный запрос story-sprint дал socket hang up, отдельный и полный повторные прогоны прошли.
 
 ## Conclusion
-Независимое ревью 399fd50: 4 important, 0 critical; все подтверждены контроллером, исправлены и переданы на повторное ревью.
+Outcome: цель реализована и проверена через локальный UI/API/MCP; повторное независимое ревью 4f1d593 закрыло все четыре замечания, открытых critical/important нет.
+
+Invariants: IV1 — CK1; IV2/IV3 — CK2 и legacy HTTP; IV4 — CK3/CK8; IV5 — CK4 и restart; IV6 — CK5/CK6; IV7 — CK7/CK9–CK11.
+
+Goal validation: истории имеют независимый настраиваемый workflow; планирование показывает оценки и неизвестный объём; массовые переносы/undo проходят через интерфейс; запуск и закрытие сохраняют достоверный состав и ретроспективу; объяснимое предложение читается отдельно от применения через MCP. Наблюдалось на локальной SQLite и Chrome desktop/mobile. Production deployment в этот результат не входит.
+
+Verified by: backend 732 unit + 165 HTTP, frontend 1066, MCP 216 tests; сборки трёх приложений, vue-tsc, scoped lint, два прохода независимого review. Доказательства UI: story-board.jpg, planning-mobile.jpg, focus-verified.jpg в /Users/v/.codex/visualizations/2026/11/04/01a1a794-bc60-7b13-a320-224d1cf0c89f.
+
+
 ### Deviations from plan
 - Setup: baseline backend npm ci failed at f9af7e8 because lockfile iconv-lite 0.7.2 did not satisfy dependency 0.7.3; corrected six lockfile lines and clean install passed (d0f45e1).
 - PH2: reuse serialized SQLite data source helper from existing calendar fix to isolate transaction writes; no calendar functionality included. This is required for atomic planning against concurrent task updates.
+
 ### Hands-off decisions
 - make: весь согласованный объём, включая статусы историй, принят; dedicated worktree от актуального origin/main, чужие незакоммиченные изменения сохранены.
 - udesign: совместимое status + workflowStatusId выбрано для существующих MCP/релизов; AI через уже доступный MCP без нового платного провайдера.
@@ -129,8 +144,4 @@ Notes: frontend suite на Node 25 запускается с NODE_OPTIONS=--no-e
 - ureview: fixed — задавать перенос дочерних задач открытой истории через саму историю, включая общий default.
 - ureview: fixed — proposal и неявный перенос через storyIds включают незавершённые задачи; explicit taskIds остаются осознанным выбором, legacy setGroupSprint не меняется. Выполненное внутри целевого спринта продолжает занимать бюджет.
 
-- CK8 (IV4/IF3) — ready story с done90 + open10 и budget10: held после a79559c; completed вне target остаётся на месте, внутри target занимает бюджет, preview/apply completion и undo проверены HTTP.
-- CK9 (IV7) — внешняя правка/удаление оставляет старый context или поздний proposal: held, регрессии после store action + CUA переименование без reload; selection очищается, undo сохраняется.
-- CK10 (IV7) — архив/отсрочка предлагаются в focus: held, компонентная регрессия и CUA с датой 2026-11-20.
-- CK11 (IF2) — дочерней задаче доступно несовместимое назначение: held, компонентная регрессия и CUA disabled selector при default истории.
-- Финальные проверки после ревью: backend 165 HTTP tests, frontend 1066 tests/build/vue-tsc/lint новых файлов, MCP 216 tests/build/lint; все passed.
+- make: validating → done после прямого полного UI/API цикла и повторного review; результат сохранён локальными коммитами, worktree оставлен для дальнейшего merge/PR.
