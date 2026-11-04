@@ -28,7 +28,25 @@ export type GroupType = 'epic' | 'story'
 
 export type GroupStatus = 'open' | 'done'
 
-export interface BoardGroup {
+export type StoryCategory = 'open' | 'ready' | 'in_progress' | 'review' | 'done'
+
+export interface StoryWorkflowStatus {
+  id: string
+  name: string
+  category: StoryCategory
+  color: string
+}
+
+export interface StoryMetadata {
+  workflowStatusId?: string | null
+  blockedReason?: string | null
+  deferredUntil?: string | null
+  archived?: boolean
+  dependencyIds?: string[]
+}
+
+export interface BoardGroup extends StoryMetadata {
+  updatedAt?: string
   /** Плановый релиз истории; у эпика и незапланированной истории — null. */
   releaseId: string | null
   /** Назначенный спринт истории; у эпика и истории в бэклоге — null. */
@@ -60,7 +78,7 @@ export interface CreateGroupPayload {
   dueDate?: string | null
 }
 
-export type UpdateGroupPayload = Partial<CreateGroupPayload> & {
+export type UpdateGroupPayload = Partial<CreateGroupPayload> & StoryMetadata & {
   status?: GroupStatus
 }
 
@@ -87,6 +105,8 @@ export type SprintStatus = 'planned' | 'active' | 'closed'
 
 /** Спринт agile-проекта. Даты — `YYYY-MM-DD` (локальный календарный день), `null` пока спринт не запущен. */
 export interface Sprint {
+  capacityMinutes?: number | null
+  reserveMinutes?: number
   id: string
   userId: number
   projectId: string
@@ -103,11 +123,15 @@ export interface Sprint {
 
 /** Без `name` сервер называет спринт «Спринт N». */
 export interface CreateSprintPayload {
+  capacityMinutes?: number | null
+  reserveMinutes?: number
   name?: string
   goal?: string | null
 }
 
 export interface UpdateSprintPayload {
+  capacityMinutes?: number | null
+  reserveMinutes?: number
   name?: string
   goal?: string | null
   startDate?: string | null
@@ -124,6 +148,12 @@ export interface StartSprintPayload {
 /** Завершение спринта: `moveTo` — `'backlog'` или id запланированного спринта, куда уходят незавершённые задачи. */
 export interface CompleteSprintPayload {
   moveTo: 'backlog' | string
+  goalOutcome?: 'achieved' | 'partial' | 'missed'
+  retrospective?: string
+  improvement?: string
+  carryoverReason?: string
+  taskDestinations?: { taskId: string, sprintId: string | null }[]
+  storyDestinations?: { storyId: string, sprintId: string | null }[]
 }
 
 /** Статус релиза: `planned` — запланирован, `released` — выпущен (только чтение). */

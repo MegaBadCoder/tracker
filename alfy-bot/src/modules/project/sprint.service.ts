@@ -21,6 +21,19 @@ export class SprintService {
     private readonly groupRepo: BoardGroupRepositoryPort,
   ) {}
 
+  private assertCapacity(capacity: number | null, reserve: number): void {
+    if (
+      !Number.isSafeInteger(reserve) ||
+      reserve < 0 ||
+      (capacity !== null &&
+        (!Number.isSafeInteger(capacity) || capacity < reserve))
+    ) {
+      throw new BadRequestException(
+        'Резерв не может превышать доступное время',
+      );
+    }
+  }
+
   private assertDateOrder(
     startDate: string | null,
     endDate: string | null,
@@ -68,6 +81,7 @@ export class SprintService {
   ): Promise<Sprint> {
     await this.validateProjectAccess(userId, projectId);
 
+    this.assertCapacity(dto.capacityMinutes ?? null, dto.reserveMinutes ?? 0);
     const existing = await this.sprintRepo.findAllByProject(projectId);
     const openOrders = existing
       .filter((s) => s.status !== 'closed')
@@ -78,6 +92,8 @@ export class SprintService {
       projectId,
       name: dto.name ?? `Спринт ${existing.length + 1}`,
       goal: dto.goal ?? null,
+      capacityMinutes: dto.capacityMinutes ?? null,
+      reserveMinutes: dto.reserveMinutes ?? 0,
       order: openOrders.length ? Math.max(...openOrders) + 1 : 0,
     });
   }
@@ -108,6 +124,14 @@ export class SprintService {
     sprint.endDate = endDate;
     if (dto.name !== undefined) sprint.name = dto.name;
     if (dto.goal !== undefined) sprint.goal = dto.goal;
+    if (dto.capacityMinutes !== undefined)
+      sprint.capacityMinutes = dto.capacityMinutes;
+    if (dto.reserveMinutes !== undefined)
+      sprint.reserveMinutes = dto.reserveMinutes;
+    this.assertCapacity(
+      sprint.capacityMinutes ?? null,
+      sprint.reserveMinutes ?? 0,
+    );
 
     return this.sprintRepo.save(sprint);
   }
@@ -174,7 +198,11 @@ export class SprintService {
       moveToSprintId = target.id;
     }
 
-    await this.sprintRepo.closeAndMoveUnfinished(id, moveToSprintId);
+    if (Object.keys(dto).some((key) => key !== 'moveTo')) {
+      await this.sprintRepo.closeAndMoveUnfinished(id, moveToSprintId, dto);
+    } else {
+      await this.sprintRepo.closeAndMoveUnfinished(id, moveToSprintId);
+    }
     return this.getSprint(id, projectId);
   }
 

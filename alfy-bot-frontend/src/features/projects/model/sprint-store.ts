@@ -1,4 +1,4 @@
-import type { CreateSprintPayload, Sprint, StartSprintPayload, UpdateSprintPayload } from './types'
+import type { CompleteSprintPayload, CreateSprintPayload, Sprint, StartSprintPayload, UpdateSprintPayload } from './types'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useTaskStore } from '@/features/tasks/model/task-store'
@@ -195,7 +195,7 @@ export const useSprintStore = defineStore('sprints', () => {
    * незавершённые задачи; после успеха API им локально выставляется
    * `sprintId` (`'backlog'` → `null`), выполненные задачи остаются в спринте.
    */
-  const completeSprint = async (projectId: string, id: string, moveTo: 'backlog' | string) => {
+  const completeSprint = async (projectId: string, id: string, moveTo: 'backlog' | string, details?: Omit<CompleteSprintPayload, 'moveTo'>) => {
     const previous = sprintsOf(projectId)
     if (!previous.some(s => s.id === id))
       return
@@ -204,7 +204,7 @@ export const useSprintStore = defineStore('sprints', () => {
 
     let data: Sprint
     try {
-      ({ data } = await sprintsApi.completeSprint(projectId, id, { moveTo }))
+      ({ data } = await sprintsApi.completeSprint(projectId, id, { moveTo, ...details }))
     }
     catch (err) {
       lists.value[projectId] = previous

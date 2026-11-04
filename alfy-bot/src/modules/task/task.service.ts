@@ -79,6 +79,13 @@ export class TaskService {
   }
 
   async create(userId: number, dto: CreateTaskDto): Promise<Task> {
+    return this.taskRepo.exclusive(() => this.createInUnit(userId, dto));
+  }
+
+  private async createInUnit(
+    userId: number,
+    dto: CreateTaskDto,
+  ): Promise<Task> {
     const {
       isPomodoroTask,
       pomodoroCount,
@@ -162,6 +169,16 @@ export class TaskService {
     sourceId: string,
     dto: MaterializeOccurrenceDto,
   ): Promise<Task> {
+    return this.taskRepo.exclusive(() =>
+      this.materializeOccurrenceInUnit(userId, sourceId, dto),
+    );
+  }
+
+  private async materializeOccurrenceInUnit(
+    userId: number,
+    sourceId: string,
+    dto: MaterializeOccurrenceDto,
+  ): Promise<Task> {
     if (sourceId.includes('__virtual__')) {
       throw new BadRequestException(
         'Virtual task instances cannot be modified directly.',
@@ -239,6 +256,14 @@ export class TaskService {
   }
 
   async update(
+    userId: number,
+    id: string,
+    dto: UpdateTaskDto,
+  ): Promise<UpdateTaskResponse> {
+    return this.taskRepo.exclusive(() => this.updateInUnit(userId, id, dto));
+  }
+
+  private async updateInUnit(
     userId: number,
     id: string,
     dto: UpdateTaskDto,
@@ -549,6 +574,16 @@ export class TaskService {
     taskId: string,
     dto: UpdatePomodoroConfigDto | null,
   ): Promise<Task> {
+    return this.taskRepo.exclusive(() =>
+      this.updatePomodoroConfigInUnit(userId, taskId, dto),
+    );
+  }
+
+  private async updatePomodoroConfigInUnit(
+    userId: number,
+    taskId: string,
+    dto: UpdatePomodoroConfigDto | null,
+  ): Promise<Task> {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
     return this.attachGoalIdsOne(
@@ -562,6 +597,16 @@ export class TaskService {
     taskId: string,
     dto: UpdateChecklistDto,
   ): Promise<Task> {
+    return this.taskRepo.exclusive(() =>
+      this.updateChecklistInUnit(userId, taskId, dto),
+    );
+  }
+
+  private async updateChecklistInUnit(
+    userId: number,
+    taskId: string,
+    dto: UpdateChecklistDto,
+  ): Promise<Task> {
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
     return this.attachGoalIdsOne(
@@ -571,6 +616,16 @@ export class TaskService {
   }
 
   async incrementPomodoro(
+    userId: number,
+    taskId: string,
+    increment: number,
+  ): Promise<UpdateTaskResponse> {
+    return this.taskRepo.exclusive(() =>
+      this.incrementPomodoroInUnit(userId, taskId, increment),
+    );
+  }
+
+  private async incrementPomodoroInUnit(
     userId: number,
     taskId: string,
     increment: number,
@@ -604,6 +659,13 @@ export class TaskService {
   }
 
   async delete(userId: number, id: string): Promise<DeleteTaskResponse> {
+    return this.taskRepo.exclusive(() => this.deleteInUnit(userId, id));
+  }
+
+  private async deleteInUnit(
+    userId: number,
+    id: string,
+  ): Promise<DeleteTaskResponse> {
     const task = await this.taskRepo.findById(id, userId);
 
     if (task && (task.recurrence || task.recurringParentId)) {
@@ -664,6 +726,15 @@ export class TaskService {
     userId: number,
     dto: ReorderInboxTasksDto,
   ): Promise<{ ok: true; orderedIds: string[] }> {
+    return this.taskRepo.exclusive(() =>
+      this.reorderInboxTasksInUnit(userId, dto),
+    );
+  }
+
+  private async reorderInboxTasksInUnit(
+    userId: number,
+    dto: ReorderInboxTasksDto,
+  ): Promise<{ ok: true; orderedIds: string[] }> {
     for (const id of dto.orderedIds) {
       const task = await this.taskRepo.findById(id, userId);
       if (!task) throw new NotFoundException(`Task #${id} not found`);
@@ -678,6 +749,16 @@ export class TaskService {
   }
 
   async moveToInbox(
+    userId: number,
+    taskId: string,
+    dto: MoveTaskToInboxDto,
+  ): Promise<Task> {
+    return this.taskRepo.exclusive(() =>
+      this.moveToInboxInUnit(userId, taskId, dto),
+    );
+  }
+
+  private async moveToInboxInUnit(
     userId: number,
     taskId: string,
     dto: MoveTaskToInboxDto,
@@ -722,6 +803,16 @@ export class TaskService {
     taskId: string,
     goalIds: number[],
   ): Promise<{ goalIds: number[] }> {
+    return this.taskRepo.exclusive(() =>
+      this.replaceGoalLinksInUnit(userId, taskId, goalIds),
+    );
+  }
+
+  private async replaceGoalLinksInUnit(
+    userId: number,
+    taskId: string,
+    goalIds: number[],
+  ): Promise<{ goalIds: number[] }> {
     this.assertNotVirtual(taskId);
     const task = await this.taskRepo.findById(taskId, userId);
     if (!task) throw new NotFoundException(`Task #${taskId} not found`);
@@ -742,6 +833,16 @@ export class TaskService {
   }
 
   async replaceTaskLinksForGoal(
+    userId: number,
+    goalId: number,
+    taskIds: string[],
+  ): Promise<{ taskIds: string[] }> {
+    return this.taskRepo.exclusive(() =>
+      this.replaceTaskLinksForGoalInUnit(userId, goalId, taskIds),
+    );
+  }
+
+  private async replaceTaskLinksForGoalInUnit(
     userId: number,
     goalId: number,
     taskIds: string[],

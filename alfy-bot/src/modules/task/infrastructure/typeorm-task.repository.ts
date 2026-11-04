@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
+import { withSqliteAccess } from '../../../shared/database/serialized-sqlite';
 import { Task, PomodoroConfig } from '../../../shared/entities';
 import {
   TaskRepositoryPort,
@@ -16,6 +17,10 @@ export class TypeOrmTaskRepository extends TaskRepositoryPort {
     private pomodoroRepo: Repository<PomodoroConfig>,
   ) {
     super();
+  }
+
+  exclusive<T>(work: () => Promise<T>): Promise<T> {
+    return withSqliteAccess(this.taskRepo.manager.connection, work);
   }
 
   async findAllByUser(userId: number): Promise<Task[]> {

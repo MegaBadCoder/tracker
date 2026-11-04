@@ -130,6 +130,38 @@ describe('projectBacklogView', () => {
     vi.clearAllMocks()
   })
 
+  it('передаёт полный бюджет предложения без повторного вычитания текущих задач', async () => {
+    const sprint = makeSprint({ capacityMinutes: 120, reserveMinutes: 20, goal: 'Оплата' })
+    const wrapper = await mountView([sprint], [])
+    const context = { sprintId: sprint.id, capacityMinutes: 120, reserveMinutes: 20, plannedMinutes: 60, remainingMinutes: 40, unestimatedCount: 0, otherProjectsMinutes: 0, historicalCapacityMinutes: null, historySampleCount: 0, tasks: [], stories: [], carryoverCounts: {} }
+    vi.mocked(api.get).mockImplementation(async url => ({ data: String(url).includes('/planning') ? context : { statuses: [] } }) as never)
+    vi.mocked(api.post).mockResolvedValue({ data: { taskIds: [], storyIds: [], totalMinutes: 60, unestimatedIds: [], excluded: [], reasons: [] } })
+    await wrapper.findAll('button').find(button => button.text() === 'Планирование')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Предложить план')!.trigger('click')
+    await flushPromises()
+    expect(api.post).toHaveBeenCalledWith('/projects/proj-1/planning/proposal', { sprintId: sprint.id, budgetMinutes: 100, goal: 'Оплата' })
+    expect(wrapper.text()).toContain('Предложение готово')
+    wrapper.unmount()
+  })
+
+  it('сохраняет отмену переноса при фоновом обновлении спринтов', async () => {
+    const sprint = makeSprint()
+    const task = rawTask()
+    const wrapper = await mountView([sprint], [task])
+    const context = { sprintId: sprint.id, capacityMinutes: 120, reserveMinutes: 0, plannedMinutes: 0, remainingMinutes: 120, unestimatedCount: 0, otherProjectsMinutes: 0, historicalCapacityMinutes: null, historySampleCount: 0, tasks: [{ ...task, estimateMinutes: 30, blocked: false }], stories: [], carryoverCounts: {} }
+    vi.mocked(api.get).mockImplementation(async url => ({ data: String(url).includes('/planning') ? context : String(url).includes('/story-workflow') ? { statuses: [] } : String(url).includes('/sprints') ? [sprint] : [task] }) as never)
+    vi.mocked(api.post).mockResolvedValue({ data: { updated: 1, undoToken: 'undo-token' } })
+    await wrapper.findAll('button').find(button => button.text() === 'Планирование')!.trigger('click')
+    await flushPromises()
+    await wrapper.get('input[aria-label="Выбрать задачу Задача"]').setValue(true)
+    await wrapper.findAll('button').find(button => button.text() === 'В выбранный спринт')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('button').some(button => button.text() === 'Отменить перенос')).toBe(true)
+    expect(wrapper.text()).toContain('Перенос сохранён')
+    wrapper.unmount()
+  })
+
   it('рендерит блоки в порядке: активный спринт, запланированные по order, бэклог', async () => {
     const wrapper = await mountView([
       makeSprint({ id: 'planned-2', name: 'Позже', status: 'planned', order: 2, startDate: null, endDate: null }),

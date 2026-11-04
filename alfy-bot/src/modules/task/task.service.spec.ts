@@ -70,6 +70,7 @@ describe('TaskService', () => {
 
   beforeEach(async () => {
     repo = {
+      exclusive: jest.fn((work: () => Promise<unknown>) => work()),
       findAllByUser: jest.fn().mockResolvedValue([]),
       findById: jest.fn().mockResolvedValue(null),
       findByIds: jest.fn().mockResolvedValue([]),

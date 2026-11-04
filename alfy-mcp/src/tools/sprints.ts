@@ -24,6 +24,8 @@ export function registerSprintTools(server: McpServer, client: AlfyRestClient): 
       projectId,
       name: z.string().min(1).optional().describe('Имя спринта'),
       goal: z.string().optional().describe('Цель спринта'),
+      capacityMinutes: z.number().int().nonnegative().nullable().optional().describe('Бюджет времени в минутах или null'),
+      reserveMinutes: z.number().int().nonnegative().optional().describe('Резерв времени в минутах'),
     },
   }, async ({ projectId, ...body }) => toText(await client.post(`/projects/${projectId}/sprints`, body)));
 
@@ -35,6 +37,8 @@ export function registerSprintTools(server: McpServer, client: AlfyRestClient): 
       goal: z.string().nullable().optional().describe('Цель или null для очистки'),
       startDate: date.nullable().optional(),
       endDate: date.nullable().optional(),
+      capacityMinutes: z.number().int().nonnegative().nullable().optional().describe('Бюджет времени в минутах или null'),
+      reserveMinutes: z.number().int().nonnegative().optional().describe('Резерв времени в минутах'),
     },
   }, async ({ projectId, id, ...body }) => toText(await client.patch(`/projects/${projectId}/sprints/${id}`, body)));
 
@@ -48,8 +52,14 @@ export function registerSprintTools(server: McpServer, client: AlfyRestClient): 
     inputSchema: {
       projectId, id,
       moveTo: z.union([z.literal('backlog'), z.string().uuid()]).describe('backlog или UUID запланированного спринта этого проекта'),
+      goalOutcome: z.enum(['achieved', 'partial', 'missed']).optional().describe('Достигнута ли цель спринта'),
+      retrospective: z.string().optional().describe('Выводы по завершённому спринту'),
+      improvement: z.string().optional().describe('Что изменить в следующем спринте'),
+      carryoverReason: z.string().optional().describe('Причина переноса остатка'),
+      taskDestinations: z.array(z.object({ taskId: z.string().uuid(), sprintId: z.string().uuid().nullable() })).optional(),
+      storyDestinations: z.array(z.object({ storyId: z.string().uuid(), sprintId: z.string().uuid().nullable() })).optional(),
     },
-  }, async ({ projectId, id, moveTo }) => toText(await client.post(`/projects/${projectId}/sprints/${id}/complete`, { moveTo })));
+  }, async ({ projectId, id, ...body }) => toText(await client.post(`/projects/${projectId}/sprints/${id}/complete`, body)));
 
   server.registerTool('delete_sprint', {
     description: 'Удалить спринт при confirm=true. Его задачи и истории сохраняются, назначение спринта очищается.',

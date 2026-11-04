@@ -5,6 +5,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { BoardGroupService } from './board-group.service';
+import { UpdateGroupDto } from './dto/update-group.dto';
+import { StoryWorkflowService } from './story-workflow.service';
 import { BoardGroupRepositoryPort } from './domain/board-group-repository.port';
 import { ProjectRepositoryPort } from './domain/project-repository.port';
 import { BoardGroup, Project } from '../../shared/entities';
@@ -84,6 +86,7 @@ describe('BoardGroupService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BoardGroupService,
+        StoryWorkflowService,
         { provide: BoardGroupRepositoryPort, useValue: groupRepo },
         { provide: ProjectRepositoryPort, useValue: projRepo },
       ],
@@ -533,5 +536,110 @@ describe('BoardGroupService', () => {
         expect(groupRepo.reorder).not.toHaveBeenCalled();
       },
     );
+  });
+  describe('жизненный цикл истории', () => {
+    beforeEach(() => {
+      projRepo.findById.mockResolvedValue(makeProject({ type: 'agile' }));
+      const story = makeGroup({ id: 'story', type: 'story', parentId: 'epic' });
+      groupRepo.findById.mockResolvedValue(story);
+      groupRepo.findAllByProject.mockResolvedValue([story]);
+    });
+
+    it('переводит историю в работу без изменения совместимого open', async () => {
+      const result = await service.update(1, 'proj-1', 'story', {
+        workflowStatusId: 'in_progress',
+      } as UpdateGroupDto);
+      expect(result).toMatchObject({
+        workflowStatusId: 'in_progress',
+        status: 'open',
+        completedAt: null,
+      });
+    });
+
+    it('принимает результат только при выборе выполненного статуса', async () => {
+      const result = await service.update(1, 'proj-1', 'story', {
+        workflowStatusId: 'done',
+      } as UpdateGroupDto);
+      expect(result).toMatchObject({
+        workflowStatusId: 'done',
+        status: 'done',
+      });
+      expect(result.completedAt).toBeInstanceOf(Date);
+    });
+
+    it('отклоняет отсутствующий в каталоге статус до записи', async () => {
+      await expect(
+        service.update(1, 'proj-1', 'story', {
+          workflowStatusId: 'missing',
+        } as UpdateGroupDto),
+      ).rejects.toThrow(BadRequestException);
+      expect(groupRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('сохраняет блокировку, архив и дату отдельно от статуса', async () => {
+      const result = await service.update(1, 'proj-1', 'story', {
+        blockedReason: 'Ждём доступ',
+        archived: true,
+        deferredUntil: '2026-11-15',
+      } as UpdateGroupDto);
+      expect(result).toMatchObject({
+        blockedReason: 'Ждём доступ',
+        archived: true,
+        deferredUntil: '2026-11-15',
+        status: 'open',
+      });
+    });
+
+    it('отклоняет зависимость истории от самой себя', async () => {
+      await expect(
+        service.update(1, 'proj-1', 'story', {
+          dependencyIds: ['story'],
+        } as UpdateGroupDto),
+      ).rejects.toThrow(BadRequestException);
+      expect(groupRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('отклоняет зависимость от истории другого проекта', async () => {
+      await expect(
+        service.update(1, 'proj-1', 'story', {
+          dependencyIds: ['foreign'],
+        } as UpdateGroupDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('не выдумывает дату выполнения старой истории при изменении описания', async () => {
+      groupRepo.findById.mockResolvedValue(
+        makeGroup({
+          id: 'story',
+          type: 'story',
+          parentId: 'epic',
+          status: 'done',
+          completedAt: null,
+        }),
+      );
+      const result = await service.update(1, 'proj-1', 'story', {
+        description: 'Уточнение',
+      });
+      expect(result.completedAt).toBeNull();
+    });
+
+    it('нормализует старую выполненную историю без изменения базы при чтении', async () => {
+      groupRepo.findAllByProject.mockResolvedValue([
+        makeGroup({ id: 'epic' }),
+        makeGroup({
+          id: 'story',
+          type: 'story',
+          parentId: 'epic',
+          status: 'done',
+        }),
+      ]);
+      const tree = await service.getTree(1, 'proj-1');
+      expect(tree[0].children[0]).toMatchObject({
+        workflowStatusId: 'done',
+        dependencyIds: [],
+        archived: false,
+      });
+      expect(groupRepo.save).not.toHaveBeenCalled();
+    });
   });
 });

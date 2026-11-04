@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BoardGroup } from '../../../shared/entities';
@@ -34,7 +38,33 @@ export class TypeOrmBoardGroupRepository extends BoardGroupRepositoryPort {
   }
 
   async save(group: BoardGroup): Promise<BoardGroup> {
-    return this.repo.save(group);
+    const fields = [
+      'parentId',
+      'type',
+      'title',
+      'description',
+      'color',
+      'startDate',
+      'dueDate',
+      'status',
+      'completedAt',
+      'workflowStatusId',
+      'blockedReason',
+      'deferredUntil',
+      'archived',
+      'dependencyIds',
+    ] as const;
+    const changes = Object.fromEntries(
+      fields.map((field) => [field, group[field]]),
+    );
+    const result = await this.repo.update(
+      { id: group.id, projectId: group.projectId },
+      changes,
+    );
+    if (result.affected !== 1) throw new NotFoundException('Группа не найдена');
+    const saved = await this.findById(group.id, group.projectId);
+    if (!saved) throw new NotFoundException('Группа не найдена');
+    return saved;
   }
 
   async delete(id: string, projectId: string): Promise<boolean> {

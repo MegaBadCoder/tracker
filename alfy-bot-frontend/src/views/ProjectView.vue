@@ -18,6 +18,8 @@ import GroupedListView from '@/features/projects/ui/GroupedListView.vue'
 import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
 import SprintBanner from '@/features/projects/ui/SprintBanner.vue'
 import SprintCompleteDialog from '@/features/projects/ui/SprintCompleteDialog.vue'
+import SprintFocusPanel from '@/features/projects/ui/SprintFocusPanel.vue'
+import StoryBoardView from '@/features/projects/ui/StoryBoardView.vue'
 import ViewModeToggle from '@/features/projects/ui/ViewModeToggle.vue'
 import { useReorderList } from '@/features/tasks/lib/dnd/use-reorder-list'
 import { useTaskDnd } from '@/features/tasks/lib/dnd/use-task-dnd'
@@ -48,11 +50,12 @@ const columns = computed(() => columnStore.columns)
 const sprintStore = useSprintStore()
 const activeSprint = computed(() => sprintStore.activeSprintOf(projectId.value))
 const sprintsPending = computed(() =>
-  sprintStore.isLoading(projectId.value)
-  || (!(projectId.value in sprintStore.lists) && !sprintStore.error),
+  !(projectId.value in sprintStore.lists)
+  && (sprintStore.isLoading(projectId.value) || !sprintStore.error),
 )
 
 const completeTarget = ref<Sprint | null>(null)
+const agileMode = ref<'tasks' | 'stories' | 'focus'>('tasks')
 
 const taskFormRef = ref<InstanceType<typeof TaskForm> | null>(null)
 const isCreatingTask = ref(false)
@@ -89,6 +92,12 @@ const {
   handleUpdatePomodoroConfig,
   handleDeleteFromDialog,
 } = useTaskDetailHandlers(taskStore, confirm)
+
+function openTaskById(id: string) {
+  const task = taskStore.tasks.find(task => task.id === id)
+  if (task)
+    handleOpenTask(task)
+}
 
 const dnd = useTaskDnd()
 const draggedId = computed(() => dnd.state.active?.task.id ?? null)
@@ -266,7 +275,13 @@ watch([projectId, isAgileProject], ([id, isAgile]) => {
         </div>
 
         <main class="flex-1 min-h-0 px-4 pb-4">
+          <div class="mb-4 flex flex-wrap gap-1" role="group" aria-label="Режим доски">
+            <Button v-for="mode in [{ id: 'tasks' as const, label: 'Задачи' }, { id: 'stories' as const, label: 'Истории' }, { id: 'focus' as const, label: 'Фокус' }]" :key="mode.id" size="sm" :variant="agileMode === mode.id ? 'secondary' : 'ghost'" :aria-pressed="agileMode === mode.id" @click="agileMode = mode.id">{{ mode.label }}</Button>
+          </div>
+          <StoryBoardView v-if="agileMode === 'stories'" :project-id="projectId" :sprint-id="activeSprint.id" :show-completed="showCompleted" />
+          <SprintFocusPanel v-else-if="agileMode === 'focus'" :project-id="projectId" @open-task="openTaskById" />
           <AgileBoardView
+            v-else
             :project-id="projectId"
             :show-completed="showCompleted"
             :hide-overdue="hideOverdue"

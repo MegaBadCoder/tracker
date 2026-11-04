@@ -16,3 +16,6 @@ export { ApiToken } from './api-token.entity';
 export { Link } from './link.entity';
 export { Sprint } from './sprint.entity';
 export { Release } from './release.entity';
+
+export { SprintEvent } from './sprint-event.entity';
+export { PlanningUndo } from './planning-undo.entity';

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Sprint } from '../model/types'
+import type { Sprint, UpdateSprintPayload } from '../model/types'
 import { CalendarIcon, X } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
@@ -48,6 +48,9 @@ const sprintStore = useSprintStore()
 
 const name = ref('')
 const goal = ref('')
+const capacity = ref<number | string>('')
+const reserve = ref<number | string>(0)
+const budgetInvalid = computed(() => (capacity.value !== '' && (!Number.isInteger(Number(capacity.value)) || Number(capacity.value) < 0)) || !Number.isInteger(Number(reserve.value)) || Number(reserve.value) < 0 || (capacity.value !== '' && Number(reserve.value) > Number(capacity.value)))
 const weeks = ref<Weeks | 'custom'>(DEFAULT_WEEKS)
 const startDate = ref<Date | undefined>()
 const endDate = ref<Date | undefined>()
@@ -68,12 +71,14 @@ const datesInvalid = computed(() =>
 )
 const startDatesMissing = computed(() => isStart.value && (!startDate.value || !endDate.value))
 const canSubmit = computed(() =>
-  name.value.trim().length > 0 && !datesInvalid.value && !startDatesMissing.value && !submitting.value,
+  name.value.trim().length > 0 && !datesInvalid.value && !startDatesMissing.value && !submitting.value && !budgetInvalid.value,
 )
 
 function resetForm() {
   name.value = props.sprint.name
   goal.value = props.sprint.goal ?? ''
+  capacity.value = props.sprint.capacityMinutes ?? ''
+  reserve.value = props.sprint.reserveMinutes ?? 0
   errorMessage.value = null
   submitting.value = false
 
@@ -124,8 +129,11 @@ function isoOrNull(date: Date | undefined): string | null {
 
 async function saveStart() {
   const newName = name.value.trim()
+  const changes: UpdateSprintPayload = budgetChanges()
   if (newName !== props.sprint.name)
-    await sprintStore.updateSprint(props.projectId, props.sprint.id, { name: newName })
+    changes.name = newName
+  if (Object.keys(changes).length)
+    await sprintStore.updateSprint(props.projectId, props.sprint.id, changes)
   await sprintStore.startSprint(props.projectId, props.sprint.id, {
     startDate: toLocalISODate(startDate.value!),
     endDate: toLocalISODate(endDate.value!),
@@ -133,8 +141,17 @@ async function saveStart() {
   })
 }
 
+function budgetChanges(): UpdateSprintPayload {
+  const capacityMinutes = capacity.value === '' ? null : Number(capacity.value)
+  const reserveMinutes = Number(reserve.value)
+  return {
+    ...(capacityMinutes !== (props.sprint.capacityMinutes ?? null) ? { capacityMinutes } : {}),
+    ...(reserveMinutes !== (props.sprint.reserveMinutes ?? 0) ? { reserveMinutes } : {}),
+  }
+}
+
 async function saveEdit() {
-  const payload: { name?: string, goal?: string | null, startDate?: string | null, endDate?: string | null } = {}
+  const payload: UpdateSprintPayload = budgetChanges()
   const newName = name.value.trim()
   const newGoal = goal.value.trim() || null
   const newStart = isoOrNull(startDate.value)
@@ -194,6 +211,9 @@ async function submit() {
           Цель
           <Textarea v-model="goal" placeholder="Чего хотим достичь" class="min-h-20 text-sm" aria-label="Цель спринта" />
         </label>
+
+        <div class="grid grid-cols-2 gap-3"><label class="grid gap-1.5 text-sm">Доступно, мин<Input v-model="capacity" type="number" min="0" step="1" placeholder="Не задано" aria-label="Доступное время спринта" /></label><label class="grid gap-1.5 text-sm">Резерв, мин<Input v-model="reserve" type="number" min="0" step="1" aria-label="Резерв времени спринта" /></label></div>
+        <p v-if="budgetInvalid" role="alert" class="text-sm text-destructive">Укажите целое неотрицательное число минут; резерв не должен превышать бюджет.</p>
 
         <div v-if="isStart" class="grid gap-1.5">
           <span class="text-sm font-medium">Длительность</span>

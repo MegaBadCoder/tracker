@@ -39,6 +39,7 @@ import { useReleaseStore } from '../model/release-store'
 import { useGroupDetail } from '../model/use-group-detail'
 import ColorPicker from './ColorPicker.vue'
 import ReleasePicker from './ReleasePicker.vue'
+import StoryPlanningFields from './StoryPlanningFields.vue'
 
 function parseGroupDate(value: string | null): Date | undefined {
   if (!value)
@@ -341,7 +342,8 @@ const ownTasks = computed(() => {
             isMobile ? 'w-full border-t border-border/60' : 'sm:w-60 border-l border-border/60 overflow-y-auto',
           ]"
         >
-          <div class="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
+          <StoryPlanningFields v-if="story" :story="story" />
+          <div v-else class="flex items-center justify-between px-4 py-2.5 border-b border-border/40">
             <span class="text-[11px] text-muted-foreground/60 font-medium">Статус</span>
             <div class="flex items-center gap-2">
               <span class="text-[13px]">{{ statusLabel }}</span>

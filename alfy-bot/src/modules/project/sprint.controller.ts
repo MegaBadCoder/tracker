@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtOrApiTokenGuard } from '../auth/guards/jwt-or-api-token.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
+import { PlanningService } from './planning.service';
 import { SprintService } from './sprint.service';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
@@ -27,7 +28,10 @@ interface AuthRequest extends Request {
 @UseGuards(JwtOrApiTokenGuard)
 @Controller('projects/:projectId/sprints')
 export class SprintController {
-  constructor(private readonly sprintService: SprintService) {}
+  constructor(
+    private readonly sprintService: SprintService,
+    private readonly planningService: PlanningService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Спринты проекта, включая закрытые' })
@@ -67,6 +71,15 @@ export class SprintController {
     @Param('id') id: string,
   ) {
     return this.sprintService.delete(req.user.sub, projectId, id);
+  }
+
+  @Get(':id/report')
+  report(
+    @Request() req: AuthRequest,
+    @Param('projectId') projectId: string,
+    @Param('id') id: string,
+  ) {
+    return this.planningService.report(req.user.sub, projectId, id);
   }
 
   @Post(':id/start')

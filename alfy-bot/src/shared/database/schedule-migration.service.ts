@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { withSqliteAccess } from './serialized-sqlite';
 
 @Injectable()
 export class ScheduleMigrationService implements OnApplicationBootstrap {
@@ -8,6 +9,10 @@ export class ScheduleMigrationService implements OnApplicationBootstrap {
   constructor(private readonly dataSource: DataSource) {}
 
   async onApplicationBootstrap() {
+    return withSqliteAccess(this.dataSource, () => this.migrate());
+  }
+
+  private async migrate() {
     // Check if the old goal_schedules table still exists (pre-rename migration)
     const hasOldTable = await this.tableExists('goal_schedules');
     if (!hasOldTable) {

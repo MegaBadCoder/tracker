@@ -29,6 +29,8 @@ function makeSprint(overrides: Partial<Sprint> = {}): Sprint {
     projectId: 'proj-1',
     name: 'Спринт 1',
     goal: null,
+        capacityMinutes: null,
+        reserveMinutes: 0,
     startDate: null,
     endDate: null,
     status: 'planned' as const,
@@ -137,6 +139,8 @@ describe('SprintService', () => {
         projectId: 'proj-1',
         name: 'Спринт 4',
         goal: null,
+        capacityMinutes: null,
+        reserveMinutes: 0,
         order: 2,
       });
     });
@@ -162,6 +166,8 @@ describe('SprintService', () => {
         projectId: 'proj-1',
         name: 'Релиз',
         goal: 'Выпустить',
+        capacityMinutes: null,
+        reserveMinutes: 0,
         order: 0,
       });
     });
@@ -208,6 +214,8 @@ describe('SprintService', () => {
 
       const result = await service.update(1, 'proj-1', 'sprint-1', {
         goal: null,
+        capacityMinutes: null,
+        reserveMinutes: 0,
         startDate: null,
         endDate: null,
       });
@@ -245,6 +253,8 @@ describe('SprintService', () => {
       startDate: '2026-01-01',
       endDate: '2026-01-14',
       goal: 'Цель',
+        capacityMinutes: null,
+        reserveMinutes: 0,
     };
 
     it('переводит planned в active с датами и целью', async () => {

@@ -10,6 +10,10 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Project } from './project.entity';
+import type {
+  PlanningSnapshot,
+  SprintRetrospective,
+} from '../types/sprint-planning.types';
 
 export type SprintStatus = 'planned' | 'active' | 'closed';
 
@@ -57,6 +61,21 @@ export class Sprint {
 
   @Column({ type: 'integer', default: 0 })
   order: number;
+
+  @Column({ type: 'integer', nullable: true })
+  capacityMinutes: number | null;
+
+  @Column({ type: 'integer', default: 0 })
+  reserveMinutes: number;
+
+  @Column('simple-json', { nullable: true })
+  initialSnapshot: PlanningSnapshot | null;
+
+  @Column('simple-json', { nullable: true })
+  finalSnapshot: PlanningSnapshot | null;
+
+  @Column('simple-json', { nullable: true })
+  retrospective: SprintRetrospective | null;
 
   @CreateDateColumn()
   createdAt: Date;

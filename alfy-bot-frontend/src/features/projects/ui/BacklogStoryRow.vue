@@ -12,6 +12,7 @@ import { useReleaseStore } from '../model/release-store'
 import { useGroupDetail } from '../model/use-group-detail'
 import BacklogTaskRow from './BacklogTaskRow.vue'
 import ReleasePickerContent from './ReleasePickerContent.vue'
+import StoryStatusPicker from './StoryStatusPicker.vue'
 
 const props = defineProps<{
   entry: BacklogStory
@@ -74,7 +75,7 @@ function handleChange(event: { added?: { element: Task } }) {
         <GripVertical :size="15" />
       </button>
       <button
-        class="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="flex min-w-0 basis-[calc(100%-2rem)] flex-1 cursor-pointer items-center gap-2 rounded text-left sm:basis-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         :aria-expanded="expanded"
         :aria-label="`${expanded ? 'Свернуть' : 'Раскрыть'} историю ${story.title}`"
         @click="expanded = !expanded"
@@ -82,9 +83,10 @@ function handleChange(event: { added?: { element: Task } }) {
         <ChevronDown v-if="expanded" :size="15" class="shrink-0 text-muted-foreground" />
         <ChevronRight v-else :size="15" class="shrink-0 text-muted-foreground" />
         <BookOpen :size="14" class="shrink-0 text-primary/70" />
-        <span class="truncate text-sm font-medium" :class="story.status === 'done' && 'text-muted-foreground line-through'">{{ story.title }}</span>
+        <span class="line-clamp-2 text-sm font-medium sm:truncate" :class="story.status === 'done' && 'text-muted-foreground line-through'">{{ story.title }}</span>
       </button>
       <span class="hidden max-w-32 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground sm:inline" :title="entry.epic.title">{{ entry.epic.title }}</span>
+      <StoryStatusPicker :story="story" />
       <span class="shrink-0 text-xs tabular-nums text-muted-foreground" data-testid="story-progress">{{ entry.done }}/{{ entry.total }}</span>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
