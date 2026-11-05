@@ -8,6 +8,7 @@ import { AppModule } from '../../src/app.module';
 import {
   User,
   Task,
+  TaskDependency,
   PomodoroConfig,
   TimerSession,
   Goal,
@@ -44,6 +45,7 @@ export async function createTestApp(): Promise<TestContext> {
     entities: [
       User,
       Task,
+      TaskDependency,
       PomodoroConfig,
       TimerSession,
       Goal,
