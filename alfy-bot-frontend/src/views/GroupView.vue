@@ -46,17 +46,15 @@ watch([projectId, groupId, retry], async ([pid, gid], _, onCleanup) => {
   deletionError.value = null
   isDetailOpen.value = false
   try {
-    const [projectResponse, groupResponse, releaseResponse] = await Promise.all([
+    const [projectResponse, groupResponse, releaseResponse, taskSnapshot] = await Promise.all([
       projectsApi.fetchProject(pid),
       groupsApi.fetchGroups(pid),
       releasesApi.fetchReleases(pid),
-      tasks.fetchTasks().then(() => {
-        if (tasks.error)
-          throw new Error(tasks.error)
-      }),
+      tasks.fetchTaskSnapshot(),
     ])
     if (!active)
       return
+    tasks.tasks = taskSnapshot
     groups.trees[pid] = groupResponse.data
     releases.lists[pid] = releaseResponse.data
     const project = projectResponse.data
