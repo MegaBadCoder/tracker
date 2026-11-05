@@ -1,6 +1,6 @@
 # Зависимости задач
 
-**Status:** executing
+**Status:** done
 **Branch:** codex/task-dependencies
 **Worktree:** /Users/v/projects/Alfy/.worktrees/task-dependencies
 **Base:** a323db8 (codex/release-canvas)
@@ -64,7 +64,46 @@ Approach: additive graph REST API + shared Pinia graph store/editor + separate S
 - RK3 — clutter and collapsed endpoints: selected-only default, all toggle, visible-ancestor endpoints + real predecessor panel.
 
 ## Conclusion
+
+Outcome: зависимости задач реализованы в 64da258 / 1478057 / 109edf1; независимое ревью a323db8..109edf1 не обнаружило critical/important findings с confidence ≥80. Reviewer независимо выполнил 15 backend unit, 12 backend e2e, 47 frontend tests — всё прошло.
+
+Invariants: IV1–IV5 подтверждены CK1–CK8; API сохраняет владельца и атомарность, ожидание не меняет статус, дерево/прогресс не зависят от графа, общий редактор сохраняет черновик и защищает свежие ответы.
+
 ### Hands-off decisions
 - make: new codex/task-dependencies worktree from a323db8 — retain completed map and local preview without mixing implementation branches.
 - udesign: normalized FK graph, cross-sprint/project within one user, advisory waiting, concrete recurring occurrences — follows approved behavior while preserving existing task status semantics.
+- uverify: browser/API checks passed; independent review completed without fixes; local preview retained, delivery remains on feature branch.
+- udocument: README and CLAUDE updated with usage, edge direction and transaction/store constraints.
 - uplan: plan auto-approved; three disjoint parallel implementers, controller integration/verification/docs; fresh dependencies per WT, isolated local API/frontend ports.
+
+## Verify
+
+Baseline a323db8: task.service 143 tests and Canvas/TaskView 19 tests passed; Node 25 frontend requires NODE_OPTIONS=--no-experimental-webstorage as in the base branch. Backend/frontend installed independently with npm ci.
+
+Local smoke uses new API 3019 / frontend 5190, isolated data/database.sqlite and dev account 900106. Existing previews 3018/5188/5189 retained. Fixture: project f2b9dcb7-8c62-463e-9b96-893e5e3390f5, chain recording→mixing→publication, cover approval in another sprint.
+
+
+Result: passed
+
+- CK1 (IV1, IF1) — self/duplicate/missing/foreign IDs, direct/transitive cycles and concurrent opposite writes — held: domain/service RED→GREEN; real HTTP/SQLite tests reject invalid replacement without changing prior graph.
+- CK2 (IV2) — failed insert leaves partial replacement, cascade misses either endpoint, schema rebuild loses graph — held: transaction rollback, both delete endpoints, restart/rebuild tests pass. Completion/move preserve edges; recurring successor does not inherit them.
+- CK3 (IV3) — finishing a predecessor completes dependent or leaves stale waiting — held: browser A→B→C plus external D→B, finishing A and D removes B waiting while B remains unfinished and C waits for B; sprint remains 1/3.
+- CK4 (IV4) — collapsed/external endpoints disappear or alter totals — held: collapse marks real tasks hidden, reveal expands path; external task has direct link and other-sprint label, never enters tree totals. Dashed arrowheads distinguish dependency direction.
+- CK5 (IV5, IF2) — stale GET or unrelated save replaces newer graph — held: store race tests, serialized same-task saves, canonical per-task merge, failed save preserves draft. Page load rejects stale revision; editor snapshot preserves concurrent task changes.
+- CK6 (IF3) — failed graph load appears empty — held: page/editor failure-and-retry tests. Shared editor integration covered for preview/page, persisted UUID and readonly/frozen restrictions.
+- CK7 — cold task page loses candidates or links after reload — held in browser: B direct page reload shows both completed predecessors; remove/save/search/re-add/save works.
+- CK8 — fullscreen/mobile makes dependency controls inaccessible — held in browser at 1280×720 and 390×844: fullscreen preview, shared editor, all-links panel and reveal usable; no horizontal page overflow observed.
+
+Commands: backend `npm test -- --runInBand` (44 suites / 745 tests) and `npm run test:e2e -- --runInBand` (15 / 175) passed before supplemental tests; final focused domain/service/repository 15 tests and e2e 12 tests pass. Backend build and new-file ESLint pass. Frontend `NODE_OPTIONS=--no-experimental-webstorage npm run test:run` passes 152 suites / 1168 tests; `npm run build`, vue-tsc, scoped ESLint and diff-check pass.
+
+Smoke: real API 3019 + UI 5190, isolated SQLite. Browser saved external predecessor, rejected A→C cycle with draft retained, completed predecessors, removed/re-added link, reloaded canonical task page, collapsed/revealed story, inspected mobile and desktop fullscreen. Goal reached locally on representative persisted tasks; production rollout is outside this task.
+
+## Code smells
+- Existing backend broad `tsc --noEmit` errors in project-move.integration.spec.ts (obsolete telegramId), board-groups.e2e-spec.ts (getHttpServer generic), planning.e2e-spec.ts (DataSourceOptions union). Nest build, unit and e2e commands pass; these unrelated test typing issues were not changed.
+
+
+## Goal validation
+
+Direct browser evidence: persisted A→B→C and external D→B chain; cycle rejected, reload preserved links, A/D completion removed B waiting while B stayed unfinished, C still waited for B, sprint stayed 1/3. Hidden tasks were revealed from dependency panel; desktop fullscreen and 390px editor/map worked. Final local map: http://localhost:5190/tasks/project/f2b9dcb7-8c62-463e-9b96-893e5e3390f5/map. Screenshot: /Users/v/.codex/visualizations/2026/11/04/01a1a794-bc60-7b13-a320-224d1cf0c89f/task-dependencies.png.
+
+Finish: local commits on codex/task-dependencies, isolated preview kept running; no remote publication. Temporary fixture/probe scripts removed; demo data retained in ignored local SQLite.
