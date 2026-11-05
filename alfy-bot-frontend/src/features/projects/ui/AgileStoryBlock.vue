@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { BoardGroupNode, ProjectColumn } from '../model/types'
 import type { Task } from '@/features/tasks/model/types'
-import { Plus } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Plus } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { groupTasksByColumn } from '../lib/agile-layout'
+import { useBoardCollapseStore } from '../model/board-collapse-store'
 import AgileCell from './AgileCell.vue'
 import GroupActionsMenu from './GroupActionsMenu.vue'
 import GroupOrderControls from './GroupOrderControls.vue'
@@ -38,12 +39,22 @@ const emit = defineEmits<{
 
 const tasksByColumn = computed(() => groupTasksByColumn(props.tasks))
 
+const collapse = useBoardCollapseStore()
+const collapsed = computed({
+  get: () => collapse.isCollapsed(props.story.projectId, props.story.id),
+  set: value => collapse.setCollapsed(props.story.projectId, props.story.id, value),
+})
 const renaming = ref(false)
 const addingTask = ref(false)
 
 function commitRename(title: string) {
   renaming.value = false
   emit('renameGroup', props.story.id, title)
+}
+
+function startAddingTask() {
+  collapsed.value = false
+  addingTask.value = true
 }
 
 function handleCreateTask(title: string) {
@@ -57,6 +68,16 @@ function handleCreateTask(title: string) {
     class="col-span-full grid [grid-template-columns:subgrid] mt-1"
   >
     <div class="col-span-full flex items-center gap-2 pl-8 pr-3 py-1.5">
+      <button
+        type="button"
+        class="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        :aria-label="`${collapsed ? 'Развернуть' : 'Свернуть'} историю ${story.title}`"
+        :aria-expanded="!collapsed"
+        @click="collapsed = !collapsed"
+      >
+        <ChevronRight v-if="collapsed" :size="14" />
+        <ChevronDown v-else :size="14" />
+      </button>
       <InlineTitleInput
         v-if="renaming"
         placeholder="Название истории"
@@ -89,7 +110,7 @@ function handleCreateTask(title: string) {
           size="icon-sm"
           class="text-muted-foreground hover:text-foreground"
           aria-label="Добавить задачу в историю"
-          @click="addingTask = true"
+          @click="startAddingTask"
         >
           <Plus :size="14" />
         </Button>
@@ -106,22 +127,24 @@ function handleCreateTask(title: string) {
         />
       </div>
     </div>
-    <div v-if="addingTask" class="col-span-full pl-8 pr-3 py-1.5">
+    <div v-if="addingTask && !collapsed" class="col-span-full pl-8 pr-3 py-1.5">
       <InlineTitleInput
         placeholder="Название задачи"
         @submit="handleCreateTask"
         @cancel="addingTask = false"
       />
     </div>
-    <AgileCell
-      v-for="lane in lanes"
-      :key="lane.id"
-      :tasks="tasksByColumn.get(lane.id) ?? []"
-      :column-id="lane.id"
-      :group-id="story.id"
-      @toggle-task="$emit('toggleTask', $event)"
-      @open-task="$emit('openTask', $event)"
-      @task-change="(...args) => $emit('taskChange', ...args)"
-    />
+    <template v-if="!collapsed">
+      <AgileCell
+        v-for="lane in lanes"
+        :key="lane.id"
+        :tasks="tasksByColumn.get(lane.id) ?? []"
+        :column-id="lane.id"
+        :group-id="story.id"
+        @toggle-task="$emit('toggleTask', $event)"
+        @open-task="$emit('openTask', $event)"
+        @task-change="(...args) => $emit('taskChange', ...args)"
+      />
+    </template>
   </div>
 </template>

@@ -65,4 +65,12 @@ describe('router guard — загрузка типов вопросов', () => 
     expect(router.resolve('/tasks/project/project-id').name).toBe('tasks-project')
   })
 
+  it('сохраняет глубокую ссылку истории при входе', async () => {
+    isAuthenticatedMock.mockReturnValue(false)
+    const path = '/tasks/project/c8581138-9470-4b3f-aa73-a9483787d5fb/group/20a8a4ef-58ac-4649-97d8-050810863842?mode=full#description'
+    await router.push(path)
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe(path)
+  })
+
 })

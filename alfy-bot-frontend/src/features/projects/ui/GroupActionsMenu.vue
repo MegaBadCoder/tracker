@@ -2,6 +2,7 @@
 import type { BoardGroup } from '../model/types'
 import { CircleCheck, Ellipsis, Palette, Pencil, Plus, Rocket, RotateCcw, SquareArrowOutUpRight, Trash2 } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -14,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { apiErrorMessage } from '../lib/api-error'
+import { groupLinkPath } from '../lib/group-link'
 import { PROJECT_COLOR_PALETTE } from '../model/project-color-palette'
 import { useReleaseStore } from '../model/release-store'
 
@@ -39,6 +41,7 @@ const emit = defineEmits<{
   delete: []
 }>()
 
+const pagePath = computed(() => groupLinkPath(props.group.projectId, props.group.id))
 const isEpic = computed(() => props.group.type === 'epic')
 const triggerLabel = computed(() => (isEpic.value ? 'Действия с эпиком' : 'Действия с историей'))
 const toggleDoneLabel = computed(() => (props.group.status === 'done' ? 'Открыть' : 'Закрыть'))
@@ -91,6 +94,12 @@ function onCloseAutoFocus(event: Event) {
       <DropdownMenuItem @click="$emit('open')">
         <SquareArrowOutUpRight :size="14" class="mr-2" />
         Открыть карточку
+      </DropdownMenuItem>
+      <DropdownMenuItem v-if="pagePath" as-child>
+        <RouterLink :to="pagePath">
+          <SquareArrowOutUpRight :size="14" class="mr-2" />
+          Открыть страницу
+        </RouterLink>
       </DropdownMenuItem>
       <DropdownMenuItem @click="startInlineEdit('rename')">
         <Pencil :size="14" class="mr-2" />

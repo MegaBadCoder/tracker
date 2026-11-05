@@ -59,6 +59,11 @@ const router = createRouter({
               component: () => import('../views/ProjectView.vue'),
             },
             {
+              path: 'project/:projectId/group/:groupId',
+              name: 'project-group',
+              component: () => import('../views/GroupView.vue'),
+            },
+            {
               path: 'project/:projectId/backlog',
               name: 'tasks-project-backlog',
               component: () => import('../views/ProjectBacklogView.vue'),
