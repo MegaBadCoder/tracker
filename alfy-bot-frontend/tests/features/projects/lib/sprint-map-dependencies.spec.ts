@@ -92,4 +92,21 @@ describe('связи карты', () => {
     expect(result.minX).toBeLessThan(0)
     expect(deriveSprintMapDependencies({ ...input, dependencies: [...edges].reverse() }).links.map(link => link.path)).toEqual(result.links.map(link => link.path))
   })
+
+  it('обходит карточки между свёрнутыми историями при нескольких дорожках', () => {
+    const sources = ['a1', 'a2', 'a3', 'a4', 'a5']
+    const targets = ['z1', 'z2', 'z3', 'z4', 'z5']
+    const obstacleRoot = node('sprint', 's', [
+      node('story', 'first', sources.map(id => node('task', id))),
+      node('story', 'middle', [node('task', 'middle')]),
+      node('story', 'last', targets.map(id => node('task', id))),
+    ])
+    const visibleNodes = layoutSprintMap(obstacleRoot, new Set(['story:first', 'story:last'])).nodes
+    const result = deriveSprintMapDependencies({ root: obstacleRoot, visibleNodes, tasks: [...sources, ...targets, 'middle'].map(id => ({ ...tasks[0]!, id })), dependencies: sources.map((id, index) => ({ dependencyId: id, taskId: targets[index]! })), selectedTaskId: null, showAll: true })
+    const obstacle = visibleNodes.find(item => item.node.key === 'task:middle')!
+    const rails = result.links.map(link => Number(link.path!.match(/Q([-\d.]+) /)![1]))
+    expect(rails.every(x => x < obstacle.x - 12 || x > obstacle.x + obstacle.width + 12)).toBe(true)
+    expect(new Set(rails).size).toBe(5)
+  })
+
 })

@@ -38,8 +38,8 @@ function taskEndpoints(root: SprintMapNode, visibleNodes: PositionedMapNode[]) {
   return endpoints
 }
 
-function routeDependencies(links: SprintMapDependency[]): number {
-  const lanes: { start: number, end: number }[][] = []
+function routeDependencies(links: SprintMapDependency[], visibleNodes: PositionedMapNode[]): number {
+  const lanes: { start: number, end: number, x: number }[] = []
   let minX = 0
   for (const link of links) {
     if (!link.from || !link.to)
@@ -47,13 +47,20 @@ function routeDependencies(links: SprintMapDependency[]): number {
     const source = { x: link.from.x - 9, y: link.from.y + link.from.height * 2 / 3 }
     const target = { x: link.to.x - 11, y: link.to.y + link.to.height / 3 }
     const interval = { start: Math.min(source.y, target.y) - 12, end: Math.max(source.y, target.y) + 12 }
-    let lane = lanes.findIndex(items => items.every(item => interval.end < item.start || interval.start > item.end))
-    if (lane === -1) {
-      lane = lanes.length
-      lanes.push([])
+    let laneX = Math.min(link.from.x, link.to.x) - 40
+    while (true) {
+      const obstacle = visibleNodes.find(item => laneX >= item.x - 12 && laneX <= item.x + item.width + 12 && interval.start <= item.y + item.height && interval.end >= item.y)
+      if (obstacle) {
+        laneX = obstacle.x - 24
+        continue
+      }
+      if (lanes.some(item => Math.abs(item.x - laneX) < 18 && interval.start <= item.end && interval.end >= item.start)) {
+        laneX -= 18
+        continue
+      }
+      break
     }
-    lanes[lane]!.push(interval)
-    const laneX = Math.min(link.from.x, link.to.x) - 40 - lane * 18
+    lanes.push({ ...interval, x: laneX })
     const direction = target.y >= source.y ? 1 : -1
     const radius = Math.min(12, Math.abs(target.y - source.y) / 2)
     link.sourcePort = source
@@ -96,5 +103,5 @@ export function deriveSprintMapDependencies(input: SprintMapDependencyInput): { 
     })
   }
   links.sort((a, b) => a.dependencyId.localeCompare(b.dependencyId) || a.taskId.localeCompare(b.taskId))
-  return { waiting, links, minX: routeDependencies(links) }
+  return { waiting, links, minX: routeDependencies(links, input.visibleNodes) }
 }
