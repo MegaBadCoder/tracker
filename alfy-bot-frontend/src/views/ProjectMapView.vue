@@ -26,7 +26,9 @@ import { useGroupDetail } from '@/features/projects/model/use-group-detail'
 import ProjectTabs from '@/features/projects/ui/ProjectTabs.vue'
 import SprintMapCanvas from '@/features/projects/ui/SprintMapCanvas.vue'
 import SprintMapCreateDialog from '@/features/projects/ui/SprintMapCreateDialog.vue'
+import { fetchTaskDependencies } from '@/features/tasks/api/task-dependencies-api'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
+import { useTaskDependencyStore } from '@/features/tasks/model/task-dependency-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
 
@@ -40,6 +42,7 @@ const sprints = useSprintStore()
 const columns = useColumnStore()
 const workflow = useStoryWorkflowStore()
 const tasks = useTaskStore()
+const dependencies = useTaskDependencyStore()
 const groupDetail = useGroupDetail()
 const { confirm } = useConfirm()
 const { selectedTask, isDetailOpen, handleOpenTask, handleDetailOpenChange, handleUpdateTask, handleUpdateChecklist, handleUpdatePomodoroConfig, handleDeleteFromDialog } = useTaskDetailHandlers(tasks, confirm)
@@ -79,7 +82,8 @@ watch([projectId, retry], async ([pid], _, onCleanup) => {
   state.value = 'loading'
   error.value = ''
   try {
-    const [projectResponse, groupResponse, releaseResponse, sprintResponse, columnResponse, workflowResponse, taskSnapshot] = await Promise.all([
+    const dependencyRevision = dependencies.revision
+    const [projectResponse, groupResponse, releaseResponse, sprintResponse, columnResponse, workflowResponse, taskSnapshot, dependencyResponse] = await Promise.all([
       projectsApi.fetchProject(pid),
       groupsApi.fetchGroups(pid),
       releasesApi.fetchReleases(pid),
@@ -87,9 +91,15 @@ watch([projectId, retry], async ([pid], _, onCleanup) => {
       columnsApi.fetchColumns(pid),
       fetchStoryWorkflow(pid),
       tasks.fetchTaskSnapshot(),
+      fetchTaskDependencies(),
     ])
     if (!active)
       return
+    if (!dependencies.applySnapshot(dependencyResponse.data, dependencyRevision)) {
+      await dependencies.fetchGraph()
+      if (!active)
+        return
+    }
     tasks.tasks = taskSnapshot
     groups.trees[pid] = groupResponse.data
     releases.lists[pid] = releaseResponse.data
@@ -222,7 +232,7 @@ function addChild(node: SprintMapNode) {
         <p v-if="readonly" class="text-sm text-muted-foreground">
           Спринт закрыт. Добавление новых элементов недоступно.
         </p>
-        <SprintMapCanvas :key="`${projectId}/${tree.key}`" :root="tree" :project-id="projectId" :readonly="readonly" @open-node="openNode" @add-child="addChild" />
+        <SprintMapCanvas :key="`${projectId}/${tree.key}`" :root="tree" :project-id="projectId" :readonly="readonly" :tasks="tasks.tasks" :dependencies="dependencies.edges" @open-node="openNode" @add-child="addChild" />
       </template>
     </template>
     <SprintMapCreateDialog v-if="createContext && selectedSprint" :context="createContext" :sprint-name="selectedSprint.name" :closed="readonly" @close="createContext = null" @created="createContext = null" />

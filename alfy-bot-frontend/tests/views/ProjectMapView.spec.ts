@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { api } from '@/api/client'
 import { useGroupStore } from '@/features/projects/model/group-store'
+import { useTaskDependencyStore } from '@/features/tasks/model/task-dependency-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import ProjectMapView from '@/views/ProjectMapView.vue'
 
@@ -15,8 +16,10 @@ let failPath = ''
 function response(path: string) {
   if (path === failPath)
     return Promise.reject(new Error('Сеть недоступна'))
+  if (path === '/tasks/dependencies/graph')
+    return Promise.resolve({ data: [{ taskId: 'task', dependencyId: 'outside' }] })
   if (path === '/tasks')
-    return Promise.resolve({ data: [{ id: 'task', title: 'Из спринта', projectId, sprintId: 'active', completed: false }] })
+    return Promise.resolve({ data: [{ id: 'task', title: 'Из спринта', projectId, sprintId: 'active', completed: false }, { id: 'outside', title: 'Внешняя', projectId: 'other', sprintId: 'next', completed: false }] })
   if (path.endsWith('/sprints'))
     return Promise.resolve({ data: [{ ...sprint, id: 'closed', name: 'Прошлый спринт', status: 'closed', order: 0, projectId: path.split('/')[2] }, { ...sprint, projectId: path.split('/')[2] }] })
   if (path.endsWith('/story-workflow'))
@@ -40,7 +43,7 @@ async function setup(query = '') {
   ] })
   await router.push(`/tasks/project/${projectId}/map${query}`)
   const wrapper = mount(ProjectMapView, { global: { plugins: [router], stubs: {
-    SprintMapCanvas: { props: ['root', 'readonly'], template: '<div data-testid="canvas">{{ root.title }}:{{ root.total }}<span v-if="readonly">Просмотр</span></div>' },
+    SprintMapCanvas: { name: 'SprintMapCanvas', props: ['root', 'readonly', 'tasks', 'dependencies'], template: '<div data-testid="canvas">{{ root.title }}:{{ root.total }}<span v-if="readonly">Просмотр</span></div>' },
     SprintMapCreateDialog: true,
     TaskDetailDialog: true,
   } } })
@@ -109,4 +112,57 @@ it('не применяет снимок после ухода со страни
   await flushPromises()
   expect(useTaskStore().tasks).toEqual([])
   expect(useGroupStore().trees).toEqual({})
+})
+
+it('передаёт полный состав задач и граф, не увеличивая итоги спринта', async () => {
+  const { wrapper } = await setup()
+  expect(api.get).toHaveBeenCalledWith('/tasks/dependencies/graph')
+  const canvas = wrapper.findComponent({ name: 'SprintMapCanvas' })
+  expect(canvas.props('tasks')).toHaveLength(2)
+  expect(canvas.props('dependencies')).toEqual([{ taskId: 'task', dependencyId: 'outside' }])
+  expect(canvas.props('root').total).toBe(1)
+  wrapper.unmount()
+})
+
+it('ошибка графа не выглядит отсутствием связей и не сохраняет частичный снимок', async () => {
+  failPath = '/tasks/dependencies/graph'
+  const { wrapper } = await setup()
+  expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+  expect(wrapper.find('[data-testid="canvas"]').exists()).toBe(false)
+  expect(useTaskStore().tasks).toEqual([])
+  expect(useTaskDependencyStore().loaded).toBe(false)
+  failPath = ''
+  await wrapper.findAll('button').find(button => button.text() === 'Повторить')!.trigger('click')
+  await flushPromises()
+  expect(wrapper.find('[data-testid="canvas"]').exists()).toBe(true)
+  expect(useTaskDependencyStore().loaded).toBe(true)
+  wrapper.unmount()
+})
+
+it('повторно получает граф, если его изменили за время загрузки карты', async () => {
+  let resolveGraph!: (value: any) => void
+  let requests = 0
+  vi.mocked(api.get).mockImplementation((path: string) => {
+    if (path !== '/tasks/dependencies/graph')
+      return response(path)
+    requests++
+    return requests === 1
+      ? new Promise((resolve) => {
+          resolveGraph = resolve
+        })
+      : Promise.resolve({ data: [] })
+  })
+  const { wrapper } = await setup()
+  expect(wrapper.find('[data-testid="canvas"]').exists()).toBe(false)
+  expect(useTaskStore().tasks).toEqual([])
+  const dependencies = useTaskDependencyStore()
+  dependencies.revision++
+  dependencies.edges = []
+  resolveGraph({ data: [{ taskId: 'task', dependencyId: 'outside' }] })
+  await flushPromises()
+  expect(dependencies.edges).toEqual([])
+  expect(dependencies.loaded).toBe(true)
+  expect(requests).toBe(2)
+  expect(wrapper.find('[data-testid="canvas"]').exists()).toBe(true)
+  wrapper.unmount()
 })

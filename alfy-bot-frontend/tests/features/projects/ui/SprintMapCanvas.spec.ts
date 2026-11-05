@@ -204,3 +204,69 @@ describe('карта спринта', () => {
     wrapper.unmount()
   })
 })
+
+describe('зависимости на карте', () => {
+  const tasks = [
+    { id: taskId, title: 'Проверить оплату', completed: false, projectId, sprintId: 'sprint' },
+    { id: 'task2', title: 'Отменить оплату', completed: false, projectId, sprintId: 'sprint' },
+    { id: '00000000-0000-4000-8000-000000000099', title: 'Выпустить SDK', completed: false, projectId: 'other', sprintId: 'next' },
+  ]
+  const dependencies = [{ taskId, dependencyId: 'task2' }, { taskId, dependencyId: '00000000-0000-4000-8000-000000000099' }]
+
+  it('отдельно выбирает связи и сохраняет быстрый просмотр', async () => {
+    const wrapper = render()
+    await wrapper.setProps({ tasks, dependencies })
+    expect(wrapper.findAll('[data-dependency-edge]')).toHaveLength(0)
+    expect(wrapper.get(`[data-map-node="task:${taskId}"]`).text()).toContain('Ждёт 2 задачи')
+    await wrapper.get('button[aria-label="Связи: Проверить оплату"]').trigger('click')
+    expect(wrapper.findAll('[data-dependency-edge]')).toHaveLength(1)
+    expect(wrapper.get('[data-dependency-edge]').attributes('marker-end')).toContain('url(#')
+    expect(wrapper.emitted('openNode')).toBeUndefined()
+    await wrapper.get('button[aria-label="Быстрый просмотр: Проверить оплату"]').trigger('click')
+    expect(wrapper.emitted('openNode')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it('сохраняет реальные названия и раскрывает скрытого предшественника', async () => {
+    const wrapper = render()
+    await wrapper.setProps({ tasks, dependencies })
+    await wrapper.get('button[aria-label="Связи: Проверить оплату"]').trigger('click')
+    await wrapper.get('button[aria-label="Свернуть Принимать карты"]').trigger('click')
+    const panel = wrapper.get('[aria-label="Зависимости задач"]')
+    expect(panel.text()).toContain('Отменить оплату')
+    expect(panel.text()).toContain('Скрыта в ветке')
+    expect(wrapper.findAll('[data-dependency-edge]')).toHaveLength(1)
+    await panel.get('button[aria-label="Показать на карте: Отменить оплату"]').trigger('click')
+    await nextTick()
+    expect(wrapper.find('[data-map-node="task:task2"]').exists()).toBe(true)
+    expect(document.activeElement).toBe(wrapper.get('[data-map-node="task:task2"]').element)
+    wrapper.unmount()
+  })
+
+  it('показывает внешние задачи со ссылкой без добавления карточек', async () => {
+    const wrapper = render()
+    await wrapper.setProps({ tasks, dependencies })
+    await wrapper.get('button[aria-label="Все связи задач"]').trigger('click')
+    const panel = wrapper.get('[aria-label="Зависимости задач"]')
+    expect(panel.text()).toContain('Другой проект')
+    expect(panel.get('a[aria-label="Открыть задачу: Выпустить SDK"]').attributes('href')).toBe('/tasks/00000000-0000-4000-8000-000000000099')
+    expect(wrapper.find('[data-map-node="task:outside"]').exists()).toBe(false)
+    expect(wrapper.get('button[aria-label="Все связи задач"]').attributes('aria-pressed')).toBe('true')
+    await wrapper.get('button[aria-label="Все связи задач"]').trigger('click')
+    expect(wrapper.findAll('[data-dependency-edge]')).toHaveLength(0)
+    wrapper.unmount()
+  })
+
+  it('снимает ожидание и меняет стиль готовой связи по актуальным задачам', async () => {
+    const wrapper = render()
+    await wrapper.setProps({ tasks, dependencies })
+    await wrapper.get('button[aria-label="Связи: Проверить оплату"]').trigger('click')
+    await wrapper.setProps({ tasks: tasks.map(task => task.id === taskId ? task : { ...task, completed: true }) })
+    expect(wrapper.get(`[data-map-node="task:${taskId}"]`).text()).not.toContain('Ждёт')
+    expect(wrapper.get('[data-dependency-edge]').attributes('data-completed')).toBe('true')
+    expect(wrapper.get('[aria-label="Зависимости задач"]').text()).toContain('Готово')
+    await wrapper.setProps({ tasks })
+    expect(wrapper.get(`[data-map-node="task:${taskId}"]`).text()).toContain('Ждёт 2 задачи')
+    wrapper.unmount()
+  })
+})

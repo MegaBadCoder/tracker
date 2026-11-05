@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import type { SprintMapNode } from '../lib/sprint-map'
+import type { TaskDependencyEdge } from '@/features/tasks/model/task-dependencies'
+import type { Task } from '@/features/tasks/model/types'
 import { useScrollLock, useStorage } from '@vueuse/core'
-import { ChevronsLeftRight, Maximize, Maximize2, Minimize2, Minus, Plus, Search, X } from 'lucide-vue-next'
+import { ChevronsLeftRight, GitBranch, Maximize, Maximize2, Minimize2, Minus, Plus, Search, X } from 'lucide-vue-next'
 import { FocusScope } from 'reka-ui'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { flattenSprintMap } from '../lib/sprint-map'
+import { deriveSprintMapDependencies } from '../lib/sprint-map-dependencies'
 import { layoutSprintMap } from '../lib/sprint-map-layout'
 import { useSprintMapViewport } from '../lib/use-sprint-map-viewport'
+import SprintMapDependencies from './SprintMapDependencies.vue'
 import SprintMapNodeCard from './SprintMapNode.vue'
 
-const props = defineProps<{ root: SprintMapNode, projectId: string, readonly: boolean }>()
+const props = withDefaults(defineProps<{ root: SprintMapNode, projectId: string, readonly: boolean, tasks?: Task[], dependencies?: TaskDependencyEdge[] }>(), { tasks: () => [], dependencies: () => [] })
 const emit = defineEmits<{ openNode: [node: SprintMapNode], addChild: [node: SprintMapNode] }>()
 const surface = ref<HTMLElement | null>(null)
 const container = ref<HTMLElement | null>(null)
@@ -19,12 +23,17 @@ const fullscreen = ref(false)
 const scrollLocked = useScrollLock(document.documentElement)
 const query = ref('')
 const selected = ref<string | null>(null)
+const dependencySelection = ref<string | null>(null)
+const showAllDependencies = ref(false)
+const dependencyArrowId = `dependency-arrow-${useId()}`
 const stored = useStorage<Record<string, string[]>>('alfy-sprint-map-collapsed', {}, undefined, { flush: 'sync' })
 const scope = computed(() => `${props.projectId}/${props.root.key}`)
 const collapsed = computed(() => new Set(Array.isArray(stored.value?.[scope.value]) ? stored.value[scope.value] : []))
 const layout = computed(() => layoutSprintMap(props.root, collapsed.value))
 const allNodes = computed(() => flattenSprintMap(props.root))
 const matches = computed(() => query.value.trim() ? allNodes.value.filter(node => node.title.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase())) : [])
+const dependencyGraph = computed(() => deriveSprintMapDependencies({ root: props.root, visibleNodes: layout.value.nodes, tasks: props.tasks, dependencies: props.dependencies, selectedTaskId: dependencySelection.value, showAll: showAllDependencies.value }))
+const dependencyTitle = computed(() => props.tasks.find(task => task.id === dependencySelection.value)?.title ?? null)
 const viewport = useSprintMapViewport(surface)
 const { scale, minScale, dragging, transform } = viewport
 const percentage = computed(() => Math.round(scale.value * 100))
@@ -97,6 +106,23 @@ async function reveal(node: SprintMapNode) {
   target?.focus({ preventScroll: true })
 }
 
+function selectDependencies(node: SprintMapNode) {
+  dependencySelection.value = node.sourceId
+  showAllDependencies.value = false
+  selected.value = node.key
+}
+
+function revealDependency(taskId: string) {
+  const node = allNodes.value.find(item => item.kind === 'task' && item.sourceId === taskId)
+  if (node)
+    void reveal(node)
+}
+
+function closeDependencies() {
+  dependencySelection.value = null
+  showAllDependencies.value = false
+}
+
 function fit() {
   viewport.fit(layout.value)
 }
@@ -121,6 +147,7 @@ function initialize() {
 watch(scope, async () => {
   query.value = ''
   selected.value = null
+  closeDependencies()
   await nextTick()
   initialize()
 })
@@ -173,6 +200,9 @@ onMounted(initialize)
           <Button variant="ghost" size="sm" :disabled="!collapsed.size" @click="expandAll">
             <ChevronsLeftRight /><span>Раскрыть всё</span>
           </Button>
+          <Button :variant="showAllDependencies ? 'secondary' : 'ghost'" size="sm" aria-label="Все связи задач" :aria-pressed="showAllDependencies" @click="showAllDependencies = !showAllDependencies">
+            <GitBranch /><span>Все связи</span>
+          </Button>
           <Button variant="outline" size="sm" class="ml-auto" data-fullscreen-toggle :aria-label="fullscreen ? 'Выйти из полноэкранного режима' : 'Развернуть карту на весь экран'" :aria-pressed="fullscreen" @click="setFullscreen(!fullscreen)">
             <Minimize2 v-if="fullscreen" /><Maximize2 v-else />
             <span>{{ fullscreen ? 'Свернуть' : 'На весь экран' }}</span>
@@ -188,11 +218,22 @@ onMounted(initialize)
             <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
               <path v-for="edge in layout.edges" :key="`${edge.from}-${edge.to}`" :d="edge.path" fill="none" class="stroke-muted-foreground/35" stroke-width="1.5" />
             </svg>
+            <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
+              <defs>
+                <marker :id="dependencyArrowId" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M0 0 L10 5 L0 10 z" fill="context-stroke" />
+                </marker>
+              </defs>
+              <template v-for="link in dependencyGraph.links" :key="`${link.dependencyId}-${link.taskId}`">
+                <path v-if="link.path" :d="link.path" fill="none" :class="link.completed ? 'stroke-muted-foreground/60' : 'stroke-primary'" stroke-width="2" stroke-dasharray="6 5" :marker-end="`url(#${dependencyArrowId})`" :data-dependency-edge="`${link.dependencyId}-${link.taskId}`" :data-completed="link.completed" />
+              </template>
+            </svg>
             <div v-for="item in layout.nodes" :key="item.node.key" class="absolute cursor-default" :style="{ left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` }">
-              <SprintMapNodeCard :node="item.node" :project-id="projectId" :readonly="readonly" :collapsed="collapsed.has(item.node.key)" :selected="selected === item.node.key" @toggle="toggle(item.node)" @focus="focusNode(item.node.key)" @open="emit('openNode', item.node)" @add="add(item.node)" />
+              <SprintMapNodeCard :node="item.node" :project-id="projectId" :readonly="readonly" :collapsed="collapsed.has(item.node.key)" :selected="selected === item.node.key" :waiting-count="dependencyGraph.waiting.get(item.node.sourceId ?? '') ?? 0" :dependencies-selected="dependencySelection === item.node.sourceId" @dependencies="selectDependencies(item.node)" @toggle="toggle(item.node)" @focus="focusNode(item.node.key)" @open="emit('openNode', item.node)" @add="add(item.node)" />
             </div>
           </div>
         </div>
+        <SprintMapDependencies v-if="dependencySelection || showAllDependencies" :links="dependencyGraph.links" :selected-title="dependencyTitle" :project-id="projectId" :show-all="showAllDependencies" @reveal="revealDependency" @close="closeDependencies" />
         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
           <span>Задачи → истории → эпики → спринт</span>
           <span class="hidden sm:inline">Тяните фон · Ctrl / ⌘ + прокрутка — масштаб</span>

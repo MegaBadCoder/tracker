@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { SprintMapNode } from '../lib/sprint-map'
-import { ChevronLeft, ChevronRight, Crosshair, ExternalLink, LockKeyhole, Plus } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Crosshair, ExternalLink, GitBranch, LockKeyhole, Plus } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { taskLinkPath } from '@/features/tasks/lib/task-link'
+import { pluralRu } from '@/lib/plural'
 import { groupLinkPath } from '../lib/group-link'
 
-const props = defineProps<{ node: SprintMapNode, projectId: string, collapsed: boolean, readonly: boolean, selected: boolean }>()
-const emit = defineEmits<{ toggle: [], open: [], add: [], focus: [] }>()
+const props = withDefaults(defineProps<{ node: SprintMapNode, projectId: string, collapsed: boolean, readonly: boolean, selected: boolean, waitingCount?: number, dependenciesSelected?: boolean }>(), { waitingCount: 0, dependenciesSelected: false })
+const emit = defineEmits<{ toggle: [], open: [], add: [], focus: [], dependencies: [] }>()
 const labels = { sprint: 'Спринт', epic: 'Эпик', story: 'История', task: 'Задача', ungrouped: 'Без эпика' }
 const childLabels = { sprint: 'Добавить эпик', epic: 'Добавить историю', story: 'Добавить задачу', task: '', ungrouped: '' }
 const canOpen = computed(() => ['epic', 'story', 'task'].includes(props.node.kind))
@@ -40,6 +41,7 @@ const details = computed(() => [
   >
     <div class="flex h-5 shrink-0 items-center gap-1.5">
       <span class="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">{{ labels[node.kind] }}</span>
+      <span v-if="node.kind === 'task' && waitingCount" class="ml-auto rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary" aria-live="polite">Ждёт {{ waitingCount }} {{ pluralRu(waitingCount, ['задачу', 'задачи', 'задач']) }}</span>
       <span v-if="node.blockedReason" :title="node.blockedReason" class="inline-flex min-w-0 items-center gap-1 text-[10px] text-destructive">
         <LockKeyhole class="size-3" />Блокировка
       </span>
@@ -73,6 +75,9 @@ const details = computed(() => [
         <template v-if="node.total"><strong class="font-semibold">{{ node.done }}</strong><span class="text-muted-foreground"> / {{ node.total }} задач</span></template>
         <span v-else class="text-muted-foreground">Нет задач</span>
       </span>
+      <Button v-if="node.kind === 'task'" variant="ghost" size="icon-sm" class="size-6" :aria-label="`Связи: ${node.title}`" :aria-pressed="dependenciesSelected" @click="emit('dependencies')">
+        <GitBranch class="size-3.5" />
+      </Button>
       <Button variant="ghost" size="icon-sm" class="size-6" :aria-label="`В центре: ${node.title}`" @click="emit('focus')">
         <Crosshair class="size-3.5" />
       </Button>
