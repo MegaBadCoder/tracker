@@ -266,11 +266,11 @@ watch(() => props.projectId, (id) => {
       {{ reorderError }}
     </p>
     <div class="grid gap-x-2" :style="{ gridTemplateColumns: `repeat(${lanes.length}, ${COLUMN_WIDTH_PX}px)` }">
-      <div class="contents">
+      <div class="col-span-full grid [grid-template-columns:subgrid] sticky top-0 z-10 bg-background">
         <div
           v-for="lane in lanes"
           :key="lane.id"
-          class="sticky top-0 z-10 bg-background border-b border-border px-3 py-2 flex items-center gap-2"
+          class="border-b border-border px-3 py-2 flex items-center gap-2"
         >
           <div
             v-if="lane.color"
