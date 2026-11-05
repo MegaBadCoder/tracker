@@ -1,6 +1,6 @@
 # Зависимости задач
 
-**Status:** reviewing
+**Status:** done
 **Branch:** codex/task-dependencies
 **Worktree:** /Users/v/projects/Alfy/.worktrees/task-dependencies
 **Base:** a323db8 (codex/release-canvas)
@@ -15,7 +15,7 @@
 ## Design
 Зависимость A→B означает: B зависит от A. Отдельная таблица task_dependencies с FK на оба Task и каскадным удалением; команды замены предшественников валидируются и сохраняются в одной сериализованной транзакции. JSON-поле было бы короче, но потребовало бы очистки ссылок во всех путях удаления; отдельный endpoint с нормализованной таблицей сохраняет существующий Task API. Перестройка турнирного дерева в общий граф не нужна: зависимости идут отдельным слоем поверх существующей иерархии.
 
-Общий редактор показывает выбранные зависимости, статус и ссылки, поиск по своим сохранённым задачам, явное сохранение/ошибку и удаление связи. Разрешены свои задачи из других спринтов и проектов; перенос задачи сохраняет связь. Связи относятся к конкретной сохранённой задаче; виртуальные повторения не редактируются, новые повторения не наследуют связи автоматически. Ожидание информационное: число незавершённых предшественников; выполнение/статус задачи не блокируются и не переключаются автоматически.
+Общий редактор показывает выбранные зависимости, статус и ссылки, поиск по доступным сохранённым задачам, немедленное сохранение добавления/удаления, откат отображения и повтор действия при ошибке. Разрешены свои задачи из других спринтов и проектов; перенос задачи сохраняет связь. Связи относятся к конкретной сохранённой задаче; виртуальные повторения не редактируются, новые повторения не наследуют связи автоматически. Ожидание информационное: число незавершённых предшественников; выполнение/статус задачи не блокируются и не переключаются автоматически.
 
 На карте отдельное действие выбора связей задачи; по умолчанию только выбранная задача, кнопка показывает все. Направление от предшественника к зависимой задаче обозначено наконечником и пунктиром. Свёрнутые задачи проецируют концы стрелок на видимого предка; список выбранной задачи сохраняет реальные названия, раскрывает скрытого предшественника или открывает внешний по постоянной ссылке. Внешние задачи не включаются в прогресс/дерево. Готовые связи визуально отличаются, подпись сообщает источник ожидания. Отсутствие графа из-за сетевой ошибки показывается как ошибка с повтором, не как отсутствие зависимостей.
 TDD: yes — API ownership/atomicity/cycles/delete, derivation, store races, UI save/error and map visibility.
@@ -25,7 +25,7 @@ TDD: yes — API ownership/atomicity/cycles/delete, derivation, store races, UI 
 - IV2 — GET не меняет данные; replace повторяем; удаление задачи удаляет обе стороны связей; перенос/завершение не стирают связи.
 - IV3 — ожидание считается по текущему completed предшественников; зависимая задача не получает автоматический статус и её можно завершить вручную.
 - IV4 — связи не влияют на иерархию и счётчики спринта; скрытые/внешние зависимости доступны и явно различимы.
-- IV5 — страница и preview используют единый редактор и граф; ошибки сохранения не закрывают форму и не показывают ложный успех; старые ответы не затирают новые связи.
+- IV5 — страница и preview используют единый редактор и граф; ошибки сохранения восстанавливают сохранённый набор, допускают повтор действия и не показывают ложный успех; старые ответы не затирают новые связи.
 
 ## Plan
 Approach: additive graph REST API + shared Pinia graph store/editor + separate SVG overlay using existing layout. No new package.
@@ -119,3 +119,16 @@ Plan: helper маршрутизации → SVG ports/markers и bounds → focu
 
 
 Follow-up Verify: passed. RED: 2 новых geometry tests падали на старой кривой; GREEN: 162 tests (17 suites), build, scoped ESLint, diff-check. CK9 — точки начала/конца вынесены за карточку, конечный отрезок горизонтальный, перекрывающиеся интервалы получают разные дорожки независимо от порядка API — held. CK10 — 7 пересекающихся связей уходят в отрицательные X, команда «Вся карта» оставляет крайний путь внутри viewport — held. CK11 — browser desktop 1496×1112, mobile 390×844, collapse/reveal — held: шевроны не перекрываются карточкой; петля внутри свёрнутой истории компактна, цвет готовности совпадает с панелью. Screenshot: task-dependencies-polished.png.
+
+
+Review follow-up: important finding confirmed — five edges between collapsed outer stories sent a rail under the visible task of the middle story. Added failing regression (1 failed / 10 passed); route allocation now checks actual visible card rectangles and occupied rails before accepting X.
+
+User steering: replace conversational text with consistent product copy across dependency editor/map and similar project/sprint/release search and form hints. Neutral action text is retained. Remove edit/save mode for task dependencies: direct add/remove with immediate persistence, busy state, rollback and retry on failure, no cross-task leakage. This supersedes explicit-save editor behavior above. Preserve backend contract and readonly rules. Implementation split: editor agent owns TaskDependencies+tests; root owns routing, other copy and docs. Auto-approved under existing make hands-off scope.
+
+
+Review obstacle fix: passed at 5b9f68a; independent probes with 5 and 30 edges confirm clearance, distinct lanes, input-order stability and minX.
+
+Inline/copy Verify: passed. Editor RED 11 failed/2 passed → GREEN 13 tests; full frontend 152 suites/1177 tests and build pass. Browser removes cover predecessor immediately, adds it back through search without edit/save buttons, rejects publication cycle with saved list intact and retry available. Copy audit covered tasks/projects/map/forms and goal search; repeated search finds no old conversational phrases. README updated for immediate persistence.
+
+
+Final follow-up conclusion: ccf5e21 + 5b9f68a improve arrow routing/visibility and fix the reviewed obstacle defect; f8b14de enables immediate add/remove; d4bd66c standardizes product copy. Independent review of 5b9f68a..d4bd66c found no critical/important issues (static review of component/store/integration/tests). Scoped lint and diff-check pass. Goal validated on real desktop/mobile task UI and persisted API data: no edit/save gate, rollback on cycle, links survive cold navigation. Proof: task-dependencies-inline.png and task-dependencies-inline-mobile.png in the session visualization directory. Local preview remains on 5190; worktree retained, no remote publication.
