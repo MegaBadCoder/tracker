@@ -94,13 +94,18 @@ export const useTaskStore = defineStore('tasks', () => {
     return updatedTask
   }
 
+  /** Загружает список задач с преобразованными датами без изменения хранилища; отклоняет промис при ошибке API. */
+  const fetchTaskSnapshot = async (): Promise<Task[]> => {
+    const { data } = await api.get<Record<string, unknown>[]>('/tasks')
+    return data.map(parseTask)
+  }
+
   const fetchTasks = async () => {
     loading.value = true
     error.value = null
 
     try {
-      const { data } = await api.get<Record<string, unknown>[]>('/tasks')
-      tasks.value = data.map(parseTask)
+      tasks.value = await fetchTaskSnapshot()
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Ошибка загрузки задач'
       console.error('Ошибка загрузки задач:', err)
@@ -443,6 +448,7 @@ export const useTaskStore = defineStore('tasks', () => {
     pomodoroTasks,
     highPriorityTasks,
     fetchTasks,
+    fetchTaskSnapshot,
     fetchTask,
     createTask,
     updateTask,

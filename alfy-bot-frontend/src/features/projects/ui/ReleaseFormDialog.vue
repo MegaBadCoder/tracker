@@ -150,7 +150,7 @@ async function submit() {
 
         <label class="grid gap-1.5 text-sm font-medium">
           Описание
-          <Textarea v-model="description" placeholder="Что войдёт в релиз" class="min-h-20 text-sm" aria-label="Описание релиза" />
+          <Textarea v-model="description" placeholder="Содержание релиза" class="min-h-20 text-sm" aria-label="Описание релиза" />
         </label>
 
         <div class="grid grid-cols-2 gap-3">

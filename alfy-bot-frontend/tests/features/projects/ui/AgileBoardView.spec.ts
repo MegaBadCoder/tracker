@@ -297,7 +297,10 @@ describe('agileBoardView', () => {
     await wrapper.vm.$nextTick()
 
     const headers = wrapper.findAll('.sticky.top-0')
-    expect(headers).toHaveLength(2)
+    expect(headers).toHaveLength(1)
+    expect(headers[0]!.classes()).toContain('bg-background')
+    expect(headers[0]!.classes()).toContain('col-span-full')
+    expect(headers[0]!.element.children).toHaveLength(2)
     expect(wrapper.text()).not.toContain('Без колонки')
   })
 

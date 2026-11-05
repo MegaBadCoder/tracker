@@ -19,3 +19,5 @@ export { Release } from './release.entity';
 
 export { SprintEvent } from './sprint-event.entity';
 export { PlanningUndo } from './planning-undo.entity';
+
+export { TaskDependency } from './task-dependency.entity';

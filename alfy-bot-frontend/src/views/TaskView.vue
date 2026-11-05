@@ -5,9 +5,10 @@ import AppHeader from '@/components/AppHeader.vue'
 import PageContainer from '@/components/PageContainer.vue'
 import { Button } from '@/components/ui/button'
 import { useConfirm } from '@/composables/useConfirm'
+import { taskLinkPath } from '@/features/tasks/lib/task-link'
 import { useTaskDetailHandlers } from '@/features/tasks/lib/use-task-detail-handlers'
 import { useTaskStore } from '@/features/tasks/model/task-store'
-import TaskDetailDialog from '@/features/tasks/ui/TaskDetailDialog.vue'
+import TaskDetailContent from '@/features/tasks/ui/TaskDetailContent.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,12 +23,16 @@ const {
   handleUpdateChecklist,
   handleUpdatePomodoroConfig,
   handleDeleteFromDialog,
-} = useTaskDetailHandlers(taskStore, confirm)
+} = useTaskDetailHandlers(taskStore, confirm, (task) => {
+  const path = taskLinkPath(task.id)
+  if (path)
+    void router.push(path)
+})
 const taskId = computed(() => String(route.params.taskId ?? ''))
 const loading = ref(false)
 const error = ref<string | null>(null)
 const notFound = ref(false)
-const deleting = ref(false)
+const deletionError = ref<string | null>(null)
 let request = 0
 const visibleTask = computed(() => selectedTask.value?.id === taskId.value ? selectedTask.value : null)
 
@@ -38,6 +43,7 @@ async function loadTask() {
   isDetailOpen.value = false
   loading.value = true
   error.value = null
+  deletionError.value = null
   notFound.value = false
   try {
     const task = await taskStore.fetchTask(id)
@@ -61,16 +67,10 @@ function leaveTask(projectId = visibleTask.value?.projectId) {
   void router.push(projectId ? { name: 'tasks-project', params: { projectId } } : { name: 'tasks' })
 }
 
-function handleOpenChange(open: boolean) {
-  isDetailOpen.value = open
-  if (!open && !deleting.value)
-    leaveTask()
-}
-
 async function deleteTask(id: string) {
   const previous = visibleTask.value
   const current = request
-  deleting.value = true
+  deletionError.value = null
   try {
     await handleDeleteFromDialog(id)
     if (current !== request)
@@ -83,10 +83,9 @@ async function deleteTask(id: string) {
   catch {
     if (current !== request)
       return
-    error.value = 'Не удалось удалить задачу. Попробуйте ещё раз.'
-  }
-  finally {
-    deleting.value = false
+    deletionError.value = 'Не удалось удалить задачу. Попробуйте ещё раз.'
+    if (previous)
+      handleOpenTask(previous)
   }
 }
 
@@ -113,19 +112,19 @@ onBeforeUnmount(() => {
         К задачам
       </Button>
     </div>
-    <p v-else class="py-8 text-muted-foreground">
-      {{ visibleTask?.title || 'Задача' }}
+    <p v-if="deletionError" role="alert" class="mb-4 text-destructive">
+      {{ deletionError }}
     </p>
+    <TaskDetailContent
+      v-if="visibleTask"
+      :key="visibleTask.id"
+      :task="visibleTask"
+      :open="isDetailOpen"
+      presentation="page"
+      @update="handleUpdateTask"
+      @update:checklist="handleUpdateChecklist"
+      @update:pomodoro-config="handleUpdatePomodoroConfig"
+      @delete="deleteTask"
+    />
   </PageContainer>
-  <TaskDetailDialog
-    v-if="visibleTask"
-    :key="visibleTask.id"
-    :task="visibleTask"
-    :open="isDetailOpen"
-    @update:open="handleOpenChange"
-    @update="handleUpdateTask"
-    @update:checklist="handleUpdateChecklist"
-    @update:pomodoro-config="handleUpdatePomodoroConfig"
-    @delete="deleteTask"
-  />
 </template>

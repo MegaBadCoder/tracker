@@ -20,7 +20,8 @@ type ConfirmFn = (opts: {
   cancelText?: string
 }) => Promise<boolean>
 
-export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
+/** Предоставляет редактирование задачи; onOpenTask заменяет открытие предпросмотра при внешней навигации. */
+export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn, onOpenTask?: (task: Task) => void) {
   const selectedTask = ref<Task | null>(null)
   const isDetailOpen = ref(false)
   const autofocusTitle = ref(false)
@@ -41,7 +42,7 @@ export function useTaskDetailHandlers(store: TaskStore, confirm: ConfirmFn) {
   let unregisterTaskOpener: (() => void) | null = null
 
   onMounted(() => {
-    unregisterTaskOpener = registerTaskOpener(handleOpenTask)
+    unregisterTaskOpener = registerTaskOpener(onOpenTask ?? handleOpenTask)
   })
 
   onBeforeUnmount(() => {

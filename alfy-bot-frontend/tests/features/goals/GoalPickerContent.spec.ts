@@ -44,7 +44,7 @@ describe('GoalPickerContent', () => {
 
     await wrapper.find('input').setValue('zzzz')
 
-    expect(wrapper.text()).toContain('Ничего не нашлось')
+    expect(wrapper.text()).toContain('Цели не найдены')
     expect(wrapper.text()).toContain('Попробуйте другое название')
     expect(wrapper.text()).not.toContain('Карьера')
   })

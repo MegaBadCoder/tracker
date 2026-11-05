@@ -209,7 +209,7 @@ async function submit() {
 
         <label class="grid gap-1.5 text-sm font-medium">
           Цель
-          <Textarea v-model="goal" placeholder="Чего хотим достичь" class="min-h-20 text-sm" aria-label="Цель спринта" />
+          <Textarea v-model="goal" placeholder="Ожидаемый результат спринта" class="min-h-20 text-sm" aria-label="Цель спринта" />
         </label>
 
         <div class="grid grid-cols-2 gap-3"><label class="grid gap-1.5 text-sm">Доступно, мин<Input v-model="capacity" type="number" min="0" step="1" placeholder="Не задано" aria-label="Доступное время спринта" /></label><label class="grid gap-1.5 text-sm">Резерв, мин<Input v-model="reserve" type="number" min="0" step="1" aria-label="Резерв времени спринта" /></label></div>

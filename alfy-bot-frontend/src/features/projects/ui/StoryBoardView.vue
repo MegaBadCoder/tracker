@@ -48,7 +48,7 @@ async function dropped(event: { added?: { element: BoardGroupNode } }, statusId:
 <template>
   <section aria-label="Доска историй" class="space-y-3">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <input v-model="query" type="search" placeholder="Найти историю" aria-label="Поиск историй" class="min-h-9 rounded-md border border-input bg-background px-3 text-sm"><Button variant="outline" size="sm" @click="settingsOpen = true">
+      <input v-model="query" type="search" placeholder="Поиск историй по названию" aria-label="Поиск историй" class="min-h-9 rounded-md border border-input bg-background px-3 text-sm"><Button variant="outline" size="sm" @click="settingsOpen = true">
         Настроить статусы
       </Button>
     </div>

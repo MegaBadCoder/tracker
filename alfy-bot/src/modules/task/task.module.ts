@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Task,
+  TaskDependency,
   PomodoroConfig,
   TimerSession,
   User,
@@ -49,6 +50,10 @@ import { TimerSessionService } from './timer-session.service';
 import { OverdueRecurringService } from './overdue-recurring.service';
 import { TaskController } from './task.controller';
 import { TaskGoalQueryPort } from './domain/task-goal-query.port';
+import { TaskDependencyPort } from './domain/task-dependency.port';
+import { TypeOrmTaskDependencyRepository } from './infrastructure/typeorm-task-dependency.repository';
+import { TaskDependencyService } from './task-dependency.service';
+import { TaskDependencyController } from './task-dependency.controller';
 
 const notificationProviders = isTelegramEnabled()
   ? [
@@ -61,6 +66,7 @@ const notificationProviders = isTelegramEnabled()
   imports: [
     TypeOrmModule.forFeature([
       Task,
+      TaskDependency,
       PomodoroConfig,
       TimerSession,
       User,
@@ -77,8 +83,10 @@ const notificationProviders = isTelegramEnabled()
     NotificationModule,
     EventsModule,
   ],
-  controllers: [TaskController],
+  controllers: [TaskController, TaskDependencyController],
   providers: [
+    TaskDependencyService,
+    { provide: TaskDependencyPort, useClass: TypeOrmTaskDependencyRepository },
     { provide: TaskRepositoryPort, useClass: TypeOrmTaskRepository },
     { provide: TaskLinkPort, useClass: TypeOrmTaskLinkRepository },
     {

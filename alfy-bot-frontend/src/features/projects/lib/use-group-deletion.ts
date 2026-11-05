@@ -1,7 +1,9 @@
 import type { BoardGroupNode } from '../model/types'
+import { ref } from 'vue'
 import { useConfirm } from '@/composables/useConfirm'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import { useGroupStore } from '../model/group-store'
+import { apiErrorMessage } from './api-error'
 import { deletionImpact, groupDeletionMessage, groupTaskIds } from './group-tree'
 
 /**
@@ -10,11 +12,13 @@ import { deletionImpact, groupDeletionMessage, groupTaskIds } from './group-tree
  * null`) для доски и карточки группы, чтобы они не разошлись.
  */
 export function useGroupDeletion() {
+  const error = ref<string | null>(null)
   const { confirm } = useConfirm()
   const groupStore = useGroupStore()
   const taskStore = useTaskStore()
 
   async function deleteGroupWithConfirm(projectId: string, group: BoardGroupNode): Promise<boolean> {
+    error.value = null
     const impact = deletionImpact(group, taskStore.tasks)
     const confirmed = await confirm({
       title: group.type === 'epic' ? 'Удалить эпик?' : 'Удалить историю?',
@@ -30,7 +34,7 @@ export function useGroupDeletion() {
       await groupStore.deleteGroup(projectId, group.id)
     }
     catch (err) {
-      console.error('Ошибка удаления группы:', err)
+      error.value = apiErrorMessage(err, 'Не удалось удалить группу')
       return false
     }
 
@@ -39,5 +43,5 @@ export function useGroupDeletion() {
     return true
   }
 
-  return { deleteGroupWithConfirm }
+  return { deleteGroupWithConfirm, error }
 }

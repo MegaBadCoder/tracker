@@ -179,7 +179,7 @@ function titleOf(id: string) {
       </p>
     </details>
     <form v-if="selectedSprint" class="grid gap-3 rounded-xl border border-border bg-muted/20 p-4 sm:grid-cols-[1fr_auto_auto_auto]" @submit.prevent="saveBudget">
-      <label class="grid gap-1.5 text-xs">Цель спринта<Input v-model="goal" placeholder="Какой результат получим" aria-label="Цель планирования" /></label>
+      <label class="grid gap-1.5 text-xs">Цель спринта<Input v-model="goal" placeholder="Ожидаемый результат спринта" aria-label="Цель планирования" /></label>
       <label class="grid gap-1.5 text-xs">Доступно, мин<Input v-model="capacity" type="number" min="0" step="1" placeholder="Не задано" aria-label="Бюджет спринта в минутах" class="sm:w-32" /></label>
       <label class="grid gap-1.5 text-xs">Резерв, мин<Input v-model="reserve" type="number" min="0" step="1" aria-label="Резерв спринта в минутах" class="sm:w-28" /></label>
       <Button type="submit" variant="outline" :disabled="busy || budgetInvalid" class="self-end">
