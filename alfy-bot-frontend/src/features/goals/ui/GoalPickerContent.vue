@@ -53,7 +53,7 @@
 
         <div v-else-if="isSearching && flatMatches.length === 0" class="px-3 py-2.5">
           <p class="text-sm">
-            Ничего не нашлось
+            Цели не найдены
           </p>
           <p class="mt-0.5 text-[12px] text-muted-foreground">
             Попробуйте другое название
@@ -186,11 +186,11 @@
           v-if="selectedGoals.length === 0"
           class="px-3 py-2.5 text-sm text-muted-foreground"
         >
-          Ничего не выбрано
+          Цели не выбраны
         </p>
         <div v-else-if="filteredSelected.length === 0" class="px-3 py-2.5">
           <p class="text-sm">
-            Ничего не нашлось
+            Цели не найдены
           </p>
           <p class="mt-0.5 text-[12px] text-muted-foreground">
             Попробуйте другое название

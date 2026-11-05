@@ -25,7 +25,7 @@
             </div>
             <div class="space-y-2">
               <label :for="descriptionId" class="text-sm font-medium">Описание</label>
-              <Input :id="descriptionId" v-model="localDescription" placeholder="О чём этот проект" />
+              <Input :id="descriptionId" v-model="localDescription" placeholder="Описание проекта" />
             </div>
             <div class="space-y-2">
               <span class="text-sm font-medium">Родительский проект</span>

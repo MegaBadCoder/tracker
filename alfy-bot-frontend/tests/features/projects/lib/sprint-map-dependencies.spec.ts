@@ -108,5 +108,4 @@ describe('связи карты', () => {
     expect(rails.every(x => x < obstacle.x - 12 || x > obstacle.x + obstacle.width + 12)).toBe(true)
     expect(new Set(rails).size).toBe(5)
   })
-
 })

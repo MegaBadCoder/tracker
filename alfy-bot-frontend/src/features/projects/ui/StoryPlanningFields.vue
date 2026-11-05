@@ -56,7 +56,7 @@ async function save() {
       <legend class="mb-2 text-xs text-muted-foreground">
         Зависит от историй
       </legend>
-      <Input v-model="search" type="search" aria-label="Поиск зависимостей" placeholder="Найти историю…" />
+      <Input v-model="search" type="search" aria-label="Поиск зависимостей" placeholder="Поиск историй по названию" />
       <div class="max-h-60 min-w-0 space-y-2 overflow-y-auto overscroll-contain pr-1">
         <label v-for="dependency in filteredDependencies" :key="dependency.id" class="flex min-w-0 items-start gap-2 text-xs">
           <input v-model="dependencyIds" type="checkbox" :value="dependency.id" class="mt-0.5 shrink-0 accent-primary">

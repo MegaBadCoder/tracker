@@ -12,7 +12,7 @@ function location(task: Task | null, onMap: boolean, hidden: boolean): string {
   if (!task)
     return 'Задача недоступна'
   if (hidden)
-    return 'Скрыта в ветке'
+    return 'В свёрнутой ветке'
   if (onMap)
     return 'На карте'
   if (task.projectId !== props.projectId)
@@ -32,7 +32,7 @@ function location(task: Task | null, onMap: boolean, hidden: boolean): string {
           {{ selectedTitle }}
         </p>
         <p class="mt-1 text-[11px] text-muted-foreground">
-          Предшественник → зависимая задача · пунктир — зависимость · ✓ — готово
+          Направление: от предшественника к зависимой задаче · зелёный — предшественник выполнен
         </p>
       </div>
       <Button variant="ghost" size="icon-sm" aria-label="Закрыть связи задач" @click="emit('close')">
@@ -40,14 +40,14 @@ function location(task: Task | null, onMap: boolean, hidden: boolean): string {
       </Button>
     </div>
     <p v-if="!links.length" role="status" class="py-1 text-xs text-muted-foreground">
-      Зависимостей нет
+      Зависимости не добавлены
     </p>
     <ul v-else class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
       <li v-for="link in links" :key="`${link.dependencyId}-${link.taskId}`" class="min-w-0 rounded-lg border border-border px-2.5 py-2 text-xs">
         <div class="mb-1.5 flex items-center gap-1 text-[10px] font-medium" :class="link.completed ? 'text-emerald-500' : 'text-primary'">
-          <Check v-if="link.completed" class="size-3" />{{ link.completed ? 'Готово' : 'Ожидает предшественника' }}
+          <Check v-if="link.completed" class="size-3" />{{ link.completed ? 'Предшественник выполнен' : 'Ожидает предшественника' }}
         </div>
-        <div v-for="endpoint in [{ task: link.predecessor, id: link.dependencyId, visible: !!link.from, hidden: link.predecessorHidden, label: 'Предшественник' }, { task: link.dependent, id: link.taskId, visible: !!link.to, hidden: link.dependentHidden, label: 'Зависит от него' }]" :key="endpoint.id" class="flex items-center gap-1.5 py-1">
+        <div v-for="endpoint in [{ task: link.predecessor, id: link.dependencyId, visible: !!link.from, hidden: link.predecessorHidden, label: 'Предшественник' }, { task: link.dependent, id: link.taskId, visible: !!link.to, hidden: link.dependentHidden, label: 'Зависимая задача' }]" :key="endpoint.id" class="flex items-center gap-1.5 py-1">
           <div class="min-w-0 flex-1">
             <span class="block text-[10px] text-muted-foreground">{{ endpoint.label }}</span>
             <a v-if="endpoint.task && taskLinkPath(endpoint.id)" :href="taskLinkPath(endpoint.id)!" class="block truncate rounded font-medium hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="`Открыть задачу: ${endpoint.task.title}`" :title="endpoint.task.title">{{ endpoint.task.title }}</a>

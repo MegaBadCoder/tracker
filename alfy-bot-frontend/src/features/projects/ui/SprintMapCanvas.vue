@@ -167,13 +167,13 @@ onMounted(initialize)
         <div class="relative z-10 flex flex-wrap items-center gap-2 border-b border-border bg-card p-2 sm:px-3">
           <div class="relative min-w-40 flex-1 sm:max-w-80">
             <Search class="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-            <Input v-model="query" aria-label="Найти на карте" placeholder="Найти на карте…" class="h-9 pr-8 pl-8" @keydown.enter.prevent="matches[0] && reveal(matches[0])" @keydown.esc="query = ''" />
+            <Input v-model="query" aria-label="Найти на карте" placeholder="Поиск на карте" class="h-9 pr-8 pl-8" @keydown.enter.prevent="matches[0] && reveal(matches[0])" @keydown.esc="query = ''" />
             <Button v-if="query" variant="ghost" size="icon-sm" class="absolute top-0.5 right-0.5" aria-label="Очистить поиск" @click="query = ''">
               <X class="size-3.5" />
             </Button>
             <div v-if="query.trim()" class="absolute top-full right-0 left-0 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg" aria-label="Результаты поиска">
               <p class="px-2 py-1.5 text-xs text-muted-foreground" role="status">
-                {{ matches.length ? `Найдено: ${matches.length}` : 'Ничего не найдено' }}
+                {{ matches.length ? `Найдено: ${matches.length}` : 'Совпадений не найдено' }}
               </p>
               <button v-for="node in matches.slice(0, 20)" :key="node.key" type="button" class="block w-full rounded-md px-2 py-2 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none" @click="reveal(node)">
                 <span class="line-clamp-2 wrap-anywhere">{{ node.title }}</span>
@@ -241,7 +241,7 @@ onMounted(initialize)
         <SprintMapDependencies v-if="dependencySelection || showAllDependencies" :links="dependencyGraph.links" :selected-title="dependencyTitle" :project-id="projectId" :show-all="showAllDependencies" @reveal="revealDependency" @close="closeDependencies" />
         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
           <span>Задачи → истории → эпики → спринт</span>
-          <span class="hidden sm:inline">Тяните фон · Ctrl / ⌘ + прокрутка — масштаб</span>
+          <span class="hidden sm:inline">Перемещение — перетаскивание фона · Масштаб — Ctrl / ⌘ + прокрутка</span>
           <span v-if="readonly">Спринт закрыт · просмотр</span>
         </div>
       </section>
