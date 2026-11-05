@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { SprintMapNode } from '../lib/sprint-map'
-import { useStorage } from '@vueuse/core'
-import { ChevronsLeftRight, Maximize, Minus, Plus, Search, X } from 'lucide-vue-next'
+import { useScrollLock, useStorage } from '@vueuse/core'
+import { ChevronsLeftRight, Maximize, Maximize2, Minimize2, Minus, Plus, Search, X } from 'lucide-vue-next'
+import { FocusScope } from 'reka-ui'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +14,9 @@ import SprintMapNodeCard from './SprintMapNode.vue'
 const props = defineProps<{ root: SprintMapNode, projectId: string, readonly: boolean }>()
 const emit = defineEmits<{ openNode: [node: SprintMapNode], addChild: [node: SprintMapNode] }>()
 const surface = ref<HTMLElement | null>(null)
+const container = ref<HTMLElement | null>(null)
+const fullscreen = ref(false)
+const scrollLocked = useScrollLock(document.documentElement)
 const query = ref('')
 const selected = ref<string | null>(null)
 const stored = useStorage<Record<string, string[]>>('alfy-sprint-map-collapsed', {}, undefined, { flush: 'sync' })
@@ -24,6 +28,21 @@ const matches = computed(() => query.value.trim() ? allNodes.value.filter(node =
 const viewport = useSprintMapViewport(surface)
 const { scale, minScale, dragging, transform } = viewport
 const percentage = computed(() => Math.round(scale.value * 100))
+
+async function setFullscreen(value: boolean) {
+  fullscreen.value = value
+  scrollLocked.value = value
+  await nextTick()
+  fit()
+  container.value?.querySelector<HTMLElement>('[data-fullscreen-toggle]')?.focus({ preventScroll: true })
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (!fullscreen.value || event.defaultPrevented)
+    return
+  event.preventDefault()
+  void setFullscreen(false)
+}
 
 function saveCollapsed(keys: Set<string>) {
   stored.value = { ...stored.value, [scope.value]: [...keys] }
@@ -109,66 +128,79 @@ onMounted(initialize)
 </script>
 
 <template>
-  <section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-background" aria-label="Турнирная карта спринта">
-    <div class="relative z-10 flex flex-wrap items-center gap-2 border-b border-border bg-card p-2 sm:px-3">
-      <div class="relative min-w-40 flex-1 sm:max-w-80">
-        <Search class="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-        <Input v-model="query" aria-label="Найти на карте" placeholder="Найти на карте…" class="h-9 pr-8 pl-8" @keydown.enter.prevent="matches[0] && reveal(matches[0])" @keydown.esc="query = ''" />
-        <Button v-if="query" variant="ghost" size="icon-sm" class="absolute top-0.5 right-0.5" aria-label="Очистить поиск" @click="query = ''">
-          <X class="size-3.5" />
-        </Button>
-        <div v-if="query.trim()" class="absolute top-full right-0 left-0 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg" aria-label="Результаты поиска">
-          <p class="px-2 py-1.5 text-xs text-muted-foreground" role="status">
-            {{ matches.length ? `Найдено: ${matches.length}` : 'Ничего не найдено' }}
-          </p>
-          <button v-for="node in matches.slice(0, 20)" :key="node.key" type="button" class="block w-full rounded-md px-2 py-2 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none" @click="reveal(node)">
-            <span class="line-clamp-2 wrap-anywhere">{{ node.title }}</span>
-            <span class="text-xs text-muted-foreground">{{ node.statusLabel }}</span>
-          </button>
-          <p v-if="matches.length > 20" class="px-2 py-1.5 text-xs text-muted-foreground">
-            Уточните запрос, чтобы увидеть остальные.
-          </p>
+  <Teleport to="body" :disabled="!fullscreen">
+    <FocusScope as-child :trapped="fullscreen" :loop="fullscreen" @mount-auto-focus.prevent @unmount-auto-focus.prevent>
+      <section
+        ref="container" class="flex min-h-0 flex-1 flex-col overflow-hidden border-border bg-background"
+        :class="fullscreen ? 'fixed inset-0 z-40 h-dvh w-full' : 'rounded-xl border'"
+        :role="fullscreen ? 'dialog' : 'region'" :aria-modal="fullscreen || undefined"
+        aria-label="Турнирная карта спринта" @keydown.esc="onEscape"
+      >
+        <div class="relative z-10 flex flex-wrap items-center gap-2 border-b border-border bg-card p-2 sm:px-3">
+          <div class="relative min-w-40 flex-1 sm:max-w-80">
+            <Search class="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+            <Input v-model="query" aria-label="Найти на карте" placeholder="Найти на карте…" class="h-9 pr-8 pl-8" @keydown.enter.prevent="matches[0] && reveal(matches[0])" @keydown.esc="query = ''" />
+            <Button v-if="query" variant="ghost" size="icon-sm" class="absolute top-0.5 right-0.5" aria-label="Очистить поиск" @click="query = ''">
+              <X class="size-3.5" />
+            </Button>
+            <div v-if="query.trim()" class="absolute top-full right-0 left-0 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg" aria-label="Результаты поиска">
+              <p class="px-2 py-1.5 text-xs text-muted-foreground" role="status">
+                {{ matches.length ? `Найдено: ${matches.length}` : 'Ничего не найдено' }}
+              </p>
+              <button v-for="node in matches.slice(0, 20)" :key="node.key" type="button" class="block w-full rounded-md px-2 py-2 text-left text-sm hover:bg-accent focus-visible:bg-accent focus-visible:outline-none" @click="reveal(node)">
+                <span class="line-clamp-2 wrap-anywhere">{{ node.title }}</span>
+                <span class="text-xs text-muted-foreground">{{ node.statusLabel }}</span>
+              </button>
+              <p v-if="matches.length > 20" class="px-2 py-1.5 text-xs text-muted-foreground">
+                Уточните запрос, чтобы увидеть остальные.
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <Button variant="ghost" size="icon-sm" aria-label="Уменьшить масштаб" :disabled="scale <= minScale" @click="viewport.zoom(scale / 1.2)">
+              <Minus />
+            </Button>
+            <button type="button" class="w-11 rounded px-1 py-1.5 text-center text-xs tabular-nums hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Масштаб 100 процентов" @click="viewport.zoom(1)">
+              {{ percentage }}%
+            </button>
+            <Button variant="ghost" size="icon-sm" aria-label="Увеличить масштаб" :disabled="scale >= 1.75" @click="viewport.zoom(scale * 1.2)">
+              <Plus />
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" @click="fit">
+            <Maximize /><span>Вся карта</span>
+          </Button>
+          <Button variant="ghost" size="sm" :disabled="!collapsed.size" @click="expandAll">
+            <ChevronsLeftRight /><span>Раскрыть всё</span>
+          </Button>
+          <Button variant="outline" size="sm" class="ml-auto" data-fullscreen-toggle :aria-label="fullscreen ? 'Выйти из полноэкранного режима' : 'Развернуть карту на весь экран'" :aria-pressed="fullscreen" @click="setFullscreen(!fullscreen)">
+            <Minimize2 v-if="fullscreen" /><Maximize2 v-else />
+            <span>{{ fullscreen ? 'Свернуть' : 'На весь экран' }}</span>
+          </Button>
         </div>
-      </div>
-      <div class="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" aria-label="Уменьшить масштаб" :disabled="scale <= minScale" @click="viewport.zoom(scale / 1.2)">
-          <Minus />
-        </Button>
-        <button type="button" class="w-11 rounded px-1 py-1.5 text-center text-xs tabular-nums hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Масштаб 100 процентов" @click="viewport.zoom(1)">
-          {{ percentage }}%
-        </button>
-        <Button variant="ghost" size="icon-sm" aria-label="Увеличить масштаб" :disabled="scale >= 1.75" @click="viewport.zoom(scale * 1.2)">
-          <Plus />
-        </Button>
-      </div>
-      <Button variant="outline" size="sm" @click="fit">
-        <Maximize /><span>Вся карта</span>
-      </Button>
-      <Button variant="ghost" size="sm" :disabled="!collapsed.size" @click="expandAll">
-        <ChevronsLeftRight /><span>Раскрыть всё</span>
-      </Button>
-    </div>
-    <div
-      ref="surface" class="map-surface relative min-h-[420px] flex-1 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-      :class="dragging ? 'cursor-grabbing' : 'cursor-grab'" tabindex="0" role="region" aria-label="Полотно: стрелки для перемещения, плюс и минус для масштаба"
-      @pointerdown="viewport.onPointerDown" @pointermove="viewport.onPointerMove" @pointerup="viewport.onPointerUp" @pointercancel="viewport.onPointerUp" @lostpointercapture="viewport.onPointerUp"
-      @wheel.prevent="viewport.onWheel" @keydown="viewport.onKeyDown"
-    >
-      <div class="absolute top-0 left-0 origin-top-left" :style="{ width: `${layout.width}px`, height: `${layout.height}px`, transform }" data-testid="map-plane">
-        <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
-          <path v-for="edge in layout.edges" :key="`${edge.from}-${edge.to}`" :d="edge.path" fill="none" class="stroke-muted-foreground/35" stroke-width="1.5" />
-        </svg>
-        <div v-for="item in layout.nodes" :key="item.node.key" class="absolute cursor-default" :style="{ left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` }">
-          <SprintMapNodeCard :node="item.node" :project-id="projectId" :readonly="readonly" :collapsed="collapsed.has(item.node.key)" :selected="selected === item.node.key" @toggle="toggle(item.node)" @focus="focusNode(item.node.key)" @open="emit('openNode', item.node)" @add="add(item.node)" />
+        <div
+          ref="surface" class="map-surface relative flex-1 overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          :class="[dragging ? 'cursor-grabbing' : 'cursor-grab', fullscreen ? 'min-h-0' : 'min-h-[420px]']" tabindex="0" role="region" aria-label="Полотно: стрелки для перемещения, плюс и минус для масштаба"
+          @pointerdown="viewport.onPointerDown" @pointermove="viewport.onPointerMove" @pointerup="viewport.onPointerUp" @pointercancel="viewport.onPointerUp" @lostpointercapture="viewport.onPointerUp"
+          @wheel.prevent="viewport.onWheel" @keydown="viewport.onKeyDown"
+        >
+          <div class="absolute top-0 left-0 origin-top-left" :style="{ width: `${layout.width}px`, height: `${layout.height}px`, transform }" data-testid="map-plane">
+            <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
+              <path v-for="edge in layout.edges" :key="`${edge.from}-${edge.to}`" :d="edge.path" fill="none" class="stroke-muted-foreground/35" stroke-width="1.5" />
+            </svg>
+            <div v-for="item in layout.nodes" :key="item.node.key" class="absolute cursor-default" :style="{ left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` }">
+              <SprintMapNodeCard :node="item.node" :project-id="projectId" :readonly="readonly" :collapsed="collapsed.has(item.node.key)" :selected="selected === item.node.key" @toggle="toggle(item.node)" @focus="focusNode(item.node.key)" @open="emit('openNode', item.node)" @add="add(item.node)" />
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
-      <span>Задачи → истории → эпики → спринт</span>
-      <span class="hidden sm:inline">Тяните фон · Ctrl / ⌘ + прокрутка — масштаб</span>
-      <span v-if="readonly">Спринт закрыт · просмотр</span>
-    </div>
-  </section>
+        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
+          <span>Задачи → истории → эпики → спринт</span>
+          <span class="hidden sm:inline">Тяните фон · Ctrl / ⌘ + прокрутка — масштаб</span>
+          <span v-if="readonly">Спринт закрыт · просмотр</span>
+        </div>
+      </section>
+    </FocusScope>
+  </Teleport>
 </template>
 
 <style scoped>

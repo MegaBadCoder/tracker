@@ -1,7 +1,8 @@
 import type { SprintMapNode } from '@/features/projects/lib/sprint-map'
-import { mount } from '@vue/test-utils'
+import { DOMWrapper, mount } from '@vue/test-utils'
+import { useBodyScrollLock } from 'reka-ui'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { nextTick } from 'vue'
+import { defineComponent, nextTick } from 'vue'
 import SprintMapCanvas from '@/features/projects/ui/SprintMapCanvas.vue'
 
 const projectId = '00000000-0000-4000-8000-000000000001'
@@ -31,6 +32,54 @@ function planeTransform(wrapper: ReturnType<typeof render>) {
 beforeEach(() => localStorage.removeItem('alfy-sprint-map-collapsed'))
 
 describe('карта спринта', () => {
+  it('разворачивает карту, сохраняет свёрнутые ветки и возвращается по Escape', async () => {
+    const wrapper = render()
+    const previousOverflow = document.documentElement.style.overflow
+    await wrapper.get('button[aria-label="Свернуть Принимать карты"]').trigger('click')
+    await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
+    await nextTick()
+    const fullscreen = new DOMWrapper(document.body.querySelector<HTMLElement>('[role="dialog"][aria-label="Турнирная карта спринта"]')!)
+    expect(fullscreen.element.parentElement).toBe(document.body)
+    expect(fullscreen.attributes('aria-modal')).toBe('true')
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    expect(fullscreen.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(false)
+    expect(fullscreen.get(`[data-map-node="story:${storyId}"]`).text()).toContain('Скрыто: 2')
+    await fullscreen.get('button[aria-label="Выйти из полноэкранного режима"]').trigger('keydown', { key: 'Escape' })
+    await nextTick()
+    expect(wrapper.get('section').attributes('role')).toBe('region')
+    expect(document.documentElement.style.overflow).toBe(previousOverflow)
+    expect(document.activeElement).toBe(wrapper.get('[data-fullscreen-toggle]').element)
+    wrapper.unmount()
+  })
+
+  it('снимает блокировку прокрутки при уходе с полноэкранной карты', async () => {
+    const previousOverflow = document.documentElement.style.overflow
+    const wrapper = render()
+    await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
+    wrapper.unmount()
+    expect(document.documentElement.style.overflow).toBe(previousOverflow)
+    expect(document.querySelector('[role="dialog"][aria-label="Турнирная карта спринта"]')).toBeNull()
+  })
+
+  it('согласует прокрутку с редактором, который остаётся открытым после ухода с карты', async () => {
+    const previousOverflow = document.body.style.overflow
+    const wrapper = render()
+    await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
+    const editor = mount(defineComponent({
+      setup() {
+        useBodyScrollLock(true)
+        return () => null
+      },
+    }))
+    await nextTick()
+    wrapper.unmount()
+    await nextTick()
+    expect(document.body.style.overflow).toBe('hidden')
+    editor.unmount()
+    await nextTick()
+    expect(document.body.style.overflow).toBe(previousOverflow)
+  })
+
   it('показывает выпуск релиза отдельно от готовности задачи', async () => {
     const task = node('task', taskId, 'Готовая запись')
     task.releases = [{ id: 'release', name: 'Демо', status: 'planned' }]

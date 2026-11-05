@@ -108,3 +108,11 @@ Notes: baseline 34 tests passed. PH1 12 tests and creation 5 tests observed RED�
 Review re-verification: CK2 broke for released vs planned labels; regression reproduced identical trees, then passed after preserving release state. CK9 — «Вся карта» on 100 tasks broke (1509 px in a 600 px viewport); regression now fits all bounds and preserves a 1.2× zoom step. UI regression distinguishes «Запланирован: Демо» and «Выпущен: Демо» with unchanged task progress.
 
 CK9 browser recheck — held: real 100-task sprint, plane height 380 px inside a 420 px viewport, fullyInside=true. Final suite: 148 files / 1132 tests pass; production build passes. Review a6a81d5..9a6e101: both findings resolved.
+
+### Полноэкранная карта
+
+По запросу пользователя добавлен режим на всю область окна: «На весь экран» / «Свернуть», выход по Escape, перенос того же полотна в body без потери свёрнутых веток. Масштаб подстраивается под размер; прокрутка страницы блокируется и восстанавливается при выходе/уходе. FocusScope удерживает клавиатуру на карте; общие редакторы открываются поверх неё, Escape в редакторе не закрывает саму карту.
+
+Проверки: 17 тестов Canvas/Page, vue-tsc, ESLint и production build проходят. Браузер: переключение, preview → Escape → Escape; mobile 390×844 — карта x=0/y=0, width=390/height=844, body.scrollWidth=390.
+
+Ревью выявило конфликт блокировки body при уходе с карты с открытым редактором. Карта блокирует documentElement, а body остаётся во владении Reka. Регрессия RED→GREEN и реальный переход fullscreen → story preview → Back → close подтверждают восстановление overflow и pointerEvents; повторное открытие карты работает. Независимое ревью закрыло замечание.
