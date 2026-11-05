@@ -1,24 +1,24 @@
 # Радиальная карта спринта
 
-**Status:** reviewing
+**Status:** done
 **Branch:** codex/radial-sprint-map
 **Worktree:** /Users/v/projects/Alfy/.worktrees/radial-sprint-map
 **Base:** 278625d (main)
 **Mode:** hands-off
-**Goal:** Пользователь обозревает большой спринт как радиальное дерево, раскрывает нужную ветку и видит задачи/готовность без вытянутой турнирной сетки. Useless if: подписи накладываются, обзор скрывает работу без раскрытия, зависимости проходят под карточками, поиск/collapse/fullscreen перестают работать.
+**Goal:** Пользователь обозревает большой спринт как двустороннюю mind map, раскрывает нужную ветку и видит задачи/готовность без вытянутой турнирной сетки. Useless if: подписи накладываются, обзор скрывает работу без раскрытия, зависимости проходят под карточками, поиск/collapse/fullscreen перестают работать.
 
 ## Context
 - Пользователь считает растущую турнирную сетку неудобной и прямо просит радиальное отображение.
 - Существующая карта уже имеет общий редактор, зависимости, сохранённые свёрнутые ветки и fullscreen; меняется визуальная проекция, не данные.
 
 ## Design
-Спринт в центре, эпики на первом кольце, истории и задачи на следующих. Горизонтальные карточки сохраняют название, статус, готовность и действия. Угловые сектора пропорциональны числу видимых листьев; радиусы учитывают размеры карточек и угловые расстояния. Уровни детализации «Эпики / Истории / Задачи» дают быстрый обзор и раскрытие без потери данных. Новые scope начинают с обзора эпиков, сохранённые ветки сохраняются; поиск раскрывает путь и возвращает читаемый масштаб.
+Спринт в центре. Эпики распределяются влево и вправо по полному размеру веток, поэтому сворачивание не меняет сторону эпика. Истории и задачи продолжают свою ветку наружу. Горизонтальные карточки сохраняют статус, прогресс и действия; связи иерархии имеют общий ортогональный ствол, как в предоставленном пользователем примере. Уровни «Эпики / Истории / Задачи» и последовательное раскрытие управляют плотностью; поиск раскрывает путь и приближает узел. Зависимости идут отдельным пунктирным слоем с обходом карточек. API, состав спринта и прогресс неизменны.
 
-Выбрана полноценная радиальная раскладка с адаптивными кольцами; простое вращение старой сетки сохраняет вытянутый размер. Свободное force-расположение потребовало бы нестабильных позиций и нового движка. Связи иерархии идут между краями карточек, зависимости сохраняют пунктир/наконечники и обходят видимые карточки. API, состав спринта и прогресс неизменны.
+Ранее реализованные кольца заменены двусторонними ветками по прямому выбору пользователя; исторические проверки кольцевой версии ниже относятся к 550f0f6, актуальная геометрия — 0a5eacf.
 TDD: yes — детерминированная геометрия, отсутствие наложений, обход препятствий, детализация и поиск; качество проверяется в браузере на малом и большом спринте.
 
 ### Invariants
-- IV1 — спринт в центре, глубина дерева растёт по радиусу, подписи горизонтальны, видимые карточки не перекрываются.
+- IV1 — спринт в центре, потомки растут наружу на стороне своей ветки, подписи горизонтальны, видимые карточки не перекрываются.
 - IV2 — сворачивание/детализация/поиск не меняют состав или прогресс; скрытая работа раскрывается и доступна по ссылкам.
 - IV3 — зависимости направлены, не проходят сквозь карточки, скрытые/внешние концы остаются доступны в панели.
 - IV4 — fullscreen, preview, постоянные ссылки, создание, клавиатура и narrow viewport сохраняют работу.
@@ -81,3 +81,6 @@ Plan (auto-approved): один этап — заменить layoutSprintMap и 
 
 
 Mind-map Verify: passed. New geometry tests RED (3failed/3passed) on radial implementation, GREEN after replacing it:47 layout/dependency/canvas/page tests; final17Canvas after label change, productionbuild/vue-tsc/scopedlint/diff-check pass. CK7 — left/right branches, common stems, outward descendants, fixed sides throughcollapse and unchangeddata — held. CK8 — 120tasks/151nodes, unbalanced110tasks and32collapse combinations: no card overlap or hierarchy segment crossing cards, centeredbounds and determinism — held. Browser60task demo confirms forked trunks both sides, dependencies on collapsednodes remainlisted, hidden search→RAD-3 preview works. Shared hierarchy stems render under group opacity to avoid darker repeated segments.
+
+
+Mind-map conclusion: 0a5eacf independently reviewed (5d80e02..0a5eacf), no important/critical findings ≥80. Scope: static geometry/state/dependency integration review; browser and test runs were controller evidence. Final browser shows two expanded epic branches with shared stems left/right,20/60 progress unchanged; mobile390px page has no horizontal overflow; hidden search opens RAD-3 preview. Screenshot /Users/v/.codex/visualizations/2026/11/04/01a1a794-bc60-7b13-a320-224d1cf0c89f/sprint-mindmap-branches.png. Preview retained on5191; no push/merge/deploy for this follow-up.
