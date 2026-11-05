@@ -1,24 +1,24 @@
 # Турнирная карта спринта
 
-**Status:** design
+**Status:** executing
 **Branch:** codex/release-canvas
 **Worktree:** /Users/v/projects/Alfy/.worktrees/release-canvas
 **Base:** 7b43e36 (codex/issue-pages; зависимость от общих редакторов и страниц)
-**Mode:** interactive
+**Mode:** hands-off
 **Goal:** Пользователь видит на масштабируемом полотне задачи выбранного спринта в их историях и эпиках, разбивает работу на дочерние элементы и понимает завершённость веток в этом спринте. Useless if: подписи перекрываются, узлы теряются при сворачивании, прогресс смешивает работу разных спринтов или завершённость задач подменяет статус истории/выпуск релиза.
 
 ## Context
-- Пользователь выбрал турнирную сетку на Canvas, сворачивание каждого составного узла и обзор готовности «как на чемпионате»; текущий этап — обсуждение, не реализация.
+- Пользователь выбрал турнирную сетку на Canvas, сворачивание каждого составного узла и обзор готовности «как на чемпионате»; пользователь согласовал начало реализации.
 - Пользователь уточнил: сетка формируется из спринта. `sprintTasks` уже отбирает задачи по проекту и спринту; доска дополнительно учитывает назначенные пустые истории.
 - `BoardGroup` содержит epic→story; задачи могут принадлежать истории, непосредственно эпику или не иметь группы.
 - `releaseId` назначается историям и задачам независимо; у эпика собственного релиза нет. Один эпик и даже история могут содержать задачи разных релизов.
 - Истории имеют собственные workflow-статусы, блокировку и зависимости; состояние released у релиза отдельно от готовности задач.
 - В ветке есть общие редакторы страницы/preview и постоянные ссылки на task/group.
 
-## Design — предложение, не утверждено
+## Design
 Отдельная вкладка карты в agile-проекте. Выбор спринта, по умолчанию активного; масштабирование и перемещение по полотну, раскрытие веток до нужного уровня. Узел содержит название, тип, фактический статус и счётчик готовности в выбранном спринте. Свёрнутая ветка сохраняет сводку и число скрытых потомков. Поиск раскрывает путь к найденному узлу. Кнопка добавления создаёт дочерний элемент, быстрый просмотр использует существующий редактор; ссылка открывает полноценную страницу. Предложение: новая задача явно получает выбранный спринт; пустая новая история также назначается в него.
 
-Выбрана турнирная раскладка: задачи слева сходятся в истории, далее эпики. Финальный узел справа требует уточнения после выбора спринта как источника данных: сам спринт либо релизы входящих задач. Карточки расположены по уровням, связи показывают группировку, не порядок выполнения. У родителя может быть любое число дочерних элементов; фиктивные пары участников не создаются. Родитель выравнивается относительно видимых дочерних веток. Сворачивание уплотняет ветку, сохраняя выбранный узел в поле зрения.
+Выбрана турнирная раскладка: задачи слева сходятся в истории, далее эпики. Финальный узел справа — выбранный спринт; релизы отображаются метками задач и историй. Карточки расположены по уровням, связи показывают группировку, не порядок выполнения. У родителя может быть любое число дочерних элементов; фиктивные пары участников не создаются. Родитель выравнивается относительно видимых дочерних веток. Сворачивание уплотняет ветку, сохраняя выбранный узел в поле зрения.
 
 Состав карты: задачи выбранного спринта и их родительские истории/эпики, плюс истории, явно назначенные в спринт, даже если они пусты. Прогресс ветки считается только по задачам этого спринта; пометка «есть задачи вне спринта» отличает частичное участие истории. Задачи непосредственно в эпике, без группы и без релиза остаются доступными. Смена раскладки и сворачивание не изменяют данные.
 
@@ -33,12 +33,47 @@
 - PC1 — устойчивое расположение и читаемость названий важнее декоративной симметрии.
 - PC2 — кнопка сворачивания, выбор узла и редактирование имеют разные понятные действия.
 
-### Unknowns
-- UK2 — финальный узел: выбранный спринт с релизами как метками либо отдельные релизы как финалы.
-- UK3 — создание дочерних элементов достаточно для первого выпуска или нужны переносы между родителями прямо на полотне.
-- UK4 — если релизы остаются отдельными финалами, согласовать представление эпиков/историй, работа которых распределена между ними.
+### Scope
+Создание и редактирование доступны для активных/плановых спринтов; закрытые открываются для просмотра. Перенос родителей выполняется существующим редактором, drag-reparent на полотне не входит в эту задачу. Для нового эпика форма также запрашивает первую историю, чтобы ветка имела назначение спринта. Частично успешное создание сохраняет идентификаторы для повтора без дублей и явно сообщает оставшийся шаг.
+TDD: yes для проекции/раскладки и сценариев сохранения/загрузки; визуальное качество проверяется браузером.
 
-Реализация и выбор библиотеки отложены до согласования поведения. Решение о TDD фиксируется при завершении дизайна: преобразование дерева, подсчёт прогресса и сохранение состояния потребуют регрессий; визуальная раскладка — браузерной проверки.
+## Plan
+Approach: собственная детерминированная раскладка дерева, SVG-связи и доступные HTML-карточки в масштабируемом полотне; существующие Vue/store/API, без новой зависимости и изменений backend.
 
-## Workspace
-Отдельный worktree создан и проверен на 7b43e36; зависимости и build-артефакты из других checkout не копировались. Baseline-тесты ещё не запускались: пока меняется только дизайн, установка окружения и проверки относятся к следующему этапу.
+### PH1 — Проекция и раскладка
+- Новые src/features/projects/lib/sprint-map.ts и sprint-map-layout.ts: типы, buildSprintMap, flattenSprintMap, layoutSprintMap. Срез одного project/sprint, empty assigned stories, прямые задачи эпика/без группы, own statuses, progress, outside count. Layout tasks→stories→epics→sprint, collapse без изменения totals. IV1–IV4.
+- Tests features/projects/lib/sprint-map.spec.ts и sprint-map-layout.spec.ts: RED→GREEN scope, mixed tasks, empty groups, no overlap, stable order, collapse.
+- Commit: feat(canvas): project sprint work into a tournament tree.
+
+### PH2 — Полотно
+- Новые ui/SprintMapCanvas.vue, ui/SprintMapNode.vue, lib/use-sprint-map-viewport.ts; props root:SprintMapNode, projectId:string, readonly:boolean; emits openNode(node), addChild(node). Панорама, zoom anchor, fit, focus, поиск с раскрытием пути, localStorage collapse per project/sprint, keyboard; отчётливые статусы/число скрытых элементов. IV2–IV5.
+- Tests ui/SprintMapCanvas.spec.ts: search раскрывает, collapse persistence, scoped keys, actions, readonly. SVG orthogonal paths behind horizontal cards, theme tokens, mobile toolbar, reduced motion.
+- Commit: feat(canvas): add interactive tournament sprint map.
+
+### PH3 — Страница и создание
+- Новый views/ProjectMapView.vue: атомарно применять project/groups/tasks snapshot/sprints/releases/columns/workflow только после актуальности request; errors/retry/missing, sprint query selection, scope reset. Existing quick-preview opener и TaskDetailDialog, real page links. IV1–IV5.
+- Новые lib/use-sprint-map-create.ts и ui/SprintMapCreateDialog.vue: task/story/epic+firststory, explicit selected sprint, released release handling, resumable partial failures, no duplicated creations.
+- router/index.ts + ui/ProjectTabs.vue: /tasks/project/:projectId/map name tasks-project-map; tests views/ProjectMapView.spec.ts, lib/use-sprint-map-create.spec.ts, tabs/router coverage.
+- README/CLAUDE/task: контракт карты, browser smoke, full frontend checks, independent review.
+- Commit: feat(projects): connect sprint map navigation and creation.
+
+### Interfaces
+- IF1 — sprint-map.ts exports SprintMapNode { key:string, kind:'sprint'|'epic'|'story'|'task'|'ungrouped', sourceId:string|null, title:string, statusLabel:string, statusCategory:string, statusColor:string|null, done:number, total:number, outsideCount:number, blockedReason:string|null, releaseNames:string[], children:SprintMapNode[] }. Keys kind:id; sourceId persisted entity ID, ungrouped null. buildSprintMap(input:{projectId:string,sprint:Sprint,groups:BoardGroupNode[],tasks:Task[],columns:ProjectColumn[],workflow:StoryWorkflowStatus[],releases:Release[]}):SprintMapNode; flattenSprintMap(root):SprintMapNode[].
+- IF2 — sprint-map-layout.ts exports layoutSprintMap(root:SprintMapNode,collapsed:ReadonlySet<string>):{nodes:PositionedMapNode[],edges:MapEdge[],width:number,height:number}; PositionedMapNode {node:SprintMapNode,x:number,y:number,width:number,height:number}; MapEdge {from:string,to:string,path:string}. Shared MAP_NODE_WIDTH=264, MAP_NODE_HEIGHT=156, MAP_COLUMN_GAP=96, MAP_ROW_GAP=32, MAP_PADDING=48. Columns task0/story1/epic|ungrouped2/sprint3. Edges child-right→parent-left.
+- IF3 — SprintMapCanvas.vue props {root:SprintMapNode,projectId:string,readonly:boolean}, emits {openNode:[node:SprintMapNode],addChild:[node:SprintMapNode]}. Canvas owns collapse/search/viewport, page owns mutation/loading. Node add allowed story→task, epic→story, sprint→epic+firststory; ungrouped no add.
+
+### Interface graph
+- PH1 -> IF1, IF2 @ alfy-bot-frontend/src/features/projects/lib/sprint-map.ts alfy-bot-frontend/src/features/projects/lib/sprint-map-layout.ts alfy-bot-frontend/tests/features/projects/lib/sprint-map.spec.ts alfy-bot-frontend/tests/features/projects/lib/sprint-map-layout.spec.ts
+- PH2 IF1, IF2 -> IF3 @ alfy-bot-frontend/src/features/projects/ui/SprintMapCanvas.vue alfy-bot-frontend/src/features/projects/ui/SprintMapNode.vue alfy-bot-frontend/src/features/projects/lib/use-sprint-map-viewport.ts alfy-bot-frontend/tests/features/projects/ui/SprintMapCanvas.spec.ts
+- PH3 IF1, IF3 -> @ alfy-bot-frontend/src/views/ProjectMapView.vue alfy-bot-frontend/src/features/projects/lib/use-sprint-map-create.ts alfy-bot-frontend/src/features/projects/ui/SprintMapCreateDialog.vue alfy-bot-frontend/src/router/index.ts alfy-bot-frontend/src/features/projects/ui/ProjectTabs.vue alfy-bot-frontend/tests/views/ProjectMapView.spec.ts alfy-bot-frontend/tests/features/projects/lib/use-sprint-map-create.spec.ts alfy-bot-frontend/tests/router/ alfy-bot-frontend/tests/features/projects/ui/ProjectTabs.spec.ts README.md CLAUDE.md docs/tasks/release-canvas.md
+
+### Risks / rollback
+- RK1 — shared stores swallow some errors: page loads raw responses and clean task snapshot; tests stale replies and retry.
+- RK2 — story creation and sprint assignment are separate requests: retry reuses created IDs; cancellation informs where partially created objects remain.
+- RK3 — large tree becomes tiny in fit view: initial useful zoom, focus/search, collapsible levels; no lossy filtering of completed tasks.
+
+## Conclusion
+### Hands-off decisions
+- udesign: «приступай» approves sprint as final node; existing autoapproval continues after design.
+- uplan: plan auto-approved; PH1/PH2 parallel implementers, PH3 controller; no changes to production.
+- frontend-design: use Alfy theme/body typography, task keys in monospace; distinctive feature is rightward tournament convergence, understated progress rails and status badges. No decorative new brand styles.
