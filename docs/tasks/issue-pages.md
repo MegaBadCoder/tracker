@@ -1,6 +1,6 @@
 # Страницы задач, историй и эпиков
 
-**Status:** executing
+**Status:** reviewing
 **Branch:** codex/issue-pages
 **Worktree:** /Users/v/projects/Alfy/.worktrees/issue-pages
 **Base:** adc9b59
@@ -70,8 +70,35 @@ Baseline focused TaskView/TaskDetail/GroupDetail and board suites; RED→GREEN c
 - RK1 — Extracting forms affects many callers: preserve wrapper contract, run existing suites, phase commits allow isolated revert.
 - RK2 — Store fetch catches errors or ensure returns early: pages must observe complete loading and display actual errors, never stale context.
 
+## Verify
+
+Result: passed
+
+Happy-path:
+- CK1 (IV1, IV2) — прямая ссылка требует предварительного открытия доски или показывает overlay — held: локальный API 3018/Vite 5188, холодные task/story страницы, переход task→epic; страницы без dialog, название и описание задачи, чеклист и зависимость сохранены через API и пережили reload.
+- CK2 (IV2) — извлечение формы ломает checklist/Pomodoro/frozen или preview — held: существующие и новые тесты TaskDetailDialog/Content/View, GroupDetailDialog/Content/View.
+
+Negative:
+- CK3 (IV1, IV3) — ошибка сети выглядит как удалённая группа или поздний ответ меняет страницу — held: GroupView tests network/retry/missing/late response; TaskView tests missing/error/race.
+- CK4 (IV2) — ошибка удаления уводит со страницы без сообщения — held: тесты отмены/ошибки удаления; GroupView показывает alert, TaskView восстанавливает редактор.
+
+Invariants / assumptions:
+- CK5 (IV4) — длинные зависимости распирают страницу — held: браузер desktop и 390 CSS px, document scrollWidth=390, поиск оставляет выбранную связь видимой, checked=true после reload; список ограничен по высоте.
+- CK6 (IV5) — история теряет collapsed после remount или скрывает статус/добавление — held: AgileStoryCollapse 3 tests, новая Pinia восстанавливает localStorage, другая история независима, добавление раскрывает; AgileBoardView 26 tests сохраняют сетку.
+- CK7 (IV3, IV4, IV5) — реальная доска/preview на 390/640px сохраняют возврат, скролл и collapse после reload — deferred: CUA перестал отвечать после проверок страниц (CDP timeouts, затем reset ядра); повторный getTab и inventory также timeout. Не подменено unit-тестом.
+
+Interfaces:
+- CK8 (IF1–IF3) — canonical links пересекаются с task/board или теряются после auth — held: route/group link tests, новый auth redirect test; ссылки child task и epic открыты в браузере.
+
+Smoke: локальные реальные Nest API и Vite, синтетический проект, 14 длинных зависимостей; task/story/epic страницы и сохранение проверены. Полный frontend test: 141 files / 1091 tests passed; дополнительный auth test 5/5; build passed; scoped lint passed. Node 25 запускался с NODE_OPTIONS=--no-experimental-webstorage из-за существующей несовместимости тестового localStorage.
+Goal: proxy only — функциональность страниц подтверждена напрямую; браузерный остаток CK7 не завершён из-за инструмента.
+Notes: тестовый checklist изначально был создан без обязательного order; сервер правильно вернул 400, fixture исправлен, повторное сохранение и UI 1 из 1 подтвердились.
+
 ## Conclusion
 ### Hands-off decisions
 - make: новый worktree от adc9b59, ранее согласованный автоапрув продолжается; production публикация этой новой доработки отдельна от завершённого предыдущего деплоя.
 - udesign: сохраняем существующий quick-preview клик; страницы доступны по постоянным ссылкам и явным действиям, общие редакторы предотвращают расхождение.
 - uplan: план auto-approved, PH1/PH2 независимые implementers, PH3 и интеграция контроллером; scope включает последнее дополнение о сворачивании.
+- uexecute: PH1 fda9085, PH2 b200701, PH3 a90971d; общий helper удаления расширен observable error ref для сохранения boolean-контракта существующих callers.
+### Deferred (needs user input)
+- Браузерная проверка CK7: инструмент CUA недоступен; implementation и автоматические проверки завершены, production не изменён.
