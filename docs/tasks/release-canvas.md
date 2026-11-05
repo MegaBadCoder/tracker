@@ -1,6 +1,6 @@
 # Турнирная карта спринта
 
-**Status:** reviewing
+**Status:** done
 **Branch:** codex/release-canvas
 **Worktree:** /Users/v/projects/Alfy/.worktrees/release-canvas
 **Base:** 7b43e36 (codex/issue-pages; зависимость от общих редакторов и страниц)
@@ -73,6 +73,15 @@ Approach: собственная детерминированная раскла
 - RK3 — large tree becomes tiny in fit view: initial useful zoom, focus/search, collapsible levels; no lossy filtering of completed tasks.
 
 ## Conclusion
+
+Outcome: турнирная карта выбранного спринта реализована и проверена сквозным браузерным сценарием; implementation HEAD 9a6e101. Independent review повторно закрыл оба замечания, новых подтверждённых дефектов нет.
+
+Invariants: IV1/IV4 — смешанный состав и пустые истории проверены тестами и API-backed UI; IV2 — workflow, прогресс и состояние выпуска разделены; IV3 — collapse/search/reload и обзор 100 задач; IV5 — общий preview, постоянная ссылка и создание всех трёх уровней через реальные API.
+
+Goal validation: пользователь может выбрать спринт, создать ветку, увидеть её после reload, свернуть и найти скрытую задачу; прогресс остаётся в границах спринта. Desktop и 390×844 проверены визуально без наложения управления. На большой карте общий обзор намеренно уменьшает карточки, поиск возвращает читаемый масштаб.
+
+Verified by: final frontend 148 suites / 1132 tests, production build, changed-file ESLint, vue-tsc, browser smoke. Local preview http://localhost:5189/tasks/project/e1e89400-cd7f-4725-a42e-e6aca914858f/map; screenshots sprint-map-desktop.png и sprint-map-mobile.png в каталоге визуализаций текущего чата.
+
 ### Hands-off decisions
 - udesign: «приступай» approves sprint as final node; existing autoapproval continues after design.
 - uplan: plan auto-approved; PH1/PH2 parallel implementers, PH3 controller; no changes to production.
@@ -97,3 +106,5 @@ Smoke: IAB + local frontend 5189 + real local API 3018; project e1e89400-cd7f-47
 Notes: baseline 34 tests passed. PH1 12 tests and creation 5 tests observed RED→GREEN; page tests observed RED→GREEN. First navigation test fixture returned a sprint of the wrong project; fixed fixture, no product workaround. Canvas border currentColor found in browser and replaced with border-border.
 
 Review re-verification: CK2 broke for released vs planned labels; regression reproduced identical trees, then passed after preserving release state. CK9 — «Вся карта» on 100 tasks broke (1509 px in a 600 px viewport); regression now fits all bounds and preserves a 1.2× zoom step. UI regression distinguishes «Запланирован: Демо» and «Выпущен: Демо» with unchanged task progress.
+
+CK9 browser recheck — held: real 100-task sprint, plane height 380 px inside a 420 px viewport, fullyInside=true. Final suite: 148 files / 1132 tests pass; production build passes. Review a6a81d5..9a6e101: both findings resolved.
