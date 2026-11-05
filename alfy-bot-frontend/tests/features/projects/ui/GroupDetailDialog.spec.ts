@@ -302,6 +302,37 @@ describe('groupDetailDialog', () => {
     wrapper.unmount()
   })
 
+  it('ошибка загрузки оставляет карточку открытой с возможностью повторить', async () => {
+    const epic = makeGroup({ title: 'Загруженный эпик' })
+    const wrapper = setup(makeProject(), [epic], [])
+    vi.mocked(groupsApi.fetchGroups).mockRejectedValueOnce(new Error('Нет сети'))
+    useGroupDetail().open('proj-1', 'epic-1')
+    await flushPromises()
+    expect(useGroupDetail().current.value?.groupId).toBe('epic-1')
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Нет сети')
+    await clickEl(findButtonByText('Повторить'))
+    expect(document.body.textContent).toContain('Загруженный эпик')
+    wrapper.unmount()
+  })
+
+  it('ответ старого запроса не закрывает уже открытую другую карточку', async () => {
+    const epic = makeGroup({ projectId: 'proj-2', title: 'Новый эпик' })
+    const wrapper = setup(makeProject(), [epic], [])
+    let resolveOld!: (value: any) => void
+    vi.mocked(groupsApi.fetchGroups).mockReturnValueOnce(new Promise((resolve) => {
+      resolveOld = resolve
+    }))
+    useGroupDetail().open('proj-1', 'missing')
+    await flushPromises()
+    useGroupDetail().open('proj-2', 'epic-1')
+    await flushPromises()
+    resolveOld({ data: [] })
+    await flushPromises()
+    expect(useGroupDetail().current.value).toEqual({ projectId: 'proj-2', groupId: 'epic-1' })
+    expect(document.body.textContent).toContain('Новый эпик')
+    wrapper.unmount()
+  })
+
   it('группа, которой нет в дереве после загрузки, закрывает карточку', async () => {
     const epic = makeGroup({ id: 'epic-1', title: 'Эпик 1' })
     const wrapper = setup(makeProject(), [epic], [])
