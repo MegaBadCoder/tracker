@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { useProjectStore } from '@/features/projects/model/project-store'
 import { useTaskDependencyStore } from '@/features/tasks/model/task-dependency-store'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskDependencies from '@/features/tasks/ui/TaskDependencies.vue'
@@ -59,8 +60,8 @@ it('постоянное поле показывает результаты то
   await flushPromises()
   expect(wrapper.find('[aria-label="Изменить зависимости"]').exists()).toBe(false)
   expect(wrapper.find('[data-testid="save-dependencies"]').exists()).toBe(false)
-  const input = wrapper.get('input[aria-label="Поиск задач по названию"]')
-  expect(input.attributes('placeholder')).toBe('Поиск задач по названию')
+  const input = wrapper.get('input[aria-label="Поиск задач по названию или номеру"]')
+  expect(input.attributes('placeholder')).toBe('Поиск задач по названию или номеру')
   expect(wrapper.find('[aria-label="Добавить предшественника Проверка"]').exists()).toBe(false)
   await input.setValue('Проверка')
   vi.mocked(api.put).mockResolvedValue({ data: { taskId: a, dependencyIds: [b, c] } })
@@ -216,4 +217,37 @@ it('удалённый предшественник исчезает из ожи
   await flushPromises()
   expect(wrapper.text()).not.toContain('Незавершённых зависимостей: 1')
   expect(wrapper.find(`a[href="/tasks/${b}"]`).exists()).toBe(false)
+})
+
+it('находит задачу по полному ключу без учёта регистра и точному номеру', async () => {
+  useProjectStore().projects = [{ id: 'other', title: 'Другой проект', type: 'agile', taskKeyPrefix: 'DEP', parentId: null, description: null, viewMode: 'board', icon: null, color: null, order: 0 }]
+  vi.mocked(api.get).mockImplementation(async path => ({ data: path === '/tasks' ? [task, { ...predecessor, number: 12 }, { ...another, number: 2 }] : [] }))
+  const wrapper = render()
+  await flushPromises()
+  const input = wrapper.get('input')
+  await input.setValue(' dep-12 ')
+  expect(wrapper.get('[aria-label="Добавить предшественника Подготовка"]').text()).toContain('DEP-12')
+  expect(wrapper.find('[aria-label="Добавить предшественника Проверка"]').exists()).toBe(false)
+  for (const query of ['2', '#2']) {
+    await input.setValue(query)
+    expect(wrapper.find('[aria-label="Добавить предшественника Подготовка"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Добавить предшественника Проверка"]').text()).toContain('DEP-2')
+  }
+  await input.setValue('999')
+  expect(wrapper.text()).toContain('Подходящих задач нет')
+  await input.setValue('Подготовка')
+  expect(wrapper.find('[aria-label="Добавить предшественника Подготовка"]').exists()).toBe(true)
+})
+
+it('ищет по номеру до загрузки проектов и учитывает префикс после загрузки', async () => {
+  vi.mocked(api.get).mockImplementation(async path => ({ data: path === '/tasks' ? [task, { ...predecessor, number: 12 }] : [] }))
+  const wrapper = render()
+  await flushPromises()
+  await wrapper.get('input').setValue('12')
+  expect(wrapper.get('[aria-label="Добавить предшественника Подготовка"]').text()).toContain('#12')
+  await wrapper.get('input').setValue('DEP-12')
+  expect(wrapper.find('[aria-label="Добавить предшественника Подготовка"]').exists()).toBe(false)
+  useProjectStore().projects = [{ id: 'other', title: 'Другой проект', type: 'agile', taskKeyPrefix: 'DEP', parentId: null, description: null, viewMode: 'board', icon: null, color: null, order: 0 }]
+  await flushPromises()
+  expect(wrapper.get('[aria-label="Добавить предшественника Подготовка"]').text()).toContain('DEP-12')
 })

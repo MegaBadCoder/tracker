@@ -4,6 +4,7 @@ import { GitBranch, Plus, X } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { taskKey } from '@/features/projects/lib/task-key'
 import { useProjectStore } from '@/features/projects/model/project-store'
 import { useSprintStore } from '@/features/projects/model/sprint-store'
 import { taskLinkPath } from '../lib/task-link'
@@ -23,6 +24,7 @@ const failedAction = ref<DependencyAction | null>(null)
 const pendingIds = ref<string[] | null>(null)
 const saving = ref(false)
 const query = ref('')
+const taskNumberPattern = /^#?\d+$/
 const cyrillicPattern = /\p{Script=Cyrillic}/u
 let generation = 0
 
@@ -31,12 +33,22 @@ const taskMap = computed(() => new Map(tasks.tasks.map(task => [task.id, task]))
 const savedIds = computed(() => graph.edges.filter(edge => edge.taskId === props.task.id && taskMap.value.has(edge.dependencyId)).map(edge => edge.dependencyId))
 const selected = computed(() => (pendingIds.value ?? savedIds.value).map(id => taskMap.value.get(id)).filter((task): task is Task => !!task))
 const waiting = computed(() => savedIds.value.filter(id => !taskMap.value.get(id)?.completed).length)
-const candidates = computed(() => query.value.trim()
-  ? tasks.tasks.filter(task =>
-      task.id !== props.task.id && taskLinkPath(task.id) && !savedIds.value.includes(task.id)
-      && task.title.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase()),
-    )
-  : [])
+const candidates = computed(() => {
+  const search = query.value.trim().toLocaleLowerCase()
+  if (!search)
+    return []
+  const numberSearch = taskNumberPattern.test(search)
+  return tasks.tasks.filter(task =>
+    task.id !== props.task.id && taskLinkPath(task.id) && !savedIds.value.includes(task.id)
+    && (task.title.toLocaleLowerCase().includes(search)
+      || (numberSearch ? task.number === Number(search.replace('#', '')) : keyFor(task)?.toLocaleLowerCase().includes(search))),
+  )
+})
+
+function keyFor(task: Task): string | null {
+  return taskKey(task.projectId ? projects.projectMap.get(task.projectId) : undefined, task)
+    ?? (typeof task.number === 'number' ? `#${task.number}` : null)
+}
 
 function scope(task: Task): string {
   const labels: string[] = []
@@ -164,7 +176,7 @@ onBeforeUnmount(() => generation++)
         <li v-for="predecessor in selected" :key="predecessor.id" class="flex min-w-0 items-center gap-2 rounded-md border border-border/60 px-2.5 py-2">
           <span class="size-2 shrink-0 rounded-full" :class="predecessor.completed ? 'bg-emerald-500' : 'bg-amber-500'" />
           <div class="min-w-0 flex-1">
-            <a :href="taskLinkPath(predecessor.id)!" class="block text-sm hover:underline [overflow-wrap:anywhere]">{{ predecessor.title }}</a>
+            <a :href="taskLinkPath(predecessor.id)!" class="block text-sm hover:underline [overflow-wrap:anywhere]"><span v-if="keyFor(predecessor)" class="mr-1.5 font-mono text-[11px] text-muted-foreground">{{ keyFor(predecessor) }}</span>{{ predecessor.title }}</a>
             <p class="text-[11px] text-muted-foreground">
               {{ predecessor.completed ? 'Выполнена' : 'Не выполнена' }}<span v-if="scope(predecessor)"> · {{ scope(predecessor) }}</span>
             </p>
@@ -178,12 +190,12 @@ onBeforeUnmount(() => generation++)
         Зависимости не добавлены
       </p>
       <div v-if="canEdit" class="space-y-2">
-        <Input v-model="query" :disabled="saving" aria-label="Поиск задач по названию" placeholder="Поиск задач по названию" class="h-8 text-sm" />
+        <Input v-model="query" :disabled="saving" aria-label="Поиск задач по названию или номеру" placeholder="Поиск задач по названию или номеру" class="h-8 text-sm" />
         <ul v-if="candidates.length" class="max-h-40 overflow-y-auto rounded-md border border-border/60">
           <li v-for="candidate in candidates" :key="candidate.id">
             <button type="button" class="flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-muted disabled:opacity-50" :disabled="saving" :aria-label="`Добавить предшественника ${candidate.title}`" @click="save({ kind: 'add', dependencyId: candidate.id })">
               <Plus :size="13" class="shrink-0 text-muted-foreground" />
-              <span class="min-w-0 text-xs [overflow-wrap:anywhere]">{{ candidate.title }}<span v-if="scope(candidate)" class="block text-[11px] text-muted-foreground">{{ scope(candidate) }}</span></span>
+              <span class="min-w-0 text-xs [overflow-wrap:anywhere]"><span v-if="keyFor(candidate)" class="mr-1.5 font-mono text-muted-foreground">{{ keyFor(candidate) }}</span>{{ candidate.title }}<span v-if="scope(candidate)" class="block text-[11px] text-muted-foreground">{{ scope(candidate) }}</span></span>
             </button>
           </li>
         </ul>
