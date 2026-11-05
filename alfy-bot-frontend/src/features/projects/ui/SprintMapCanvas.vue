@@ -3,7 +3,7 @@ import type { SprintMapNode } from '../lib/sprint-map'
 import type { TaskDependencyEdge } from '@/features/tasks/model/task-dependencies'
 import type { Task } from '@/features/tasks/model/types'
 import { useScrollLock, useStorage } from '@vueuse/core'
-import { ChevronsLeftRight, GitBranch, Maximize, Maximize2, Minimize2, Minus, Plus, Search, X } from 'lucide-vue-next'
+import { GitBranch, Maximize, Maximize2, Minimize2, Minus, Plus, Search, X } from 'lucide-vue-next'
 import { FocusScope } from 'reka-ui'
 import { computed, nextTick, onMounted, ref, useId, watch } from 'vue'
 import { Button } from '@/components/ui/button'
@@ -28,12 +28,22 @@ const showAllDependencies = ref(false)
 const dependencyArrowId = `dependency-arrow-${useId()}`
 const stored = useStorage<Record<string, string[]>>('alfy-sprint-map-collapsed', {}, undefined, { flush: 'sync' })
 const scope = computed(() => `${props.projectId}/${props.root.key}`)
-const collapsed = computed(() => new Set(Array.isArray(stored.value?.[scope.value]) ? stored.value[scope.value] : []))
+const collapsed = computed(() => new Set(Array.isArray(stored.value?.[scope.value]) ? stored.value[scope.value] : keysForLevel('epics')))
 const layout = computed(() => layoutSprintMap(props.root, collapsed.value))
 const allNodes = computed(() => flattenSprintMap(props.root))
 const matches = computed(() => query.value.trim() ? allNodes.value.filter(node => node.title.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase())) : [])
 const dependencyGraph = computed(() => deriveSprintMapDependencies({ root: props.root, visibleNodes: layout.value.nodes, tasks: props.tasks, dependencies: props.dependencies, selectedTaskId: dependencySelection.value, showAll: showAllDependencies.value }))
-const mapBounds = computed(() => ({ x: dependencyGraph.value.minX, width: layout.value.width - dependencyGraph.value.minX, height: layout.value.height }))
+const mapBounds = computed(() => {
+  const { minX, minY, maxX, maxY } = dependencyGraph.value.bounds
+  const x = Math.min(0, minX)
+  const y = Math.min(0, minY)
+  return { x, y, width: Math.max(layout.value.width, maxX) - x, height: Math.max(layout.value.height, maxY) - y }
+})
+const detailLevels = [{ id: 'epics', label: 'Эпики', aria: 'Показать эпики' }, { id: 'stories', label: 'Истории', aria: 'Показать истории' }, { id: 'tasks', label: 'Задачи', aria: 'Раскрыть всё' }] as const
+const selectedLevel = computed(() => detailLevels.find((level) => {
+  const keys = keysForLevel(level.id)
+  return keys.length === collapsed.value.size && keys.every(key => collapsed.value.has(key))
+})?.id)
 const dependencyTitle = computed(() => props.tasks.find(task => task.id === dependencySelection.value)?.title ?? null)
 const viewport = useSprintMapViewport(surface)
 const { scale, minScale, dragging, transform } = viewport
@@ -128,9 +138,19 @@ function fit() {
   viewport.fit(mapBounds.value)
 }
 
-function expandAll() {
-  saveCollapsed(new Set())
-  nextTick(fit)
+function keysForLevel(level: 'epics' | 'stories' | 'tasks'): string[] {
+  if (level === 'tasks')
+    return []
+  if (level === 'epics')
+    return allNodes.value.filter(node => node.key !== props.root.key && node.children.length).map(node => node.key)
+  return allNodes.value.filter(node => node.children.length && (node.kind === 'story' || node.kind === 'ungrouped' || (node.kind === 'epic' && node.children.every(child => child.kind === 'task')))).map(node => node.key)
+}
+
+async function setDetailLevel(level: 'epics' | 'stories' | 'tasks') {
+  saveCollapsed(new Set(keysForLevel(level)))
+  query.value = ''
+  await nextTick()
+  fit()
 }
 
 async function add(node: SprintMapNode) {
@@ -140,9 +160,7 @@ async function add(node: SprintMapNode) {
 }
 
 function initialize() {
-  const root = layout.value.nodes.find(item => item.node.key === props.root.key)
-  if (root)
-    viewport.initialize(mapBounds.value, { x: root.x + root.width / 2, y: root.y + root.height / 2 })
+  fit()
 }
 
 watch(scope, async () => {
@@ -162,7 +180,7 @@ onMounted(initialize)
         ref="container" class="flex min-h-0 flex-1 flex-col overflow-hidden border-border bg-background"
         :class="fullscreen ? 'fixed inset-0 z-40 h-dvh w-full' : 'rounded-xl border'"
         :role="fullscreen ? 'dialog' : 'region'" :aria-modal="fullscreen || undefined"
-        aria-label="Турнирная карта спринта" @keydown.esc="onEscape"
+        aria-label="Радиальная карта спринта" @keydown.esc="onEscape"
       >
         <div class="relative z-10 flex flex-wrap items-center gap-2 border-b border-border bg-card p-2 sm:px-3">
           <div class="relative min-w-40 flex-1 sm:max-w-80">
@@ -198,9 +216,11 @@ onMounted(initialize)
           <Button variant="outline" size="sm" @click="fit">
             <Maximize /><span>Вся карта</span>
           </Button>
-          <Button variant="ghost" size="sm" :disabled="!collapsed.size" @click="expandAll">
-            <ChevronsLeftRight /><span>Раскрыть всё</span>
-          </Button>
+          <div class="flex items-center rounded-lg border border-border bg-muted/30 p-0.5" role="group" aria-label="Детализация карты">
+            <Button v-for="level in detailLevels" :key="level.id" :variant="selectedLevel === level.id ? 'secondary' : 'ghost'" size="sm" class="h-7 px-2.5 text-xs" :aria-label="level.aria" :aria-pressed="selectedLevel === level.id" @click="setDetailLevel(level.id)">
+              {{ level.label }}
+            </Button>
+          </div>
           <Button :variant="showAllDependencies ? 'secondary' : 'ghost'" size="sm" aria-label="Все связи задач" :aria-pressed="showAllDependencies" @click="showAllDependencies = !showAllDependencies">
             <GitBranch /><span>Все связи</span>
           </Button>
@@ -240,7 +260,7 @@ onMounted(initialize)
         </div>
         <SprintMapDependencies v-if="dependencySelection || showAllDependencies" :links="dependencyGraph.links" :selected-title="dependencyTitle" :project-id="projectId" :show-all="showAllDependencies" @reveal="revealDependency" @close="closeDependencies" />
         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border bg-card px-3 py-2 text-[11px] text-muted-foreground">
-          <span>Задачи → истории → эпики → спринт</span>
+          <span>Спринт в центре · Эпики → истории → задачи</span>
           <span class="hidden sm:inline">Перемещение — перетаскивание фона · Масштаб — Ctrl / ⌘ + прокрутка</span>
           <span v-if="readonly">Спринт закрыт · просмотр</span>
         </div>

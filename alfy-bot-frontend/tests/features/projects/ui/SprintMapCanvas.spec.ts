@@ -3,6 +3,8 @@ import { DOMWrapper, mount } from '@vue/test-utils'
 import { useBodyScrollLock } from 'reka-ui'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { defineComponent, nextTick } from 'vue'
+import { deriveSprintMapDependencies } from '@/features/projects/lib/sprint-map-dependencies'
+import { layoutSprintMap } from '@/features/projects/lib/sprint-map-layout'
 import SprintMapCanvas from '@/features/projects/ui/SprintMapCanvas.vue'
 
 const projectId = '00000000-0000-4000-8000-000000000001'
@@ -19,7 +21,13 @@ function tree() {
   ])])
 }
 
-function render(root = tree(), readonly = false) {
+function render(root = tree(), readonly = false, overview = false) {
+  if (!overview) {
+    const stored = JSON.parse(localStorage.getItem('alfy-sprint-map-collapsed') ?? '{}')
+    const scope = `${projectId}/${root.key}`
+    if (!Object.hasOwn(stored, scope))
+      localStorage.setItem('alfy-sprint-map-collapsed', JSON.stringify({ ...stored, [scope]: [] }))
+  }
   return mount(SprintMapCanvas, { props: { root, projectId, readonly }, attachTo: document.body })
 }
 
@@ -32,13 +40,35 @@ function planeTransform(wrapper: ReturnType<typeof render>) {
 beforeEach(() => localStorage.removeItem('alfy-sprint-map-collapsed'))
 
 describe('карта спринта', () => {
+  it('открывает новый спринт обзором эпиков и раскрывает задачи по уровню детализации', async () => {
+    const root = tree()
+    const snapshot = JSON.stringify(root)
+    const wrapper = render(root, false, true)
+    expect(wrapper.find('[data-map-node="epic:epic"]').exists()).toBe(true)
+    expect(wrapper.find(`[data-map-node="story:${storyId}"]`).exists()).toBe(false)
+    expect(wrapper.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(false)
+    await wrapper.get('[aria-label="Развернуть Оплата"]').trigger('click')
+    expect(wrapper.find(`[data-map-node="story:${storyId}"]`).exists()).toBe(true)
+    expect(wrapper.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(false)
+    await wrapper.get('[aria-label="Показать истории"]').trigger('click')
+    expect(wrapper.find(`[data-map-node="story:${storyId}"]`).exists()).toBe(true)
+    await wrapper.get('[aria-label="Раскрыть всё"]').trigger('click')
+    expect(wrapper.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Раскрыть всё"]').attributes('aria-pressed')).toBe('true')
+    expect(JSON.stringify(root)).toBe(snapshot)
+    wrapper.unmount()
+    const restored = render(root, false, true)
+    expect(restored.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(true)
+    restored.unmount()
+  })
+
   it('разворачивает карту, сохраняет свёрнутые ветки и возвращается по Escape', async () => {
     const wrapper = render()
     const previousOverflow = document.documentElement.style.overflow
     await wrapper.get('button[aria-label="Свернуть Принимать карты"]').trigger('click')
     await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
     await nextTick()
-    const fullscreen = new DOMWrapper(document.body.querySelector<HTMLElement>('[role="dialog"][aria-label="Турнирная карта спринта"]')!)
+    const fullscreen = new DOMWrapper(document.body.querySelector<HTMLElement>('[role="dialog"][aria-label="Радиальная карта спринта"]')!)
     expect(fullscreen.element.parentElement).toBe(document.body)
     expect(fullscreen.attributes('aria-modal')).toBe('true')
     expect(document.documentElement.style.overflow).toBe('hidden')
@@ -58,7 +88,7 @@ describe('карта спринта', () => {
     await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
     wrapper.unmount()
     expect(document.documentElement.style.overflow).toBe(previousOverflow)
-    expect(document.querySelector('[role="dialog"][aria-label="Турнирная карта спринта"]')).toBeNull()
+    expect(document.querySelector('[role="dialog"][aria-label="Радиальная карта спринта"]')).toBeNull()
   })
 
   it('согласует прокрутку с редактором, который остаётся открытым после ухода с карты', async () => {
@@ -115,9 +145,9 @@ describe('карта спринта', () => {
     const restored = render()
     expect(restored.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(false)
     await restored.setProps({ root: { ...tree(), key: 'sprint:other' } })
-    expect(restored.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(true)
+    expect(restored.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(false)
     await restored.setProps({ root: tree(), projectId: 'other-project' })
-    expect(restored.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(true)
+    expect(restored.find(`[data-map-node="task:${taskId}"]`).exists()).toBe(false)
     restored.unmount()
   })
 
@@ -264,10 +294,14 @@ describe('зависимости на карте', () => {
     await wrapper.setProps({ tasks: ids.map(id => ({ ...tasks[0]!, id })), dependencies: ids.slice(1).map(id => ({ taskId: id, dependencyId: ids[0]! })) })
     await wrapper.get('button[aria-label="Все связи задач"]').trigger('click')
     await wrapper.findAll('button').find(button => button.text() === 'Вся карта')!.trigger('click')
-    const { x, scale } = planeTransform(wrapper)
-    const rails = wrapper.findAll('[data-dependency-edge]').map(edge => Number(edge.attributes('d').match(/Q([-\d.]+) /)![1]))
-    expect(Math.min(...rails)).toBeLessThan(0)
-    expect(Math.min(...rails) * scale + x).toBeGreaterThanOrEqual(20)
+    const { x, y, scale } = planeTransform(wrapper)
+    const layout = layoutSprintMap(root, new Set())
+    const graph = deriveSprintMapDependencies({ root, visibleNodes: layout.nodes, tasks: ids.map(id => ({ ...tasks[0]!, id })), dependencies: ids.slice(1).map(id => ({ taskId: id, dependencyId: ids[0]! })), selectedTaskId: null, showAll: true })
+    expect(wrapper.findAll('[data-dependency-edge]')).toHaveLength(7)
+    expect(Math.min(0, graph.bounds.minX) * scale + x).toBeGreaterThanOrEqual(19.99)
+    expect(Math.min(0, graph.bounds.minY) * scale + y).toBeGreaterThanOrEqual(19.99)
+    expect(Math.max(layout.width, graph.bounds.maxX) * scale + x).toBeLessThanOrEqual(940.01)
+    expect(Math.max(layout.height, graph.bounds.maxY) * scale + y).toBeLessThanOrEqual(580.01)
     wrapper.unmount()
   })
 
