@@ -26,7 +26,7 @@ function descendantCount(node: SprintMapNode): number {
 const details = computed(() => [
   props.collapsed ? `Скрыто: ${descendantCount(props.node)}` : '',
   props.node.outsideCount ? `Вне спринта: ${props.node.outsideCount}` : '',
-  ...props.node.releaseNames,
+  ...props.node.releases.map(release => `${release.status === 'released' ? 'Выпущен' : 'Запланирован'}: ${release.name}`),
 ].filter(Boolean).join(' · '))
 </script>
 

@@ -105,8 +105,20 @@ describe('buildSprintMap', () => {
       tasks: [task('done', { groupId: 'story', completed: true, releaseId: 'r' })],
       releases: [{ id: 'r', projectId: 'p', userId: 1, name: 'Версия 2', status: 'planned', description: null, startDate: null, releaseDate: null, releasedAt: null, order: 0, createdAt: '', updatedAt: '' }],
     }))
-    expect(flattenSprintMap(root).find(node => node.key === 'story:story')?.releaseNames).toEqual(['Версия 2'])
-    expect(flattenSprintMap(root).find(node => node.key === 'task:done')?.releaseNames).toEqual(['Версия 2'])
+    expect(flattenSprintMap(root).find(node => node.key === 'story:story')?.releases).toEqual([{ id: 'r', name: 'Версия 2', status: 'planned' }])
+    expect(flattenSprintMap(root).find(node => node.key === 'task:done')?.releases).toEqual([{ id: 'r', name: 'Версия 2', status: 'planned' }])
+  })
+
+  it('отличает выпущенный релиз от запланированного при одинаковом прогрессе задач', () => {
+    const data = input({
+      tasks: [task('done', { completed: true, releaseId: 'r' })],
+      releases: [{ id: 'r', projectId: 'p', userId: 1, name: 'Версия 2', status: 'planned', description: null, startDate: null, releaseDate: null, releasedAt: null, order: 0, createdAt: '', updatedAt: '' }],
+    })
+    const planned = buildSprintMap(data)
+    data.releases[0]!.status = 'released'
+    const released = buildSprintMap(data)
+    expect(released.done).toBe(planned.done)
+    expect(released).not.toEqual(planned)
   })
 
   it('сортирует по order и id независимо от порядка ответа, не меняя исходные данные', () => {

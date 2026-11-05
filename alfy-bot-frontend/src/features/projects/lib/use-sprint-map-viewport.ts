@@ -9,6 +9,7 @@ export function useSprintMapViewport(element: Ref<HTMLElement | null>) {
   const x = ref(0)
   const y = ref(0)
   const scale = ref(1)
+  const minScale = ref(0.08)
   const dragging = ref(false)
   const size = ref({ width: 960, height: 600 })
   let pointer: { id: number, x: number, y: number } | null = null
@@ -22,7 +23,7 @@ export function useSprintMapViewport(element: Ref<HTMLElement | null>) {
   }
 
   function zoom(next: number, point: MapPoint = { x: size.value.width / 2, y: size.value.height / 2 }) {
-    const clamped = Math.min(1.75, Math.max(0.08, next))
+    const clamped = Math.min(1.75, Math.max(minScale.value, next))
     const ratio = clamped / scale.value
     x.value = point.x - (point.x - x.value) * ratio
     y.value = point.y - (point.y - y.value) * ratio
@@ -36,7 +37,8 @@ export function useSprintMapViewport(element: Ref<HTMLElement | null>) {
 
   function fit(bounds: MapBounds) {
     measure()
-    scale.value = Math.max(0.08, Math.min(1, (size.value.width - 40) / bounds.width, (size.value.height - 40) / bounds.height))
+    scale.value = Math.max(Number.EPSILON, Math.min(1, (size.value.width - 40) / bounds.width, (size.value.height - 40) / bounds.height))
+    minScale.value = Math.min(0.08, scale.value)
     focus({ x: bounds.width / 2, y: bounds.height / 2 })
   }
 
@@ -122,5 +124,5 @@ export function useSprintMapViewport(element: Ref<HTMLElement | null>) {
   })
   onBeforeUnmount(() => observer?.disconnect())
 
-  return { x, y, scale, dragging, transform, zoom, focus, fit, initialize, onPointerDown, onPointerMove, onPointerUp, onWheel, onKeyDown }
+  return { x, y, scale, minScale, dragging, transform, zoom, focus, fit, initialize, onPointerDown, onPointerMove, onPointerUp, onWheel, onKeyDown }
 }

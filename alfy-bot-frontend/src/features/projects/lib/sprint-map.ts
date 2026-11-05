@@ -13,7 +13,7 @@ export interface SprintMapNode {
   total: number
   outsideCount: number
   blockedReason: string | null
-  releaseNames: string[]
+  releases: Pick<Release, 'id' | 'name' | 'status'>[]
   children: SprintMapNode[]
 }
 
@@ -52,9 +52,9 @@ export function buildSprintMap(input: SprintMapInput): SprintMapNode {
   const claimedGroups = new Set<string>()
   const claimedTasks = new Set<string>()
 
-  function releaseNames(releaseId?: string | null): string[] {
+  function nodeReleases(releaseId?: string | null): SprintMapNode['releases'] {
     const release = releaseId ? releases.get(releaseId) : undefined
-    return release ? [release.name] : []
+    return release ? [{ id: release.id, name: release.name, status: release.status }] : []
   }
 
   function taskNode(task: Task): SprintMapNode {
@@ -72,7 +72,7 @@ export function buildSprintMap(input: SprintMapInput): SprintMapNode {
       total: 1,
       outsideCount: 0,
       blockedReason: null,
-      releaseNames: releaseNames(task.releaseId),
+      releases: nodeReleases(task.releaseId),
       children: [],
     }
   }
@@ -109,7 +109,7 @@ export function buildSprintMap(input: SprintMapInput): SprintMapNode {
       ...summary(children),
       outsideCount,
       blockedReason: group.blockedReason ?? null,
-      releaseNames: releaseNames(group.releaseId),
+      releases: nodeReleases(group.releaseId),
       children,
     }
   }
@@ -127,7 +127,7 @@ export function buildSprintMap(input: SprintMapInput): SprintMapNode {
       statusColor: null,
       ...summary(ungroupedTasks),
       blockedReason: null,
-      releaseNames: [],
+      releases: [],
       children: ungroupedTasks,
     })
   }
@@ -141,7 +141,7 @@ export function buildSprintMap(input: SprintMapInput): SprintMapNode {
     statusColor: null,
     ...summary(children),
     blockedReason: null,
-    releaseNames: [],
+    releases: [],
     children,
   }
 }

@@ -58,7 +58,7 @@ Approach: собственная детерминированная раскла
 - Commit: feat(projects): connect sprint map navigation and creation.
 
 ### Interfaces
-- IF1 — sprint-map.ts exports SprintMapNode { key:string, kind:'sprint'|'epic'|'story'|'task'|'ungrouped', sourceId:string|null, title:string, statusLabel:string, statusCategory:string, statusColor:string|null, done:number, total:number, outsideCount:number, blockedReason:string|null, releaseNames:string[], children:SprintMapNode[] }. Keys kind:id; sourceId persisted entity ID, ungrouped null. buildSprintMap(input:{projectId:string,sprint:Sprint,groups:BoardGroupNode[],tasks:Task[],columns:ProjectColumn[],workflow:StoryWorkflowStatus[],releases:Release[]}):SprintMapNode; flattenSprintMap(root):SprintMapNode[].
+- IF1 — sprint-map.ts exports SprintMapNode { key:string, kind:'sprint'|'epic'|'story'|'task'|'ungrouped', sourceId:string|null, title:string, statusLabel:string, statusCategory:string, statusColor:string|null, done:number, total:number, outsideCount:number, blockedReason:string|null, releases:Pick<Release,'id'|'name'|'status'>[], children:SprintMapNode[] }. Keys kind:id; sourceId persisted entity ID, ungrouped null. buildSprintMap(input:{projectId:string,sprint:Sprint,groups:BoardGroupNode[],tasks:Task[],columns:ProjectColumn[],workflow:StoryWorkflowStatus[],releases:Release[]}):SprintMapNode; flattenSprintMap(root):SprintMapNode[].
 - IF2 — sprint-map-layout.ts exports layoutSprintMap(root:SprintMapNode,collapsed:ReadonlySet<string>):{nodes:PositionedMapNode[],edges:MapEdge[],width:number,height:number}; PositionedMapNode {node:SprintMapNode,x:number,y:number,width:number,height:number}; MapEdge {from:string,to:string,path:string}. Shared MAP_NODE_WIDTH=264, MAP_NODE_HEIGHT=156, MAP_COLUMN_GAP=96, MAP_ROW_GAP=32, MAP_PADDING=48. Columns task0/story1/epic|ungrouped2/sprint3. Edges child-right→parent-left.
 - IF3 — SprintMapCanvas.vue props {root:SprintMapNode,projectId:string,readonly:boolean}, emits {openNode:[node:SprintMapNode],addChild:[node:SprintMapNode]}. Canvas owns collapse/search/viewport, page owns mutation/loading. Node add allowed story→task, epic→story, sprint→epic+firststory; ungrouped no add.
 
@@ -76,7 +76,9 @@ Approach: собственная детерминированная раскла
 ### Hands-off decisions
 - udesign: «приступай» approves sprint as final node; existing autoapproval continues after design.
 - uplan: plan auto-approved; PH1/PH2 parallel implementers, PH3 controller; no changes to production.
-- frontend-design: use Alfy theme/body typography, task keys in monospace; distinctive feature is rightward tournament convergence, understated progress rails and status badges. No decorative new brand styles.
+- frontend-design: use Alfy theme/body typography, distinctive feature is rightward tournament convergence, understated progress rails and status badges. No decorative new brand styles.
+- ureview: fixed IV2 release-state loss — IF1 now preserves release id/name/status; cards distinguish planned and released independently of task progress.
+- ureview: fixed large-map clipping — fit derives its minimum zoom from actual bounds; later zoom steps remain continuous.
 
 ## Verify
 
@@ -93,3 +95,5 @@ Result: passed
 
 Smoke: IAB + local frontend 5189 + real local API 3018; project e1e89400-cd7f-4725-a42e-e6aca914858f. User preview 5188 preserved. No production changes.
 Notes: baseline 34 tests passed. PH1 12 tests and creation 5 tests observed RED→GREEN; page tests observed RED→GREEN. First navigation test fixture returned a sprint of the wrong project; fixed fixture, no product workaround. Canvas border currentColor found in browser and replaced with border-border.
+
+Review re-verification: CK2 broke for released vs planned labels; regression reproduced identical trees, then passed after preserving release state. CK9 — «Вся карта» on 100 tasks broke (1509 px in a 600 px viewport); regression now fits all bounds and preserves a 1.2× zoom step. UI regression distinguishes «Запланирован: Демо» and «Выпущен: Демо» with unchanged task progress.

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { layoutSprintMap, MAP_COLUMN_GAP, MAP_NODE_HEIGHT, MAP_NODE_WIDTH, MAP_PADDING, MAP_ROW_GAP } from '@/features/projects/lib/sprint-map-layout'
 
 function node(kind: SprintMapNode['kind'], id: string, children: SprintMapNode[] = []): SprintMapNode {
-  return { key: `${kind}:${id}`, kind, sourceId: id, title: id, statusLabel: '', statusCategory: 'open', statusColor: null, total: 4, done: 2, outsideCount: 0, blockedReason: null, releaseNames: [], children }
+  return { key: `${kind}:${id}`, kind, sourceId: id, title: id, statusLabel: '', statusCategory: 'open', statusColor: null, total: 4, done: 2, outsideCount: 0, blockedReason: null, releases: [], children }
 }
 
 function tree() {

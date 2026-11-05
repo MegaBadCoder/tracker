@@ -9,7 +9,7 @@ const taskId = '00000000-0000-4000-8000-000000000002'
 const storyId = '00000000-0000-4000-8000-000000000003'
 
 function node(kind: SprintMapNode['kind'], id: string, title: string, children: SprintMapNode[] = []): SprintMapNode {
-  return { key: `${kind}:${id}`, kind, sourceId: id, title, statusLabel: 'В работе', statusCategory: 'in_progress', statusColor: null, done: 1, total: 2, outsideCount: 0, blockedReason: null, releaseNames: [], children }
+  return { key: `${kind}:${id}`, kind, sourceId: id, title, statusLabel: 'В работе', statusCategory: 'in_progress', statusColor: null, done: 1, total: 2, outsideCount: 0, blockedReason: null, releases: [], children }
 }
 
 function tree() {
@@ -31,6 +31,30 @@ function planeTransform(wrapper: ReturnType<typeof render>) {
 beforeEach(() => localStorage.removeItem('alfy-sprint-map-collapsed'))
 
 describe('карта спринта', () => {
+  it('показывает выпуск релиза отдельно от готовности задачи', async () => {
+    const task = node('task', taskId, 'Готовая запись')
+    task.releases = [{ id: 'release', name: 'Демо', status: 'planned' }]
+    const wrapper = render(node('sprint', 'sprint', 'Спринт', [task]))
+    expect(wrapper.get(`[data-map-node="task:${taskId}"]`).text()).toContain('Запланирован: Демо')
+    await wrapper.setProps({ root: node('sprint', 'sprint', 'Спринт', [{ ...task, releases: [{ id: 'release', name: 'Демо', status: 'released' }] }]) })
+    expect(wrapper.get(`[data-map-node="task:${taskId}"]`).text()).toContain('Выпущен: Демо')
+    expect(wrapper.get(`[data-map-node="task:${taskId}"] [aria-label="Выполнено задач: 1 из 2"]`).exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('вмещает все сто задач и плавно увеличивает масштаб после общего обзора', async () => {
+    const root = node('sprint', 'large', 'Большой спринт', [node('ungrouped', 'ungrouped', 'Без эпика', Array.from({ length: 100 }, (_, index) => node('task', `task-${index}`, `Задача ${index}`)))])
+    const wrapper = render(root)
+    await wrapper.findAll('button').find(button => button.text() === 'Вся карта')!.trigger('click')
+    const plane = wrapper.get('[data-testid="map-plane"]').element as HTMLElement
+    const before = planeTransform(wrapper)
+    expect(Number.parseFloat(plane.style.height) * before.scale).toBeLessThanOrEqual(600)
+    expect(before.y).toBeGreaterThanOrEqual(0)
+    await wrapper.get('button[aria-label="Увеличить масштаб"]').trigger('click')
+    expect(planeTransform(wrapper).scale).toBeCloseTo(before.scale * 1.2)
+    wrapper.unmount()
+  })
+
   it('сворачивает ветку с сохранением счётчиков и восстанавливает состояние только в её спринте и проекте', async () => {
     const wrapper = render()
     await wrapper.get('button[aria-label="Свернуть Принимать карты"]').trigger('click')

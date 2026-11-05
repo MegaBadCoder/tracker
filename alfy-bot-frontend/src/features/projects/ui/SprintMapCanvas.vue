@@ -22,7 +22,7 @@ const layout = computed(() => layoutSprintMap(props.root, collapsed.value))
 const allNodes = computed(() => flattenSprintMap(props.root))
 const matches = computed(() => query.value.trim() ? allNodes.value.filter(node => node.title.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase())) : [])
 const viewport = useSprintMapViewport(surface)
-const { scale, dragging, transform } = viewport
+const { scale, minScale, dragging, transform } = viewport
 const percentage = computed(() => Math.round(scale.value * 100))
 
 function saveCollapsed(keys: Set<string>) {
@@ -131,7 +131,7 @@ onMounted(initialize)
         </div>
       </div>
       <div class="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" aria-label="Уменьшить масштаб" :disabled="scale <= 0.08" @click="viewport.zoom(scale / 1.2)">
+        <Button variant="ghost" size="icon-sm" aria-label="Уменьшить масштаб" :disabled="scale <= minScale" @click="viewport.zoom(scale / 1.2)">
           <Minus />
         </Button>
         <button type="button" class="w-11 rounded px-1 py-1.5 text-center text-xs tabular-nums hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Масштаб 100 процентов" @click="viewport.zoom(1)">
