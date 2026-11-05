@@ -1,6 +1,6 @@
 # Страницы задач, историй и эпиков
 
-**Status:** reviewing
+**Status:** done
 **Branch:** codex/issue-pages
 **Worktree:** /Users/v/projects/Alfy/.worktrees/issue-pages
 **Base:** adc9b59
@@ -95,6 +95,18 @@ Goal: страницы, preview и сворачивание проверены �
 Notes: тестовый checklist изначально был создан без обязательного order; сервер правильно вернул 400, fixture исправлен, повторное сохранение и UI 1 из 1 подтвердились.
 
 ## Conclusion
+Outcome: отдельные страницы задачи/истории/эпика, общий быстрый просмотр и сохранение сворачивания историй реализованы; implementation f8c2c30, независимое повторное ревью c7ec9a1 без новых замечаний.
+
+Invariants:
+- IV1/IV3 — route/auth/404/network/race тесты; реальный cold load, navigation/back и preview без стека.
+- IV2 — общий редактор, существующие тесты сохранены; browser save/reload для названия, описания, checklist, dependency и mobile property.
+- IV4 — desktop и 390px страницы, 390/640px preview без горизонтального переполнения.
+- IV5 — реальная доска сохранила collapse после reload, AddTask раскрывает; 3 regression tests и 26 board tests.
+
+Review findings: P2 race исправлен f8c2c30; повторное независимое ревью c7ec9a1 подтвердило исправление, 11/11 проверок passed.
+Verified by: CK1–CK8, 1098 frontend tests и production build; скриншоты story-page.png и collapsed-story.png в каталоге визуализаций текущего чата.
+Delivery: локальная ветка codex/issue-pages готова к PR; push/merge/deploy этой доработки не выполнялись. Worktree сохранён, временные локальные серверы остановлены.
+
 ### Hands-off decisions
 - make: новый worktree от adc9b59, ранее согласованный автоапрув продолжается; production публикация этой новой доработки отдельна от завершённого предыдущего деплоя.
 - udesign: сохраняем существующий quick-preview клик; страницы доступны по постоянным ссылкам и явным действиям, общие редакторы предотвращают расхождение.
