@@ -66,6 +66,7 @@ import { getTimeString, toCalendarDateValue, toDate, updateDeadlineTime } from '
 import { countFromDurationMinutes } from '../lib/duration'
 import { DATE_WITH_TIME, formatDate, formatDueDate, formatPomodoro } from '../lib/formatters'
 import { getPriorityColor } from '../lib/priority'
+import { taskLinkPath } from '../lib/task-link'
 import { getDueDateUrgency } from '../lib/urgency'
 import { POMODORO_DEFAULTS, PRIORITY_LABELS } from '../model/constants'
 import { formatRecurrence } from '../model/recurrence'
@@ -80,6 +81,7 @@ import PriorityPickerContent from './PriorityPickerContent.vue'
 import RecurrencePicker from './RecurrencePicker.vue'
 import RecurrencePickerContent from './RecurrencePickerContent.vue'
 import TagsEditor from './TagsEditor.vue'
+import TaskDependencies from './TaskDependencies.vue'
 import TaskDescription from './TaskDescription.vue'
 import TaskLinkActions from './TaskLinkActions.vue'
 import TaskPropertyChips from './TaskPropertyChips.vue'
@@ -653,6 +655,13 @@ function emitUpdate(partial: TaskPatch) {
           :description="task.description || ''"
           :editable="effectiveEditable"
           @save="emitUpdate({ description: $event })"
+        />
+
+        <TaskDependencies
+          v-if="open && taskLinkPath(task.id)"
+          :key="task.id"
+          :task="task"
+          :editable="effectiveEditable"
         />
 
         <!-- Pomodoro section -->

@@ -94,3 +94,13 @@ it('uses real project, epic and story links on the page without opening a previe
   expect(wrapper.find('[aria-label="Закрыть быстрый просмотр"]').exists()).toBe(false)
   expect(wrapper.findComponent(TaskDetailDialog).exists()).toBe(false)
 })
+
+it('общий редактор монтирует зависимости только сохранённой задачи с эффективным правом редактирования', async () => {
+  const wrapper = render('preview')
+  expect(wrapper.findComponent({ name: 'TaskDependencies' }).exists()).toBe(true)
+  expect(wrapper.getComponent({ name: 'TaskDependencies' }).props('editable')).toBe(true)
+  await wrapper.setProps({ task: { ...task, isOverdue: true } })
+  expect(wrapper.getComponent({ name: 'TaskDependencies' }).props('editable')).toBe(false)
+  await wrapper.setProps({ task: { ...task, id: `${taskId}__virtual__123` } })
+  expect(wrapper.findComponent({ name: 'TaskDependencies' }).exists()).toBe(false)
+})
