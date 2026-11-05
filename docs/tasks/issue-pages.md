@@ -79,19 +79,19 @@ Happy-path:
 - CK2 (IV2) — извлечение формы ломает checklist/Pomodoro/frozen или preview — held: существующие и новые тесты TaskDetailDialog/Content/View, GroupDetailDialog/Content/View.
 
 Negative:
-- CK3 (IV1, IV3) — ошибка сети выглядит как удалённая группа или поздний ответ меняет страницу — held: GroupView tests network/retry/missing/late response; TaskView tests missing/error/race.
+- CK3 (IV1, IV3) — ошибка сети выглядит как удалённая группа или поздний ответ меняет страницу — held after repair f8c2c30: ревью выявило обход active guard через мутирующий tasks.fetchTasks(); RED воспроизвёл late tasks response при переходе/после unmount. Чистый fetchTaskSnapshot применяется под guard; оба сценария GREEN, ошибочный fetch не коммитит частичные данные. Missing state также проверен в браузере.
 - CK4 (IV2) — ошибка удаления уводит со страницы без сообщения — held: тесты отмены/ошибки удаления; GroupView показывает alert, TaskView восстанавливает редактор.
 
 Invariants / assumptions:
 - CK5 (IV4) — длинные зависимости распирают страницу — held: браузер desktop и 390 CSS px, document scrollWidth=390, поиск оставляет выбранную связь видимой, checked=true после reload; список ограничен по высоте.
 - CK6 (IV5) — история теряет collapsed после remount или скрывает статус/добавление — held: AgileStoryCollapse 3 tests, новая Pinia восстанавливает localStorage, другая история независима, добавление раскрывает; AgileBoardView 26 tests сохраняют сетку.
-- CK7 (IV3, IV4, IV5) — реальная доска/preview на 390/640px сохраняют возврат, скролл и collapse после reload — deferred: CUA перестал отвечать после проверок страниц (CDP timeouts, затем reset ядра); повторный getTab и inventory также timeout. Не подменено unit-тестом.
+- CK7 (IV3, IV4, IV5) — реальная доска/preview на 390/640px сохраняют возврат, скролл и collapse после reload — held: после отказа Chrome CUA проверка продолжена в IAB. Collapse пережил reload, AddTask раскрыл историю. Group preview clientWidth=scrollWidth=390/640, фильтр доступен; group→task preview без стека. Task mobile drawer Место принимает текст и закрывается Enter, обновлённое свойство видно в preview. Закрытие возвращает доску; меню «Открыть страницу» и back работают.
 
 Interfaces:
 - CK8 (IF1–IF3) — canonical links пересекаются с task/board или теряются после auth — held: route/group link tests, новый auth redirect test; ссылки child task и epic открыты в браузере.
 
-Smoke: локальные реальные Nest API и Vite, синтетический проект, 14 длинных зависимостей; task/story/epic страницы и сохранение проверены. Полный frontend test: 141 files / 1091 tests passed; дополнительный auth test 5/5; build passed; scoped lint passed. Node 25 запускался с NODE_OPTIONS=--no-experimental-webstorage из-за существующей несовместимости тестового localStorage.
-Goal: proxy only — функциональность страниц подтверждена напрямую; браузерный остаток CK7 не завершён из-за инструмента.
+Smoke: локальные реальные Nest API и Vite, синтетический проект, 14 длинных зависимостей; task/story/epic страницы, preview, collapse и сохранение проверены. После repair полный frontend test: 142 files / 1098 tests passed; build passed; scoped lint passed. В task-store.ts baseline/current имеют одинаковые 51 lint-ошибки, постороннее форматирование не менялось. Node 25 запускался с NODE_OPTIONS=--no-experimental-webstorage из-за существующей несовместимости тестового localStorage.
+Goal: страницы, preview и сворачивание проверены напрямую на реальном локальном API; гонка CK3 устранена с отдельными регрессиями.
 Notes: тестовый checklist изначально был создан без обязательного order; сервер правильно вернул 400, fixture исправлен, повторное сохранение и UI 1 из 1 подтвердились.
 
 ## Conclusion
@@ -100,5 +100,5 @@ Notes: тестовый checklist изначально был создан бе�
 - udesign: сохраняем существующий quick-preview клик; страницы доступны по постоянным ссылкам и явным действиям, общие редакторы предотвращают расхождение.
 - uplan: план auto-approved, PH1/PH2 независимые implementers, PH3 и интеграция контроллером; scope включает последнее дополнение о сворачивании.
 - uexecute: PH1 fda9085, PH2 b200701, PH3 a90971d; общий helper удаления расширен observable error ref для сохранения boolean-контракта существующих callers.
-### Deferred (needs user input)
-- Браузерная проверка CK7: инструмент CUA недоступен; implementation и автоматические проверки завершены, production не изменён.
+- uverify: Chrome CUA перестал отвечать, использован IAB; CK7 выполнен без сокращения проверки.
+- ureview: исправлена гонка tasks.fetchTasks — чистый снимок применяется под active guard вместе с данными группы; f8c2c30.
