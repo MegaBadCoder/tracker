@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, reactive } from 'vue'
 import { api } from '@/api/client'
+import { openTaskDetail } from '@/features/tasks/lib/task-detail-navigation'
 import { useTaskStore } from '@/features/tasks/model/task-store'
 import TaskView from '@/views/TaskView.vue'
 
@@ -11,7 +12,7 @@ const route = reactive({ params: { taskId: 'one' } })
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/api/client', () => ({ api: { get: vi.fn(), delete: vi.fn(), patch: vi.fn() } }))
 vi.mock('@/composables/useConfirm', () => ({ useConfirm: () => ({ confirm: mocks.confirm }) }))
-vi.mock('@/features/tasks/ui/TaskDetailDialog.vue', () => ({ default: { name: 'TaskDetailDialog', props: ['task', 'open'], emits: ['update:open', 'delete', 'update'], template: '<div v-if="open" data-testid="detail">{{ task.title }}</div>' } }))
+vi.mock('@/features/tasks/ui/TaskDetailContent.vue', () => ({ default: { name: 'TaskDetailContent', props: ['task', 'open'], emits: ['update:open', 'delete', 'update'], template: '<div v-if="open" data-testid="detail">{{ task.title }}</div>' } }))
 const stubs = { AppHeader: true, PageContainer: { template: '<main><slot /></main>' }, Button: { template: '<button><slot /></button>' } }
 function render() {
   return mount(TaskView, { global: { stubs, provide: { openSidebar: vi.fn() } } })
@@ -38,11 +39,11 @@ describe('taskView', () => {
     expect(wrapper.text()).toContain('Загрузка задачи')
     await flushPromises()
     expect(wrapper.get('[data-testid="detail"]').text()).toBe('Task')
-    wrapper.findComponent({ name: 'TaskDetailDialog' }).vm.$emit('update', { ...useTaskStore().tasks[0], title: 'Edited' })
+    expect(wrapper.findComponent({ name: 'TaskDetailDialog' }).exists()).toBe(false)
+    wrapper.findComponent({ name: 'TaskDetailContent' }).vm.$emit('update', { ...useTaskStore().tasks[0], title: 'Edited' })
     await flushPromises()
     expect(api.patch).toHaveBeenCalledWith('/tasks/one', expect.objectContaining({ title: 'Edited' }))
-    wrapper.findComponent({ name: 'TaskDetailDialog' }).vm.$emit('update:open', false)
-    expect(mocks.push).toHaveBeenCalledWith({ name: 'tasks-project', params: { projectId: 'project' } })
+    expect(wrapper.get('main').findComponent({ name: 'TaskDetailContent' }).exists()).toBe(true)
     wrapper.unmount()
   })
   it('separates missing from network failure and retries', async () => {
@@ -78,12 +79,12 @@ describe('taskView', () => {
     const wrapper = render()
     await flushPromises()
     mocks.confirm.mockResolvedValueOnce(false)
-    wrapper.findComponent({ name: 'TaskDetailDialog' }).vm.$emit('delete', 'one')
+    wrapper.findComponent({ name: 'TaskDetailContent' }).vm.$emit('delete', 'one')
     await flushPromises()
     expect(wrapper.get('[data-testid="detail"]').text()).toBe('Task')
     expect(mocks.push).not.toHaveBeenCalled()
     vi.mocked(api.delete).mockResolvedValueOnce({ data: {} })
-    wrapper.findComponent({ name: 'TaskDetailDialog' }).vm.$emit('delete', 'one')
+    wrapper.findComponent({ name: 'TaskDetailContent' }).vm.$emit('delete', 'one')
     await flushPromises()
     expect(api.delete).toHaveBeenCalledWith('/tasks/one')
     expect(mocks.push).toHaveBeenCalledWith({ name: 'tasks' })
@@ -106,13 +107,35 @@ describe('taskView', () => {
     }))
     const wrapper = render()
     await flushPromises()
-    wrapper.findComponent({ name: 'TaskDetailDialog' }).vm.$emit('update', { ...useTaskStore().tasks[0], title: 'Edited' })
+    wrapper.findComponent({ name: 'TaskDetailContent' }).vm.$emit('update', { ...useTaskStore().tasks[0], title: 'Edited' })
     vi.mocked(api.get).mockResolvedValueOnce({ data: { id: 'two', title: 'Second' } })
     route.params.taskId = 'two'
     await flushPromises()
     reject(new Error('Failed'))
     await flushPromises()
     expect(wrapper.get('[data-testid="detail"]').text()).toBe('Second')
+    wrapper.unmount()
+  })
+  it('navigates the URL when the global task opener opens another task', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { id: 'one', title: 'First' } })
+    const wrapper = render()
+    await flushPromises()
+    const id = '00000000-0000-4000-8000-000000000002'
+    openTaskDetail({ ...useTaskStore().tasks[0]!, id, title: 'Second' })
+    expect(mocks.push).toHaveBeenCalledWith(`/tasks/${id}`)
+    expect(wrapper.get('[data-testid="detail"]').text()).toBe('First')
+    wrapper.unmount()
+  })
+  it('keeps the editor available after a failed deletion', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { id: 'one', title: 'Task' } })
+    vi.mocked(api.delete).mockRejectedValueOnce(new Error('offline'))
+    const wrapper = render()
+    await flushPromises()
+    wrapper.findComponent({ name: 'TaskDetailContent' }).vm.$emit('delete', 'one')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="detail"]').text()).toBe('Task')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Не удалось удалить')
+    expect(mocks.push).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })

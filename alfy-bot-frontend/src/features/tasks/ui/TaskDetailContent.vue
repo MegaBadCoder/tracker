@@ -1,0 +1,1142 @@
+<script setup lang="ts">
+import type { DueDateUrgency } from '../lib/urgency'
+import type { RecurrenceRule } from '../model/recurrence'
+import type { ChecklistItem, Priority, Task, TaskPatch } from '../model/types'
+import { useMediaQuery } from '@vueuse/core'
+import {
+  Bell,
+  Calendar as CalendarIcon,
+  ChevronRight,
+  Clock,
+  EllipsisVertical,
+  Flag,
+  FolderOpen,
+  MapPin,
+  Pause,
+  Play,
+  Plus,
+  Repeat,
+  Tag,
+  Timer,
+  Trash2,
+  X,
+} from 'lucide-vue-next'
+import { storeToRefs } from 'pinia'
+import { computed, nextTick, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Calendar } from '@/components/ui/calendar'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ContentEditableInput } from '@/components/ui/content-editable-input'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { RoundCheckbox } from '@/components/ui/roundCheckbox'
+import { Switch } from '@/components/ui/switch'
+import { intlLocale, weekStartsOn } from '@/composables/useLocale'
+import GoalPicker from '@/features/goals/ui/GoalPicker.vue'
+import GoalPickerContent from '@/features/goals/ui/GoalPickerContent.vue'
+import { groupLinkPath } from '@/features/projects/lib/group-link'
+import { groupLabel, groupPath } from '@/features/projects/lib/group-tree'
+import { releaseLabel } from '@/features/projects/lib/release'
+import { sprintLabel } from '@/features/projects/lib/sprint'
+import { taskKey } from '@/features/projects/lib/task-key'
+import { useGroupStore } from '@/features/projects/model/group-store'
+import { useProjectStore } from '@/features/projects/model/project-store'
+import { useReleaseStore } from '@/features/projects/model/release-store'
+import { useSprintStore } from '@/features/projects/model/sprint-store'
+import { useGroupDetail } from '@/features/projects/model/use-group-detail'
+import GroupPicker from '@/features/projects/ui/GroupPicker.vue'
+import GroupPickerContent from '@/features/projects/ui/GroupPickerContent.vue'
+import ProjectPicker from '@/features/projects/ui/ProjectPicker.vue'
+import ProjectPickerContent from '@/features/projects/ui/ProjectPickerContent.vue'
+import ReleasePicker from '@/features/projects/ui/ReleasePicker.vue'
+import ReleasePickerContent from '@/features/projects/ui/ReleasePickerContent.vue'
+import SprintPicker from '@/features/projects/ui/SprintPicker.vue'
+import SprintPickerContent from '@/features/projects/ui/SprintPickerContent.vue'
+import { getTaskTimerState, toTimerTask, useTimerStore } from '@/features/task-timer'
+import { computeChecklistProgress, createChecklistItem } from '../lib/checklist'
+import { getTimeString, toCalendarDateValue, toDate, updateDeadlineTime } from '../lib/dateTime'
+import { countFromDurationMinutes } from '../lib/duration'
+import { DATE_WITH_TIME, formatDate, formatDueDate, formatPomodoro } from '../lib/formatters'
+import { getPriorityColor } from '../lib/priority'
+import { getDueDateUrgency } from '../lib/urgency'
+import { POMODORO_DEFAULTS, PRIORITY_LABELS } from '../model/constants'
+import { formatRecurrence } from '../model/recurrence'
+import { useTaskStore } from '../model/task-store'
+import DeadlinePicker from './DeadlinePicker.vue'
+import DeadlinePickerContent from './DeadlinePickerContent.vue'
+import DueDatePickerContent from './DueDatePickerContent.vue'
+import LocationPickerContent from './LocationPickerContent.vue'
+import PomodoroSettings from './PomodoroSettings.vue'
+import PriorityPicker from './PriorityPicker.vue'
+import PriorityPickerContent from './PriorityPickerContent.vue'
+import RecurrencePicker from './RecurrencePicker.vue'
+import RecurrencePickerContent from './RecurrencePickerContent.vue'
+import TagsEditor from './TagsEditor.vue'
+import TaskDescription from './TaskDescription.vue'
+import TaskLinkActions from './TaskLinkActions.vue'
+import TaskPropertyChips from './TaskPropertyChips.vue'
+
+const props = withDefaults(defineProps<{
+  task: Task | null
+  open: boolean
+  presentation: 'page' | 'preview'
+  editable?: boolean
+  autofocusTitle?: boolean
+}>(), {
+  editable: true,
+  autofocusTitle: false,
+})
+
+const emit = defineEmits<{
+  (e: 'update:open', value: boolean): void
+  (e: 'delete', id: string): void
+  (e: 'update', task: Task): void
+  (e: 'update:checklist', taskId: string, items: ChecklistItem[]): void
+  (e: 'update:pomodoroConfig', taskId: string, config: {
+    pomodoroCount: number
+    pomodoroDuration: number
+    shortBreak: number
+    longBreak: number
+    longBreakInterval: number
+  } | null): void
+}>()
+
+const URGENCY_CLASSES: Record<DueDateUrgency, string> = {
+  overdue: 'text-red-500',
+  soon: 'text-yellow-600 dark:text-yellow-500',
+  normal: '',
+  none: '',
+}
+
+// Mobile detection
+const isDesktop = useMediaQuery('(min-width: 640px)')
+const isMobile = computed(() => !isDesktop.value)
+
+// Drawer state
+type DrawerField = 'project' | 'group' | 'sprint' | 'release' | 'goals' | 'dueDate' | 'deadline' | 'priority' | 'location' | 'tags' | 'recurrence' | 'reminder'
+const activeDrawer = ref<DrawerField | null>(null)
+const drawerOpen = computed({
+  get: () => activeDrawer.value !== null,
+  set: (v) => {
+    if (!v)
+      activeDrawer.value = null
+  },
+})
+
+const DRAWER_TITLES: Record<DrawerField, string> = {
+  project: 'Проект',
+  group: 'Эпик / История',
+  sprint: 'Спринт',
+  release: 'Релиз',
+  goals: 'Цель',
+  dueDate: 'Срок',
+  deadline: 'Дедлайн',
+  priority: 'Приоритет',
+  location: 'Место',
+  tags: 'Теги',
+  recurrence: 'Повторение',
+  reminder: 'Напоминание',
+}
+const drawerTitle = computed(() => activeDrawer.value ? DRAWER_TITLES[activeDrawer.value] : '')
+
+const effectiveEditable = computed(() => props.editable && !props.task?.isOverdue)
+
+// Contenteditable refs
+const titleRef = ref<InstanceType<typeof ContentEditableInput> | null>(null)
+const localTitle = ref('')
+
+// Checklist state
+const localChecklist = ref<ChecklistItem[]>([])
+const newChecklistItem = ref('')
+
+// Sidebar field refs
+const localDueTime = ref('')
+const localDueDate = ref<Date | undefined>()
+const localDeadline = ref<Date | undefined>()
+const localPriority = ref<Priority | undefined>()
+const localLocation = ref('')
+const localTags = ref<string[]>([])
+
+// Recurrence
+const localRecurrence = ref<RecurrenceRule | null>(null)
+const localOnMissed = ref<'shift' | 'freeze'>('shift')
+
+// Timer
+const timerStore = useTimerStore()
+const { activeTaskId, phase, isActive } = storeToRefs(timerStore)
+
+const timerState = computed(() => {
+  if (!props.task?.isPomodoroTask)
+    return 'idle' as const
+  return getTaskTimerState(props.task.id, {
+    activeTaskId: activeTaskId.value,
+    phase: phase.value,
+    isActive: isActive.value,
+  })
+})
+
+const timerActionLabel = computed(() => {
+  if (timerState.value === 'running')
+    return 'Пауза помодоро'
+  if (timerState.value === 'paused')
+    return 'Продолжить помодоро'
+  return 'Запустить помодоро'
+})
+
+function handleToggleTimer() {
+  if (!props.task?.isPomodoroTask)
+    return
+  if (timerState.value === 'idle') {
+    timerStore.startTask(toTimerTask(props.task))
+    return
+  }
+  timerStore.toggleTimer()
+}
+
+// Project
+const localProjectId = ref<string | null>(null)
+const projectStore = useProjectStore()
+
+const projectTitle = computed(() =>
+  localProjectId.value
+    ? projectStore.projectMap.get(localProjectId.value)?.title ?? null
+    : null,
+)
+
+// Agile-projects group tasks by epic/story instead of goals — the goals
+// block is hidden while the task's project is in agile mode. This is a
+// display-only toggle: existing goalIds are never touched here.
+const isAgileProject = computed(() =>
+  localProjectId.value
+    ? projectStore.projectMap.get(localProjectId.value)?.type === 'agile'
+    : false,
+)
+
+const headerTaskKey = computed(() => {
+  const task = props.task
+  if (!task)
+    return null
+  return taskKey(task.projectId ? projectStore.projectMap.get(task.projectId) : undefined, task)
+})
+
+const localGroupId = ref<string | null>(null)
+const groupStore = useGroupStore()
+const groupDetail = useGroupDetail()
+const localSprintId = ref<string | null>(null)
+const sprintStore = useSprintStore()
+const localReleaseId = ref<string | null>(null)
+const releaseStore = useReleaseStore()
+
+function onProjectChange(value: string | null) {
+  localProjectId.value = value
+  localGroupId.value = null
+  localSprintId.value = null
+  localReleaseId.value = null
+  emitUpdate({ projectId: value })
+  activeDrawer.value = null
+}
+
+const groupTree = computed(() => (localProjectId.value ? groupStore.groupsOf(localProjectId.value) : []))
+
+const groupBreadcrumb = computed(() =>
+  localGroupId.value ? groupPath(groupTree.value, localGroupId.value) : null,
+)
+
+const groupChipTitle = computed<string | null>(() =>
+  localGroupId.value ? groupLabel(groupTree.value, localGroupId.value) : null,
+)
+
+function openGroupCard(groupId: string) {
+  if (!localProjectId.value)
+    return
+  emit('update:open', false)
+  groupDetail.open(localProjectId.value, groupId)
+}
+
+function onGroupChange(value: string | null) {
+  localGroupId.value = value
+  emitUpdate({ groupId: value })
+  activeDrawer.value = null
+}
+
+const sprintChipTitle = computed<string | null>(() =>
+  localSprintId.value && localProjectId.value
+    ? sprintLabel(sprintStore.sprintsOf(localProjectId.value), localSprintId.value)
+    : null,
+)
+
+function onSprintChange(value: string | null) {
+  localSprintId.value = value
+  emitUpdate({ sprintId: value })
+  activeDrawer.value = null
+}
+
+const releaseChipTitle = computed<string | null>(() =>
+  localReleaseId.value && localProjectId.value
+    ? releaseLabel(releaseStore.releasesOf(localProjectId.value), localReleaseId.value)
+    : null,
+)
+
+function onReleaseChange(value: string | null) {
+  localReleaseId.value = value
+  emitUpdate({ releaseId: value })
+  activeDrawer.value = null
+}
+
+watch([localProjectId, isAgileProject], ([projectId, agile]) => {
+  if (agile && projectId) {
+    groupStore.ensureGroups(projectId)
+    sprintStore.ensureSprints(projectId)
+    releaseStore.ensureReleases(projectId)
+  }
+}, { immediate: true })
+
+const localGoalIds = ref<number[]>([])
+const taskStore = useTaskStore()
+
+const goalsChipLabel = computed(() => {
+  const n = localGoalIds.value.length
+  if (n === 0)
+    return 'Цель'
+  if (n === 1)
+    return 'Цель'
+  return `${n} цели`
+})
+
+async function onGoalsChange(value: number[]) {
+  const previous = localGoalIds.value
+  localGoalIds.value = value
+  if (!props.task)
+    return
+  try {
+    const saved = await taskStore.setTaskGoals(props.task.id, value)
+    if (saved)
+      localGoalIds.value = saved
+  }
+  catch (err) {
+    localGoalIds.value = previous
+    console.error('Не удалось обновить цели задачи:', err)
+  }
+}
+
+function onRecurrenceChange(value: RecurrenceRule | null) {
+  localRecurrence.value = value
+  emitUpdate({ recurrence: value })
+}
+
+function onMissedChange(value: 'shift' | 'freeze') {
+  localOnMissed.value = value
+  emitUpdate({ onMissed: value })
+}
+
+// Drawer-specific handlers (auto-close for single-select)
+function onPriorityDrawerChange(value: Priority | null) {
+  localPriority.value = value ?? undefined
+  emitUpdate({ priority: value })
+  activeDrawer.value = null
+}
+
+function onRecurrenceDrawerChange(value: RecurrenceRule | null) {
+  localRecurrence.value = value
+  emitUpdate({ recurrence: value })
+  activeDrawer.value = null
+}
+
+function onLocationDrawerChange(value: string | undefined) {
+  localLocation.value = value || ''
+  emitUpdate({ location: value })
+  activeDrawer.value = null
+}
+
+function onDueDateDrawerChange(val: Date | undefined) {
+  localDueDate.value = val
+}
+
+// Pomodoro refs
+const localPomodoroCount = ref(POMODORO_DEFAULTS.count)
+const localPomodoroDuration = ref(POMODORO_DEFAULTS.duration)
+const localShortBreak = ref(POMODORO_DEFAULTS.shortBreak)
+const localLongBreak = ref(POMODORO_DEFAULTS.longBreak)
+const localLongBreakInterval = ref(POMODORO_DEFAULTS.longBreakInterval)
+
+// Suppresses auto-emit watchers while we're rehydrating local state from props.task.
+// Without this, syncing localDueDate/localDeadline below would trigger their watchers
+// and emit a redundant PATCH on every dialog open.
+const isInitializing = ref(false)
+
+// Sync local state when task changes
+watch(() => props.task, (task) => {
+  if (task) {
+    isInitializing.value = true
+    localTitle.value = task.title
+    localChecklist.value = task.checklist?.items
+      ? task.checklist.items.map(item => ({ ...item }))
+      : []
+    localDueDate.value = task.dueDate
+    localDueTime.value = task.dueDate ? getTimeString(task.dueDate) : ''
+    localDeadline.value = task.deadline
+    localPriority.value = task.priority
+    localLocation.value = task.location || ''
+    localTags.value = task.tags ? [...task.tags] : []
+    localProjectId.value = task.projectId ?? null
+    localGroupId.value = task.groupId ?? null
+    localSprintId.value = task.sprintId ?? null
+    localReleaseId.value = task.releaseId ?? null
+    localGoalIds.value = task.goalIds ? [...task.goalIds] : []
+    localRecurrence.value = task.recurrence ?? null
+    localOnMissed.value = task.onMissed ?? 'shift'
+    localPomodoroCount.value = task.pomodoroCount ?? POMODORO_DEFAULTS.count
+    localPomodoroDuration.value = task.pomodoroDuration ?? POMODORO_DEFAULTS.duration
+    localShortBreak.value = task.shortBreak ?? POMODORO_DEFAULTS.shortBreak
+    localLongBreak.value = task.longBreak ?? POMODORO_DEFAULTS.longBreak
+    localLongBreakInterval.value = task.longBreakInterval ?? POMODORO_DEFAULTS.longBreakInterval
+    nextTick(() => {
+      isInitializing.value = false
+    })
+  }
+}, { immediate: true })
+
+watch(() => props.open, (open) => {
+  if (open) {
+    if (props.autofocusTitle) {
+      nextTick(() => titleRef.value?.el?.focus())
+    }
+  }
+}, { immediate: true })
+
+const dueDateCalendarValue = computed(() => toCalendarDateValue(localDueDate.value))
+
+function onDueDateCalendarChange(val: any) {
+  const date = toDate(val)
+  if (date && localDueTime.value) {
+    localDueDate.value = updateDeadlineTime(date, localDueTime.value)
+  }
+  else {
+    localDueDate.value = date
+  }
+}
+
+function onDueTimeChange() {
+  if (localDueDate.value && localDueTime.value) {
+    localDueDate.value = updateDeadlineTime(localDueDate.value, localDueTime.value)
+  }
+}
+
+// Watch sidebar fields for auto-emit
+watch(localDueDate, (val) => {
+  if (isInitializing.value)
+    return
+  emitUpdate({ dueDate: val })
+})
+
+watch(localDeadline, (val) => {
+  if (isInitializing.value)
+    return
+  emitUpdate({ deadline: val })
+})
+
+// Pomodoro
+function emitPomodoroUpdate() {
+  if (!props.task)
+    return
+  emit('update:pomodoroConfig', props.task.id, {
+    pomodoroCount: localPomodoroCount.value,
+    pomodoroDuration: localPomodoroDuration.value,
+    shortBreak: localShortBreak.value,
+    longBreak: localLongBreak.value,
+    longBreakInterval: localLongBreakInterval.value,
+  })
+}
+
+function onPomodoroToggle(enabled: boolean) {
+  if (!props.task)
+    return
+  if (!enabled) {
+    emit('update:pomodoroConfig', props.task.id, null)
+    return
+  }
+  localPomodoroCount.value = props.task.durationMinutes
+    ? countFromDurationMinutes(props.task.durationMinutes)
+    : POMODORO_DEFAULTS.count
+  localPomodoroDuration.value = POMODORO_DEFAULTS.duration
+  localShortBreak.value = POMODORO_DEFAULTS.shortBreak
+  localLongBreak.value = POMODORO_DEFAULTS.longBreak
+  localLongBreakInterval.value = POMODORO_DEFAULTS.longBreakInterval
+  emitPomodoroUpdate()
+}
+
+// Title
+function commitTitle() {
+  if (props.task && localTitle.value !== props.task.title) {
+    emitUpdate({ title: localTitle.value })
+  }
+}
+
+function cancelEditTitle() {
+  localTitle.value = props.task?.title || ''
+  titleRef.value?.el?.blur()
+}
+
+// Checklist
+const sortedChecklist = computed(() =>
+  [...localChecklist.value].sort((a, b) => a.order - b.order),
+)
+
+const checklistStats = computed(() => computeChecklistProgress(localChecklist.value))
+const checklistCompleted = computed(() => checklistStats.value.completed)
+const checklistProgress = computed(() => checklistStats.value.progress)
+
+function toggleChecklistItem(id: string) {
+  const item = localChecklist.value.find(i => i.id === id)
+  if (item) {
+    item.completed = !item.completed
+    emitChecklistUpdate()
+  }
+}
+
+function updateChecklistItemText(id: string, text: string) {
+  const item = localChecklist.value.find(i => i.id === id)
+  if (item && text.trim()) {
+    item.text = text.trim()
+    emitChecklistUpdate()
+  }
+}
+
+function removeChecklistItem(id: string) {
+  localChecklist.value = localChecklist.value.filter(i => i.id !== id)
+  emitChecklistUpdate()
+}
+
+function addChecklistItem() {
+  const text = newChecklistItem.value.trim()
+  if (!text)
+    return
+
+  localChecklist.value.push(createChecklistItem(text, localChecklist.value))
+  newChecklistItem.value = ''
+  emitChecklistUpdate()
+}
+
+function emitChecklistUpdate() {
+  if (!props.task)
+    return
+  const items = localChecklist.value.map(i => ({ ...i }))
+  emit('update:checklist', props.task.id, items)
+}
+
+function autosizeTextarea(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+function emitUpdate(partial: TaskPatch) {
+  if (!props.task)
+    return
+  emit('update', { ...props.task, ...partial } as Task)
+}
+</script>
+
+<template>
+  <section class="flex min-w-0 flex-col" :class="[presentation === 'preview' ? 'min-h-0 flex-1 overflow-hidden' : 'rounded-xl border border-border/60']">
+    <!-- Header -->
+    <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3 border-b border-border/60">
+      <div class="flex items-center gap-2.5 min-w-0 max-w-full">
+        <RoundCheckbox
+          :model-value="task?.completed"
+          :disabled="!effectiveEditable"
+          class="shrink-0"
+          @update:model-value="effectiveEditable && task && emitUpdate({ completed: !task.completed })"
+        />
+        <RouterLink v-if="presentation === 'page'" :to="localProjectId ? { name: 'tasks-project', params: { projectId: localProjectId } } : { name: 'tasks' }" class="min-w-0 truncate text-[11px] text-muted-foreground hover:text-foreground hover:underline">
+          {{ projectTitle ?? 'Все входящие' }}
+        </RouterLink>
+        <span v-else-if="!isAgileProject" class="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground [overflow-wrap:anywhere]">
+          <FolderOpen :size="11" />
+          {{ localProjectId ? projectStore.projectMap.get(localProjectId)?.title ?? 'Проект' : 'Все входящие' }}
+        </span>
+        <div v-if="isAgileProject" class="flex items-center gap-1 min-w-0 text-[11px] text-muted-foreground">
+          <FolderOpen v-if="presentation === 'preview'" :size="11" class="shrink-0" />
+          <span v-if="presentation === 'preview'" class="truncate max-w-[10rem]">{{ projectTitle ?? 'Проект' }}</span>
+          <template v-if="groupBreadcrumb">
+            <ChevronRight :size="11" class="shrink-0" />
+            <RouterLink v-if="presentation === 'page' && localProjectId && groupLinkPath(localProjectId, groupBreadcrumb.epic.id)" :to="groupLinkPath(localProjectId!, groupBreadcrumb.epic.id)!" class="truncate max-w-[10rem] hover:text-foreground hover:underline" aria-label="Открыть эпик">
+              {{ groupBreadcrumb.epic.title }}
+            </RouterLink>
+            <button
+              v-else-if="presentation === 'preview'"
+              type="button"
+              class="truncate max-w-[10rem] hover:text-foreground hover:underline cursor-pointer"
+              aria-label="Открыть эпик"
+              @click="openGroupCard(groupBreadcrumb.epic.id)"
+            >
+              {{ groupBreadcrumb.epic.title }}
+            </button>
+            <template v-if="groupBreadcrumb.story">
+              <ChevronRight :size="11" class="shrink-0" />
+              <RouterLink v-if="presentation === 'page' && localProjectId && groupLinkPath(localProjectId, groupBreadcrumb.story.id)" :to="groupLinkPath(localProjectId!, groupBreadcrumb.story.id)!" class="truncate max-w-[10rem] hover:text-foreground hover:underline" aria-label="Открыть историю">
+                {{ groupBreadcrumb.story.title }}
+              </RouterLink>
+              <button
+                v-else-if="presentation === 'preview'"
+                type="button"
+                class="truncate max-w-[10rem] hover:text-foreground hover:underline cursor-pointer"
+                aria-label="Открыть историю"
+                @click="openGroupCard(groupBreadcrumb.story.id)"
+              >
+                {{ groupBreadcrumb.story.title }}
+              </button>
+            </template>
+          </template>
+        </div>
+        <span
+          v-if="headerTaskKey"
+          data-testid="task-key"
+          class="shrink-0 text-[11px] font-mono text-muted-foreground"
+        >
+          {{ headerTaskKey }}
+        </span>
+      </div>
+      <div class="flex shrink-0 items-center gap-0.5">
+        <TaskLinkActions v-if="task" :key="task.id" :task-id="task.id" />
+        <DropdownMenu v-if="effectiveEditable">
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground">
+              <EllipsisVertical :size="16" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              class="text-destructive focus:text-destructive focus:bg-destructive/10"
+              @click="$emit('delete', task!.id)"
+            >
+              <Trash2 :size="14" class="mr-2" />
+              Удалить
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button v-if="presentation === 'preview'" variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground" aria-label="Закрыть быстрый просмотр" @click="$emit('update:open', false)">
+          <X :size="16" />
+        </Button>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div v-if="task" class="flex min-w-0 flex-col sm:flex-row flex-1 min-h-0" :class="[presentation === 'preview' && 'overflow-hidden']">
+      <!-- Main content -->
+      <div class="min-w-0 flex-1 px-7 py-5 space-y-5" :class="[presentation === 'preview' && 'overflow-y-auto']">
+        <!-- Title -->
+        <ContentEditableInput
+          ref="titleRef"
+          v-model="localTitle"
+          :editable="effectiveEditable"
+          placeholder="Без названия"
+          class="text-xl font-semibold rounded-md transition-colors [overflow-wrap:anywhere]" :class="[
+            task.completed && 'line-through text-muted-foreground',
+            effectiveEditable && 'cursor-text',
+          ]"
+          aria-label="Название задачи"
+          @blur="commitTitle"
+          @keydown.enter.prevent="titleRef?.el?.blur()"
+          @keydown.escape="cancelEditTitle"
+        />
+
+        <TaskDescription
+          :key="task.id"
+          :description="task.description || ''"
+          :editable="effectiveEditable"
+          @save="emitUpdate({ description: $event })"
+        />
+
+        <!-- Pomodoro section -->
+        <div v-if="task.isPomodoroTask || effectiveEditable" class="space-y-3">
+          <div class="flex items-center gap-2">
+            <div class="flex items-center justify-center w-7 h-7 rounded-md bg-red-50 dark:bg-red-500/10">
+              <Timer :size="14" class="text-red-500" />
+            </div>
+            <span class="text-sm font-medium">Помодоро</span>
+            <span class="flex-1" />
+            <span
+              v-if="task.isPomodoroTask"
+              class="text-xs tabular-nums text-muted-foreground"
+            >
+              {{ formatPomodoro(task.pomodoroCompleted || 0) }}/{{ localPomodoroCount }}
+            </span>
+            <span
+              v-if="timerState !== 'idle'"
+              class="shrink-0 flex items-center gap-1 text-[11px]"
+              :class="timerState === 'running' ? 'text-red-500' : 'text-muted-foreground'"
+            >
+              <span
+                class="size-1.5 rounded-full bg-current"
+                :class="timerState === 'running' && 'animate-pulse motion-reduce:animate-none'"
+              />
+              {{ timerState === 'running' ? 'идёт' : 'пауза' }}
+            </span>
+            <Button
+              v-if="task.isPomodoroTask"
+              variant="ghost"
+              size="icon"
+              class="h-7 w-7 shrink-0"
+              :aria-label="timerActionLabel"
+              @click="handleToggleTimer"
+            >
+              <Pause v-if="timerState === 'running'" :size="14" class="text-red-500" />
+              <Play v-else :size="14" class="text-red-500" />
+            </Button>
+            <Switch
+              v-if="effectiveEditable"
+              :checked="!!task.isPomodoroTask"
+              @update:checked="onPomodoroToggle"
+            />
+          </div>
+          <PomodoroSettings
+            v-if="task.isPomodoroTask"
+            :count="localPomodoroCount"
+            :duration="localPomodoroDuration"
+            :short-break="localShortBreak"
+            :long-break="localLongBreak"
+            :long-break-interval="localLongBreakInterval"
+            :editable="effectiveEditable"
+            @update:count="localPomodoroCount = $event"
+            @update:duration="localPomodoroDuration = $event"
+            @update:short-break="localShortBreak = $event"
+            @update:long-break="localLongBreak = $event"
+            @update:long-break-interval="localLongBreakInterval = $event"
+            @blur="emitPomodoroUpdate"
+          />
+        </div>
+
+        <!-- Mobile: property chips -->
+        <TaskPropertyChips
+          v-if="isMobile"
+          :project-title="projectTitle"
+          :due-date="localDueDate"
+          :deadline="localDeadline"
+          :priority="localPriority"
+          :location="localLocation"
+          :tags="localTags"
+          :recurrence="localRecurrence"
+          :goals-label="goalsChipLabel"
+          :goals-set="localGoalIds.length > 0"
+          :hide-goals="isAgileProject"
+          :group-title="isAgileProject ? groupChipTitle : undefined"
+          :sprint-title="isAgileProject ? sprintChipTitle : undefined"
+          :release-title="isAgileProject ? releaseChipTitle : undefined"
+          :editable="effectiveEditable"
+          class="-mx-7 border-y border-border/40"
+          @select="activeDrawer = ($event as DrawerField)"
+        />
+
+        <!-- Checklist -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-foreground/90">Чеклист</span>
+            <span v-if="localChecklist.length > 0" class="text-[11px] tabular-nums text-muted-foreground">
+              {{ checklistCompleted }} из {{ localChecklist.length }}
+            </span>
+          </div>
+
+          <!-- Progress bar -->
+          <div v-if="localChecklist.length > 0" class="h-1 bg-muted rounded-full overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all duration-300" :class="[
+                checklistProgress === 100 ? 'bg-green-500' : 'bg-primary',
+              ]"
+              :style="{ width: `${checklistProgress}%` }"
+            />
+          </div>
+
+          <!-- Items -->
+          <div class="space-y-0.5">
+            <div
+              v-for="item in sortedChecklist"
+              :key="item.id"
+              class="group flex items-start gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <Checkbox
+                :model-value="item.completed"
+                :disabled="!effectiveEditable"
+                class="shrink-0 mt-0.5"
+                @update:model-value="effectiveEditable && toggleChecklistItem(item.id)"
+              />
+              <span
+                v-if="!effectiveEditable"
+                class="text-sm flex-1 min-w-0 break-words whitespace-pre-wrap transition-colors" :class="[
+                  item.completed && 'line-through text-muted-foreground',
+                ]"
+              >
+                {{ item.text }}
+              </span>
+              <textarea
+                v-else
+                :value="item.text"
+                rows="1"
+                class="text-sm flex-1 min-w-0 break-words whitespace-pre-wrap resize-none bg-transparent border-none outline-none transition-colors leading-5 py-0" :class="[
+                  item.completed && 'line-through text-muted-foreground',
+                ]"
+                @vue:mounted="autosizeTextarea($event.el as HTMLTextAreaElement)"
+                @input="autosizeTextarea($event.target as HTMLTextAreaElement)"
+                @blur="updateChecklistItemText(item.id, ($event.target as HTMLTextAreaElement).value)"
+                @keydown.enter.prevent="($event.target as HTMLTextAreaElement).blur()"
+              />
+              <button
+                v-if="effectiveEditable"
+                class="shrink-0 mt-0.5 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground"
+                @click="removeChecklistItem(item.id)"
+              >
+                <X :size="14" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Add new item -->
+          <div v-if="effectiveEditable" class="flex items-center gap-2.5 py-1.5 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors">
+            <Plus :size="14" class="text-muted-foreground/60 shrink-0" />
+            <input
+              v-model="newChecklistItem"
+              class="text-sm min-w-0 bg-transparent border-none outline-none flex-1 placeholder:text-muted-foreground/50"
+              placeholder="Добавить пункт..."
+              @keydown.enter="addChecklistItem"
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop: sidebar -->
+      <div v-if="!isMobile" class="sm:w-60 min-w-0 shrink-0 border-t sm:border-t-0 sm:border-l border-border/60 bg-muted/30" :class="[presentation === 'preview' && 'overflow-y-auto']">
+        <!-- Проект -->
+        <ProjectPicker
+          :model-value="localProjectId"
+          :disabled="!effectiveEditable"
+          @update:model-value="onProjectChange"
+        />
+
+        <GroupPicker
+          v-if="isAgileProject && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localGroupId"
+          :disabled="!effectiveEditable"
+          @update:model-value="onGroupChange"
+        />
+
+        <SprintPicker
+          v-if="isAgileProject && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localSprintId"
+          :disabled="!effectiveEditable"
+          @update:model-value="onSprintChange"
+        />
+
+        <ReleasePicker
+          v-if="isAgileProject && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localReleaseId"
+          :disabled="!effectiveEditable"
+          @update:model-value="onReleaseChange"
+        />
+
+        <GoalPicker
+          v-if="!isAgileProject"
+          :model-value="localGoalIds"
+          :disabled="!effectiveEditable"
+          @update:model-value="onGoalsChange"
+        />
+
+        <!-- Срок (dueDate) -->
+        <DropdownMenu>
+          <div class="relative border-b border-border/40">
+            <DropdownMenuTrigger as-child>
+              <button class="w-full px-4 py-2.5 transition-colors text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+                <div class="flex items-center gap-2 mb-1">
+                  <CalendarIcon :size="13" class="text-muted-foreground/60" />
+                  <span class="text-[11px] text-muted-foreground/60 font-medium">Срок</span>
+                </div>
+                <div class="text-[13px] truncate" :class="[URGENCY_CLASSES[getDueDateUrgency(localDueDate)] || (localDueDate ? '' : 'text-muted-foreground/40')]">
+                  {{ localDueDate ? formatDueDate(localDueDate, { includeYear: true }) : 'Не задано' }}
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <button
+              v-if="effectiveEditable && localDueDate"
+              class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Очистить дату"
+              @click.stop="localDueDate = undefined; localDueTime = ''"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+          <DropdownMenuContent class="w-auto p-0">
+            <div class="p-3 space-y-3">
+              <Calendar
+                :model-value="dueDateCalendarValue"
+                :locale="intlLocale"
+                :week-starts-on="weekStartsOn"
+                weekday-format="short"
+                @update:model-value="onDueDateCalendarChange"
+              />
+              <Input
+                v-model="localDueTime"
+                type="time"
+                class="w-full"
+                placeholder="Время (необязательно)"
+                @change="onDueTimeChange"
+              />
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <!-- Дедлайн -->
+        <DropdownMenu>
+          <div class="relative border-b border-border/40">
+            <DropdownMenuTrigger as-child>
+              <button class="w-full px-4 py-2.5 transition-colors text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+                <div class="flex items-center gap-2 mb-1">
+                  <Clock :size="13" class="text-muted-foreground/60" />
+                  <span class="text-[11px] text-muted-foreground/60 font-medium">Дедлайн</span>
+                </div>
+                <div class="text-[13px] truncate" :class="[localDeadline ? '' : 'text-muted-foreground/40']">
+                  {{ localDeadline ? formatDate(localDeadline, DATE_WITH_TIME) : 'Не задано' }}
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <button
+              v-if="effectiveEditable && localDeadline"
+              class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Очистить дедлайн"
+              @click.stop="localDeadline = undefined"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+          <DeadlinePicker
+            :model-value="localDeadline"
+            @update:model-value="localDeadline = $event"
+          />
+        </DropdownMenu>
+
+        <!-- Приоритет -->
+        <DropdownMenu>
+          <div class="relative border-b border-border/40">
+            <DropdownMenuTrigger as-child>
+              <button class="w-full px-4 py-2.5 transition-colors text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+                <div class="flex items-center gap-2 mb-1">
+                  <Flag :size="13" :class="localPriority ? getPriorityColor(localPriority) : 'text-muted-foreground/60'" />
+                  <span class="text-[11px] text-muted-foreground/60 font-medium">Приоритет</span>
+                </div>
+                <div class="text-[13px] truncate" :class="[localPriority ? '' : 'text-muted-foreground/40']">
+                  {{ localPriority ? PRIORITY_LABELS[localPriority] : 'Не задано' }}
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <button
+              v-if="effectiveEditable && localPriority"
+              class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Очистить приоритет"
+              @click.stop="localPriority = undefined; emitUpdate({ priority: null })"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+          <PriorityPicker
+            :model-value="localPriority"
+            @update:model-value="localPriority = $event ?? undefined; emitUpdate({ priority: $event })"
+          />
+        </DropdownMenu>
+
+        <!-- Место -->
+        <DropdownMenu>
+          <div class="relative border-b border-border/40">
+            <DropdownMenuTrigger as-child>
+              <button class="w-full px-4 py-2.5 transition-colors text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+                <div class="flex items-center gap-2 mb-1">
+                  <MapPin :size="13" class="text-muted-foreground/60" />
+                  <span class="text-[11px] text-muted-foreground/60 font-medium">Место</span>
+                </div>
+                <div class="text-[13px] truncate" :class="[localLocation ? '' : 'text-muted-foreground/40']">
+                  {{ localLocation || 'Не задано' }}
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <button
+              v-if="effectiveEditable && localLocation"
+              class="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-sm text-muted-foreground/40 hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Очистить место"
+              @click.stop="localLocation = ''; emitUpdate({ location: undefined })"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+          <DropdownMenuContent>
+            <div class="p-3">
+              <Input
+                v-model="localLocation"
+                placeholder="Введите место"
+                class="h-8 text-sm"
+                @blur="emitUpdate({ location: localLocation || undefined })"
+                @keyup.enter="emitUpdate({ location: localLocation || undefined })"
+              />
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <!-- Теги -->
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <button class="w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+              <div class="flex items-center gap-2 mb-1">
+                <Tag :size="13" class="text-muted-foreground/60" />
+                <span class="text-[11px] text-muted-foreground/60 font-medium">Теги</span>
+              </div>
+              <div>
+                <div v-if="localTags.length > 0" class="flex flex-wrap gap-1">
+                  <Badge
+                    v-for="tag in localTags"
+                    :key="tag"
+                    variant="secondary"
+                    class="text-[10px] px-1.5 py-0 font-normal"
+                  >
+                    {{ tag }}
+                  </Badge>
+                </div>
+                <span v-else class="text-[13px] text-muted-foreground/40">Не задано</span>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <TagsEditor
+              :model-value="localTags"
+              :editable="effectiveEditable"
+              @update:model-value="localTags = $event; emitUpdate({ tags: [...$event] })"
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <!-- Повторение -->
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <button class="w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+              <div class="flex items-center gap-2 mb-1">
+                <Repeat :size="13" :class="localRecurrence ? 'text-primary' : 'text-muted-foreground/40'" />
+                <span class="text-[11px] text-muted-foreground/60 font-medium">Повторение</span>
+              </div>
+              <div class="text-[13px]" :class="[localRecurrence ? 'text-foreground' : 'text-muted-foreground/40']">
+                {{ formatRecurrence(localRecurrence) }}
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <RecurrencePicker
+            :model-value="localRecurrence"
+            :on-missed="localOnMissed"
+            @update:model-value="onRecurrenceChange"
+            @update:on-missed="onMissedChange"
+          />
+        </DropdownMenu>
+
+        <!-- Напоминание (mock) -->
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <button class="w-full px-4 py-2.5 transition-colors border-b border-border/40 text-left" :class="[effectiveEditable && 'cursor-pointer hover:bg-muted/50']" :disabled="!effectiveEditable">
+              <div class="flex items-center gap-2 mb-1">
+                <Bell :size="13" class="text-muted-foreground/40" />
+                <span class="text-[11px] text-muted-foreground/60 font-medium">Напоминание</span>
+              </div>
+              <div class="text-[13px] text-muted-foreground/40">
+                Нет
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <div class="p-3 text-xs text-muted-foreground">
+              Скоро
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mobile bottom drawer -->
+  <Drawer v-if="isMobile" v-model:open="drawerOpen">
+    <DrawerContent class="max-h-[85dvh]">
+      <DrawerHeader>
+        <DrawerTitle>{{ drawerTitle }}</DrawerTitle>
+      </DrawerHeader>
+      <div class="px-4 pb-6 overflow-y-auto">
+        <ProjectPickerContent
+          v-if="activeDrawer === 'project'"
+          :model-value="localProjectId"
+          @update:model-value="onProjectChange"
+        />
+        <GroupPickerContent
+          v-if="activeDrawer === 'group' && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localGroupId"
+          @update:model-value="onGroupChange"
+        />
+        <SprintPickerContent
+          v-if="activeDrawer === 'sprint' && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localSprintId"
+          @update:model-value="onSprintChange"
+        />
+        <ReleasePickerContent
+          v-if="activeDrawer === 'release' && localProjectId"
+          :project-id="localProjectId"
+          :model-value="localReleaseId"
+          @update:model-value="onReleaseChange"
+        />
+        <GoalPickerContent
+          v-if="activeDrawer === 'goals' && !isAgileProject"
+          :model-value="localGoalIds"
+          @update:model-value="onGoalsChange"
+        />
+        <DueDatePickerContent
+          v-if="activeDrawer === 'dueDate'"
+          :model-value="localDueDate"
+          :time="localDueTime"
+          @update:model-value="onDueDateDrawerChange"
+          @update:time="localDueTime = $event"
+        />
+        <DeadlinePickerContent
+          v-if="activeDrawer === 'deadline'"
+          :model-value="localDeadline"
+          @update:model-value="localDeadline = $event"
+        />
+        <PriorityPickerContent
+          v-if="activeDrawer === 'priority'"
+          :model-value="localPriority"
+          @update:model-value="onPriorityDrawerChange"
+        />
+        <LocationPickerContent
+          v-if="activeDrawer === 'location'"
+          :model-value="localLocation"
+          @update:model-value="onLocationDrawerChange"
+        />
+        <TagsEditor
+          v-if="activeDrawer === 'tags'"
+          :model-value="localTags"
+          :editable="effectiveEditable"
+          @update:model-value="localTags = $event; emitUpdate({ tags: [...$event] })"
+        />
+        <RecurrencePickerContent
+          v-if="activeDrawer === 'recurrence'"
+          :model-value="localRecurrence"
+          :on-missed="localOnMissed"
+          @update:model-value="onRecurrenceDrawerChange"
+          @update:on-missed="onMissedChange"
+        />
+        <div v-if="activeDrawer === 'reminder'" class="py-4 text-sm text-muted-foreground text-center">
+          Скоро
+        </div>
+      </div>
+    </DrawerContent>
+  </Drawer>
+</template>
