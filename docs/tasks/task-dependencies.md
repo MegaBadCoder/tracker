@@ -132,3 +132,13 @@ Inline/copy Verify: passed. Editor RED 11 failed/2 passed → GREEN 13 tests; fu
 
 
 Final follow-up conclusion: ccf5e21 + 5b9f68a improve arrow routing/visibility and fix the reviewed obstacle defect; f8b14de enables immediate add/remove; d4bd66c standardizes product copy. Independent review of 5b9f68a..d4bd66c found no critical/important issues (static review of component/store/integration/tests). Scoped lint and diff-check pass. Goal validated on real desktop/mobile task UI and persisted API data: no edit/save gate, rollback on cycle, links survive cold navigation. Proof: task-dependencies-inline.png and task-dependencies-inline-mobile.png in the session visualization directory. Local preview remains on 5190; worktree retained, no remote publication.
+
+
+## Follow-up: поиск по номеру
+
+По запросу пользователя поиск зависимостей поддерживает название, полный ключ проекта без учёта регистра (DEP-12) и точный номер (12/#12). Ключ отображается в результатах и сохранённых связях. До загрузки каталога проектов доступен номер, после загрузки поиск автоматически учитывает префикс. Текущая задача, виртуальные и уже добавленные зависимости исключаются как раньше. Без изменений API или сохранения.
+
+
+Number-search Verify: passed. RED reproduced missing key/number results; 30 focused editor/detail/key tests pass, vue-tsc and scoped ESLint pass. Browser cold page: dep-3, 3 and #3 each show DEP-3; saved links display their keys. Test confirms 2 does not match task number 12, title search remains available, absent number has no artificial key, and later project load updates full-key matching. Screenshot: task-dependency-number-search.png.
+
+Number-search conclusion: 6846eb8 independently reviewed, no critical/important findings. Goal directly verified in browser with persisted DEP tasks; preview retained on 5190.
