@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { cn } from '@/lib/utils'
 
 /**
- * Вкладки agile-проекта: «Доска», «Бэклог» и «Релизы». Активная вкладка определяется
+ * Вкладки agile-проекта: «Доска», «Бэклог», «Релизы» и «Карта». Активная вкладка определяется
  * по имени текущего маршрута. Тип проекта не проверяется — вызывающий
  * рендерит компонент только для agile-проекта.
  */
@@ -19,6 +19,7 @@ const tabs = computed(() => [
   { label: 'Доска', routeName: 'tasks-project' },
   { label: 'Бэклог', routeName: 'tasks-project-backlog' },
   { label: 'Релизы', routeName: 'tasks-project-releases' },
+  { label: 'Карта', routeName: 'tasks-project-map' },
 ].map(tab => ({
   ...tab,
   to: { name: tab.routeName, params: { projectId: props.projectId } },

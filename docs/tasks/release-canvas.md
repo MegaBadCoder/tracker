@@ -1,6 +1,6 @@
 # Турнирная карта спринта
 
-**Status:** executing
+**Status:** reviewing
 **Branch:** codex/release-canvas
 **Worktree:** /Users/v/projects/Alfy/.worktrees/release-canvas
 **Base:** 7b43e36 (codex/issue-pages; зависимость от общих редакторов и страниц)
@@ -34,7 +34,7 @@
 - PC2 — кнопка сворачивания, выбор узла и редактирование имеют разные понятные действия.
 
 ### Scope
-Создание и редактирование доступны для активных/плановых спринтов; закрытые открываются для просмотра. Перенос родителей выполняется существующим редактором, drag-reparent на полотне не входит в эту задачу. Для нового эпика форма также запрашивает первую историю, чтобы ветка имела назначение спринта. Частично успешное создание сохраняет идентификаторы для повтора без дублей и явно сообщает оставшийся шаг.
+Добавление из карты доступно для активных/плановых спринтов; закрытые открываются без кнопок создания. Быстрый просмотр использует ограничения существующих редакторов. Перенос родителей выполняется существующим редактором, drag-reparent на полотне не входит в эту задачу. Для нового эпика форма также запрашивает первую историю, чтобы ветка имела назначение спринта. Частично успешное создание сохраняет идентификаторы для повтора без дублей и явно сообщает оставшийся шаг.
 TDD: yes для проекции/раскладки и сценариев сохранения/загрузки; визуальное качество проверяется браузером.
 
 ## Plan
@@ -77,3 +77,19 @@ Approach: собственная детерминированная раскла
 - udesign: «приступай» approves sprint as final node; existing autoapproval continues after design.
 - uplan: plan auto-approved; PH1/PH2 parallel implementers, PH3 controller; no changes to production.
 - frontend-design: use Alfy theme/body typography, task keys in monospace; distinctive feature is rightward tournament convergence, understated progress rails and status badges. No decorative new brand styles.
+
+## Verify
+
+Result: passed
+
+- CK1 (IV1, IV4) — смешанные спринты, пустые истории, прямые задачи эпика и потерянная группа — held: projection/layout suites; в браузере активный спринт 1/4, плановый 0/1, пустые истории видны.
+- CK2 (IV2) — прогресс подменяет статус истории — held: «В работе» остаётся отдельным статусом при 1/3 задач; релиз отображается меткой.
+- CK3 (IV3) — collapse теряет задачи или влияет на счётчик — held: поиск раскрыл свёрнутую историю до выполненной задачи; после reload эпик сохранил collapse и «Скрыто: 2».
+- CK4 — частичный отказ создаёт дубликаты — held: use-sprint-map-create tests с отказом создания истории и назначения спринта; повтор использует сохранённые ID. Неполная форма и повторный submit не отправляются.
+- CK5 — старый ответ/ошибка загрузки подменяет новый проект — held: ProjectMapView tests stale response, unmount, atomic failure/retry, missing sprint, closed sprint.
+- CK6 (IF1–IF3) — UI и модель расходятся — held: vue-tsc, targeted ESLint, 147 suites / 1128 tests, production build.
+- CK7 (IV5) — создание не доходит до API или меняет другой спринт — held: браузер создал задачу, эпик с первой историей и вторую историю; reload сохранил плановый спринт и структуру. Preview задачи и переход на отдельную страницу работают.
+- CK8 (PC1, PC2) — узкий экран перекрывает управление — held: 390×844, body.scrollWidth=390, панель в две строки; screenshot sprint-map-mobile.png. Пустой поиск показывает «Ничего не найдено», zoom и стрелка изменяют transform.
+
+Smoke: IAB + local frontend 5189 + real local API 3018; project e1e89400-cd7f-4725-a42e-e6aca914858f. User preview 5188 preserved. No production changes.
+Notes: baseline 34 tests passed. PH1 12 tests and creation 5 tests observed RED→GREEN; page tests observed RED→GREEN. First navigation test fixture returned a sprint of the wrong project; fixed fixture, no product workaround. Canvas border currentColor found in browser and replaced with border-border.
