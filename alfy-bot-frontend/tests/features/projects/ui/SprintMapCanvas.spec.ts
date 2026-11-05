@@ -68,7 +68,7 @@ describe('карта спринта', () => {
     await wrapper.get('button[aria-label="Свернуть Принимать карты"]').trigger('click')
     await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
     await nextTick()
-    const fullscreen = new DOMWrapper(document.body.querySelector<HTMLElement>('[role="dialog"][aria-label="Радиальная карта спринта"]')!)
+    const fullscreen = new DOMWrapper(document.body.querySelector<HTMLElement>('[role="dialog"][aria-label="Карта спринта"]')!)
     expect(fullscreen.element.parentElement).toBe(document.body)
     expect(fullscreen.attributes('aria-modal')).toBe('true')
     expect(document.documentElement.style.overflow).toBe('hidden')
@@ -88,7 +88,7 @@ describe('карта спринта', () => {
     await wrapper.get('button[aria-label="Развернуть карту на весь экран"]').trigger('click')
     wrapper.unmount()
     expect(document.documentElement.style.overflow).toBe(previousOverflow)
-    expect(document.querySelector('[role="dialog"][aria-label="Радиальная карта спринта"]')).toBeNull()
+    expect(document.querySelector('[role="dialog"][aria-label="Карта спринта"]')).toBeNull()
   })
 
   it('согласует прокрутку с редактором, который остаётся открытым после ухода с карты', async () => {

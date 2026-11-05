@@ -180,7 +180,7 @@ onMounted(initialize)
         ref="container" class="flex min-h-0 flex-1 flex-col overflow-hidden border-border bg-background"
         :class="fullscreen ? 'fixed inset-0 z-40 h-dvh w-full' : 'rounded-xl border'"
         :role="fullscreen ? 'dialog' : 'region'" :aria-modal="fullscreen || undefined"
-        aria-label="Радиальная карта спринта" @keydown.esc="onEscape"
+        aria-label="Карта спринта" @keydown.esc="onEscape"
       >
         <div class="relative z-10 flex flex-wrap items-center gap-2 border-b border-border bg-card p-2 sm:px-3">
           <div class="relative min-w-40 flex-1 sm:max-w-80">
@@ -237,7 +237,9 @@ onMounted(initialize)
         >
           <div class="absolute top-0 left-0 origin-top-left" :style="{ width: `${layout.width}px`, height: `${layout.height}px`, transform }" data-testid="map-plane">
             <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
-              <path v-for="edge in layout.edges" :key="`${edge.from}-${edge.to}`" :d="edge.path" fill="none" class="stroke-muted-foreground/35" stroke-width="1.5" />
+              <g class="stroke-muted-foreground" opacity="0.45" fill="none" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+                <path v-for="edge in layout.edges" :key="`${edge.from}-${edge.to}`" :d="edge.path" />
+              </g>
             </svg>
             <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
               <defs>

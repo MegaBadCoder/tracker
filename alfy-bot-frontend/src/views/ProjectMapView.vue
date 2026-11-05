@@ -201,7 +201,7 @@ function addChild(node: SprintMapNode) {
             Карта спринта
           </h1>
           <p class="mt-1 text-sm text-muted-foreground">
-            Спринт в центре · Эпики, истории и задачи вокруг
+            Эпики, истории и задачи расходятся ветками от спринта
           </p>
         </div>
         <label v-if="sprintOptions.length" class="grid min-w-0 gap-1 text-xs font-medium text-muted-foreground">

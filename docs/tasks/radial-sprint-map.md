@@ -1,6 +1,6 @@
 # Радиальная карта спринта
 
-**Status:** done
+**Status:** reviewing
 **Branch:** codex/radial-sprint-map
 **Worktree:** /Users/v/projects/Alfy/.worktrees/radial-sprint-map
 **Base:** 278625d (main)
@@ -72,3 +72,12 @@ Goal evidence: final desktop1280×720 epic overview at81% displays20/60 progress
 Outcome: radial overview achieved locally in 550f0f6/3649603/cb8cfbc. Independent review 278625d..cb8cfbc found no important/critical findings ≥80 confidence; probes covered300 irregular tree/collapse layouts and500dependency routes across50layouts without missing routes or card intersections. Browser review remains controller evidence rather than independent repetition.
 
 IV1–IV4 held by geometry/regression tests and real60task browser smoke. Scope refinement: initial epics replace planned initial stories based39% unreadable story overview; sequential expansion preserves nested collapsed keys. All stages auto-approved; controller repaired center-crossing chords and sparse-arc bounds with RED regressions. Local preview5191 retained, no remote push/merge/deploy in this task. Temporary fixture/probe scripts removed; demo data remains only in ignored local API SQLite.
+
+## Уточнение: ветви mind map
+
+Пользователь явно выбрал «Влево и вправо, как mind map: эпик → истории → задачи, с разветвлениями как на скриншоте». Это заменяет кольцевую геометрию: спринт остаётся в центре, эпики распределяются между сторонами с балансом по полному размеру веток; потомки растут наружу своей стороны. У каждого родителя общий ортогональный ствол и отдельные ответвления. Сторона эпика стабильна при collapse. Уровни детализации, зависимости, поиск и сохранённые ветки остаются.
+
+Plan (auto-approved): один этап — заменить layoutSprintMap и его geometry tests, выровнять актуальные UI тексты/документацию, проверить отсутствие наложений и пересечений линий/карточек, stability sides, bounds, общие стволы, затем browser smoke и независимое ревью. API/IF1/IF2 shapes сохраняются. База уточнения 5d80e02, та же изолированная WT.
+
+
+Mind-map Verify: passed. New geometry tests RED (3failed/3passed) on radial implementation, GREEN after replacing it:47 layout/dependency/canvas/page tests; final17Canvas after label change, productionbuild/vue-tsc/scopedlint/diff-check pass. CK7 — left/right branches, common stems, outward descendants, fixed sides throughcollapse and unchangeddata — held. CK8 — 120tasks/151nodes, unbalanced110tasks and32collapse combinations: no card overlap or hierarchy segment crossing cards, centeredbounds and determinism — held. Browser60task demo confirms forked trunks both sides, dependencies on collapsednodes remainlisted, hidden search→RAD-3 preview works. Shared hierarchy stems render under group opacity to avoid darker repeated segments.
