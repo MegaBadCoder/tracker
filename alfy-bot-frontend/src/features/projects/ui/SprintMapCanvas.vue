@@ -33,6 +33,7 @@ const layout = computed(() => layoutSprintMap(props.root, collapsed.value))
 const allNodes = computed(() => flattenSprintMap(props.root))
 const matches = computed(() => query.value.trim() ? allNodes.value.filter(node => node.title.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase())) : [])
 const dependencyGraph = computed(() => deriveSprintMapDependencies({ root: props.root, visibleNodes: layout.value.nodes, tasks: props.tasks, dependencies: props.dependencies, selectedTaskId: dependencySelection.value, showAll: showAllDependencies.value }))
+const mapBounds = computed(() => ({ x: dependencyGraph.value.minX, width: layout.value.width - dependencyGraph.value.minX, height: layout.value.height }))
 const dependencyTitle = computed(() => props.tasks.find(task => task.id === dependencySelection.value)?.title ?? null)
 const viewport = useSprintMapViewport(surface)
 const { scale, minScale, dragging, transform } = viewport
@@ -124,7 +125,7 @@ function closeDependencies() {
 }
 
 function fit() {
-  viewport.fit(layout.value)
+  viewport.fit(mapBounds.value)
 }
 
 function expandAll() {
@@ -141,7 +142,7 @@ async function add(node: SprintMapNode) {
 function initialize() {
   const root = layout.value.nodes.find(item => item.node.key === props.root.key)
   if (root)
-    viewport.initialize(layout.value, { x: root.x + root.width / 2, y: root.y + root.height / 2 })
+    viewport.initialize(mapBounds.value, { x: root.x + root.width / 2, y: root.y + root.height / 2 })
 }
 
 watch(scope, async () => {
@@ -220,12 +221,16 @@ onMounted(initialize)
             </svg>
             <svg class="pointer-events-none absolute inset-0 overflow-visible" :width="layout.width" :height="layout.height" aria-hidden="true">
               <defs>
-                <marker :id="dependencyArrowId" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                  <path d="M0 0 L10 5 L0 10 z" fill="context-stroke" />
+                <marker v-for="state in ['waiting', 'done']" :id="`${dependencyArrowId}-${state}`" :key="state" viewBox="0 0 12 12" refX="8" refY="6" :markerWidth="12 / Math.max(scale, 0.5)" :markerHeight="12 / Math.max(scale, 0.5)" markerUnits="userSpaceOnUse" orient="auto">
+                  <path d="M3 2 L8 6 L3 10" fill="none" :class="state === 'done' ? 'stroke-emerald-500/75' : 'stroke-primary'" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                 </marker>
               </defs>
               <template v-for="link in dependencyGraph.links" :key="`${link.dependencyId}-${link.taskId}`">
-                <path v-if="link.path" :d="link.path" fill="none" :class="link.completed ? 'stroke-muted-foreground/60' : 'stroke-primary'" stroke-width="2" stroke-dasharray="6 5" :marker-end="`url(#${dependencyArrowId})`" :data-dependency-edge="`${link.dependencyId}-${link.taskId}`" :data-completed="link.completed" />
+                <g v-if="link.path" :class="link.completed ? 'text-emerald-500/75' : 'text-primary'">
+                  <path :d="link.path" fill="none" class="stroke-background" stroke-width="6" vector-effect="non-scaling-stroke" />
+                  <path :d="link.path" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="5 5" stroke-linecap="round" vector-effect="non-scaling-stroke" :marker-end="`url(#${dependencyArrowId}-${link.completed ? 'done' : 'waiting'})`" :data-dependency-edge="`${link.dependencyId}-${link.taskId}`" :data-completed="link.completed" />
+                  <circle v-if="link.sourcePort" :cx="link.sourcePort.x" :cy="link.sourcePort.y" :r="3 / Math.max(scale, 0.5)" class="fill-background" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                </g>
               </template>
             </svg>
             <div v-for="item in layout.nodes" :key="item.node.key" class="absolute cursor-default" :style="{ left: `${item.x}px`, top: `${item.y}px`, width: `${item.width}px`, height: `${item.height}px` }">

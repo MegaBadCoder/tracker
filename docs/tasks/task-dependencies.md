@@ -1,6 +1,6 @@
 # Зависимости задач
 
-**Status:** done
+**Status:** reviewing
 **Branch:** codex/task-dependencies
 **Worktree:** /Users/v/projects/Alfy/.worktrees/task-dependencies
 **Base:** a323db8 (codex/release-canvas)
@@ -107,3 +107,15 @@ Smoke: real API 3019 + UI 5190, isolated SQLite. Browser saved external predeces
 Direct browser evidence: persisted A→B→C and external D→B chain; cycle rejected, reload preserved links, A/D completion removed B waiting while B stayed unfinished, C still waited for B, sprint stayed 1/3. Hidden tasks were revealed from dependency panel; desktop fullscreen and 390px editor/map worked. Final local map: http://localhost:5190/tasks/project/f2b9dcb7-8c62-463e-9b96-893e5e3390f5/map. Screenshot: /Users/v/.codex/visualizations/2026/11/04/01a1a794-bc60-7b13-a320-224d1cf0c89f/task-dependencies.png.
 
 Finish: local commits on codex/task-dependencies, isolated preview kept running; no remote publication. Temporary fixture/probe scripts removed; demo data retained in ignored local SQLite.
+
+
+## Follow-up: читаемость стрелок
+
+Пользователь показал наложение наконечника на границу карточки. Причина: endpoint совпадает с x карточки; SVG лежит под HTML, а общая cubic-кривая не разделяет пересекающиеся связи. Цель: направление читается при обычном масштабе, наконечники целиком снаружи карточек, пересекающиеся вертикальные участки разделены. Useless if: увеличили стрелку, сохранив перекрытие или обрезав дорожки по краю карты.
+
+Design: скруглённые ортогональные дорожки слева, отдельные вход/выход с зазором, начало отмечено кружком, конец открытым шевроном; пунктир и готовность сохраняются. Стабильное распределение пересекающихся интервалов по дорожкам; fit учитывает левую границу связей. Прямая кривая с увеличенным наконечником не устраняет перекрытие. TDD: yes для маршрутизации и fit; визуальная проверка на настоящей карте. API/данные/иерархия не меняются.
+
+Plan: helper маршрутизации → SVG ports/markers и bounds → focused tests/build → browser desktop/mobile/collapse → независимое ревью. Auto-approved in existing hands-off worktree.
+
+
+Follow-up Verify: passed. RED: 2 новых geometry tests падали на старой кривой; GREEN: 162 tests (17 suites), build, scoped ESLint, diff-check. CK9 — точки начала/конца вынесены за карточку, конечный отрезок горизонтальный, перекрывающиеся интервалы получают разные дорожки независимо от порядка API — held. CK10 — 7 пересекающихся связей уходят в отрицательные X, команда «Вся карта» оставляет крайний путь внутри viewport — held. CK11 — browser desktop 1496×1112, mobile 390×844, collapse/reveal — held: шевроны не перекрываются карточкой; петля внутри свёрнутой истории компактна, цвет готовности совпадает с панелью. Screenshot: task-dependencies-polished.png.

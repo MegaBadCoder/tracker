@@ -70,4 +70,26 @@ describe('связи карты', () => {
     expect(result.links[0]?.to?.node.key).toBe('sprint:s')
     expect(result.links[0]?.path).toBeTruthy()
   })
+
+  it('оставляет наконечник и начало вне карточек, подходит к цели горизонтально', () => {
+    const link = derive('b', false).links[0]!
+    expect(link.sourcePort!.x).toBeLessThan(link.from!.x - 5)
+    expect(link.targetPort!.x).toBeLessThan(link.to!.x - 5)
+    expect(link.path).toMatch(/H[-\d.]+$/)
+    expect(link.path).toContain('Q')
+    expect(link.sourcePort!.y).toBeGreaterThan(link.from!.y + link.from!.height / 2)
+    expect(link.targetPort!.y).toBeLessThan(link.to!.y + link.to!.height / 2)
+  })
+
+  it('разводит пересекающиеся связи по стабильным дорожкам и учитывает их в границах', () => {
+    const multiRoot = node('sprint', 's', [node('story', 'story', ['a', 'b', 'c', 'd', 'e'].map(id => node('task', id)))])
+    const multiTasks = ['a', 'b', 'c', 'd', 'e'].map(id => ({ ...tasks[0]!, id }))
+    const edges = ['b', 'c', 'd', 'e'].map(taskId => ({ taskId, dependencyId: 'a' }))
+    const input = { root: multiRoot, visibleNodes: layoutSprintMap(multiRoot, new Set()).nodes, tasks: multiTasks, dependencies: edges, selectedTaskId: null, showAll: true }
+    const result = deriveSprintMapDependencies(input)
+    const lanes = result.links.map(link => link.path!.match(/H([-\d.]+)/)![1])
+    expect(new Set(lanes).size).toBe(4)
+    expect(result.minX).toBeLessThan(0)
+    expect(deriveSprintMapDependencies({ ...input, dependencies: [...edges].reverse() }).links.map(link => link.path)).toEqual(result.links.map(link => link.path))
+  })
 })

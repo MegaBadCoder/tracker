@@ -12,6 +12,8 @@ export interface SprintMapDependency extends TaskDependencyEdge {
   dependentHidden: boolean
   completed: boolean
   path: string | null
+  sourcePort: { x: number, y: number } | null
+  targetPort: { x: number, y: number } | null
 }
 
 export interface SprintMapDependencyInput {
@@ -36,17 +38,34 @@ function taskEndpoints(root: SprintMapNode, visibleNodes: PositionedMapNode[]) {
   return endpoints
 }
 
-function dependencyPath(from: PositionedMapNode, to: PositionedMapNode): string {
-  const startX = from.x
-  const startY = from.y + from.height / 3
-  const endX = to.x
-  const endY = to.y + to.height * 2 / 3
-  const bendX = Math.min(startX, endX) - 32
-  return `M${startX} ${startY} C${bendX} ${startY} ${bendX} ${endY} ${endX} ${endY}`
+function routeDependencies(links: SprintMapDependency[]): number {
+  const lanes: { start: number, end: number }[][] = []
+  let minX = 0
+  for (const link of links) {
+    if (!link.from || !link.to)
+      continue
+    const source = { x: link.from.x - 9, y: link.from.y + link.from.height * 2 / 3 }
+    const target = { x: link.to.x - 11, y: link.to.y + link.to.height / 3 }
+    const interval = { start: Math.min(source.y, target.y) - 12, end: Math.max(source.y, target.y) + 12 }
+    let lane = lanes.findIndex(items => items.every(item => interval.end < item.start || interval.start > item.end))
+    if (lane === -1) {
+      lane = lanes.length
+      lanes.push([])
+    }
+    lanes[lane]!.push(interval)
+    const laneX = Math.min(link.from.x, link.to.x) - 40 - lane * 18
+    const direction = target.y >= source.y ? 1 : -1
+    const radius = Math.min(12, Math.abs(target.y - source.y) / 2)
+    link.sourcePort = source
+    link.targetPort = target
+    link.path = `M${source.x} ${source.y} H${laneX + radius} Q${laneX} ${source.y} ${laneX} ${source.y + direction * radius} V${target.y - direction * radius} Q${laneX} ${target.y} ${laneX + radius} ${target.y} H${target.x}`
+    minX = Math.min(minX, laneX - 16)
+  }
+  return minX
 }
 
 /** Вычисляет ожидание по текущим задачам и направляет связи от предшественников к видимым узлам; внешние задачи остаются в списке без добавления в дерево. */
-export function deriveSprintMapDependencies(input: SprintMapDependencyInput): { waiting: Map<string, number>, links: SprintMapDependency[] } {
+export function deriveSprintMapDependencies(input: SprintMapDependencyInput): { waiting: Map<string, number>, links: SprintMapDependency[], minX: number } {
   const tasks = new Map(input.tasks.map(task => [task.id, task]))
   const endpoints = taskEndpoints(input.root, input.visibleNodes)
   const waiting = new Map<string, number>()
@@ -71,8 +90,11 @@ export function deriveSprintMapDependencies(input: SprintMapDependencyInput): { 
       completed,
       predecessorHidden: !!from && from.node.key !== `task:${edge.dependencyId}`,
       dependentHidden: !!to && to.node.key !== `task:${edge.taskId}`,
-      path: from && to ? dependencyPath(from, to) : null,
+      path: null,
+      sourcePort: null,
+      targetPort: null,
     })
   }
-  return { waiting, links }
+  links.sort((a, b) => a.dependencyId.localeCompare(b.dependencyId) || a.taskId.localeCompare(b.taskId))
+  return { waiting, links, minX: routeDependencies(links) }
 }

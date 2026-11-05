@@ -44,7 +44,7 @@ function location(task: Task | null, onMap: boolean, hidden: boolean): string {
     </p>
     <ul v-else class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
       <li v-for="link in links" :key="`${link.dependencyId}-${link.taskId}`" class="min-w-0 rounded-lg border border-border px-2.5 py-2 text-xs">
-        <div class="mb-1.5 flex items-center gap-1 text-[10px] font-medium" :class="link.completed ? 'text-muted-foreground' : 'text-primary'">
+        <div class="mb-1.5 flex items-center gap-1 text-[10px] font-medium" :class="link.completed ? 'text-emerald-500' : 'text-primary'">
           <Check v-if="link.completed" class="size-3" />{{ link.completed ? 'Готово' : 'Ожидает предшественника' }}
         </div>
         <div v-for="endpoint in [{ task: link.predecessor, id: link.dependencyId, visible: !!link.from, hidden: link.predecessorHidden, label: 'Предшественник' }, { task: link.dependent, id: link.taskId, visible: !!link.to, hidden: link.dependentHidden, label: 'Зависит от него' }]" :key="endpoint.id" class="flex items-center gap-1.5 py-1">

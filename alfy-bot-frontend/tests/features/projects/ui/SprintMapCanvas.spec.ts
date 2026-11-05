@@ -257,6 +257,20 @@ describe('зависимости на карте', () => {
     wrapper.unmount()
   })
 
+  it('вписывает крайние дорожки в экран вместе с карточками', async () => {
+    const ids = Array.from({ length: 8 }, (_, index) => `item-${index}`)
+    const root = node('sprint', 'sprint', 'Ноябрь', [node('story', 'story', 'История', ids.map(id => node('task', id, id)))])
+    const wrapper = render(root)
+    await wrapper.setProps({ tasks: ids.map(id => ({ ...tasks[0]!, id })), dependencies: ids.slice(1).map(id => ({ taskId: id, dependencyId: ids[0]! })) })
+    await wrapper.get('button[aria-label="Все связи задач"]').trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'Вся карта')!.trigger('click')
+    const { x, scale } = planeTransform(wrapper)
+    const rails = wrapper.findAll('[data-dependency-edge]').map(edge => Number(edge.attributes('d').match(/Q([-\d.]+) /)![1]))
+    expect(Math.min(...rails)).toBeLessThan(0)
+    expect(Math.min(...rails) * scale + x).toBeGreaterThanOrEqual(20)
+    wrapper.unmount()
+  })
+
   it('снимает ожидание и меняет стиль готовой связи по актуальным задачам', async () => {
     const wrapper = render()
     await wrapper.setProps({ tasks, dependencies })
