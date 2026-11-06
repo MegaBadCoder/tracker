@@ -1,65 +1,99 @@
 import type { SprintMapNode } from '@/features/projects/lib/sprint-map'
 import { describe, expect, it } from 'vitest'
-import { layoutSprintMap, MAP_COLUMN_GAP, MAP_NODE_HEIGHT, MAP_NODE_WIDTH, MAP_PADDING, MAP_ROW_GAP } from '@/features/projects/lib/sprint-map-layout'
+import { layoutSprintMap, MAP_NODE_HEIGHT, MAP_NODE_WIDTH, MAP_PADDING, MAP_ROW_GAP } from '@/features/projects/lib/sprint-map-layout'
 
 function node(kind: SprintMapNode['kind'], id: string, children: SprintMapNode[] = []): SprintMapNode {
   return { key: `${kind}:${id}`, kind, sourceId: id, title: id, statusLabel: '', statusCategory: 'open', statusColor: null, total: 4, done: 2, outsideCount: 0, blockedReason: null, releases: [], children }
 }
-
 function tree() {
   return node('sprint', 's', [node('epic', 'e', [node('story', 'a', [node('task', '1'), node('task', '2')]), node('story', 'b', [node('task', '3')]), node('task', 'direct')]), node('ungrouped', 'u', [node('task', '4')])])
 }
-
-describe('layoutSprintMap', () => {
-  it('размещает уровни слева направо и соединяет детей с родителями', () => {
-    const result = layoutSprintMap(tree(), new Set())
-    expect(result.nodes).toHaveLength(10)
-    const columns = { task: 0, story: 1, epic: 2, ungrouped: 2, sprint: 3 }
-    for (const item of result.nodes) {
-      expect(item.x).toBe(MAP_PADDING + columns[item.node.kind] * (MAP_NODE_WIDTH + MAP_COLUMN_GAP))
-      expect(item).toMatchObject({ width: MAP_NODE_WIDTH, height: MAP_NODE_HEIGHT })
-      expect(item.y).toBeGreaterThanOrEqual(MAP_PADDING)
-      expect(item.x + item.width).toBeLessThanOrEqual(result.width - MAP_PADDING)
-      expect(item.y + item.height).toBeLessThanOrEqual(result.height - MAP_PADDING)
+function assertGeometry(result: ReturnType<typeof layoutSprintMap>) {
+  const root = result.nodes[0]!
+  expect(root.x + root.width / 2).toBe(result.width / 2)
+  expect(root.y + root.height / 2).toBe(result.height / 2)
+  for (const [index, card] of result.nodes.entries()) {
+    expect(card.x).toBeGreaterThanOrEqual(MAP_PADDING)
+    expect(card.y).toBeGreaterThanOrEqual(MAP_PADDING)
+    expect(card.x + card.width).toBeLessThanOrEqual(result.width - MAP_PADDING)
+    expect(card.y + card.height).toBeLessThanOrEqual(result.height - MAP_PADDING)
+    for (const other of result.nodes.slice(index + 1))
+      expect(Math.max(Math.abs(card.x - other.x) - card.width, Math.abs(card.y - other.y) - card.height)).toBeGreaterThanOrEqual(MAP_ROW_GAP)
+  }
+  for (const edge of result.edges) {
+    expect(edge.path).toMatch(/^M[-\d.]+ [-\d.]+ H[-\d.]+ V[-\d.]+ H[-\d.]+$/)
+    const [x = 0, y = 0, trunk = 0, targetY = 0, targetX = 0] = edge.path.match(/-?\d+(?:\.\d+)?/g)!.map(Number)
+    for (const card of result.nodes) {
+      if (card.node.key === edge.from || card.node.key === edge.to)
+        continue
+      const horizontal = (a: number, b: number, atY: number) => atY > card.y && atY < card.y + card.height && Math.max(a, b) > card.x && Math.min(a, b) < card.x + card.width
+      const vertical = trunk > card.x && trunk < card.x + card.width && Math.max(y, targetY) > card.y && Math.min(y, targetY) < card.y + card.height
+      expect(horizontal(x, trunk, y) || vertical || horizontal(trunk, targetX, targetY), `${edge.from} crosses ${card.node.key}`).toBe(false)
     }
-    expect(result.edges).toHaveLength(9)
-    expect(result.edges.find(edge => edge.from === 'task:1')).toMatchObject({ to: 'story:a' })
-    expect(result.edges.every(edge => /^M[\d .-]+ H[\d .-]+ V[\d .-]+ H[\d .-]+$/.test(edge.path))).toBe(true)
-  })
+  }
+}
 
-  it('сворачивает потомков и уплотняет карту без изменения данных и прогресса', () => {
+describe('mind map спринта', () => {
+  it('распределяет эпики по обе стороны центра, а потомков направляет наружу', () => {
+    const result = layoutSprintMap(tree(), new Set())
+    const byKey = new Map(result.nodes.map(item => [item.node.key, item]))
+    const root = byKey.get('sprint:s')!
+    expect((byKey.get('epic:e')!.x - root.x) * (byKey.get('ungrouped:u')!.x - root.x)).toBeLessThan(0)
+    for (const [childKey, parentKey] of [['story:a', 'epic:e'], ['task:1', 'story:a'], ['task:4', 'ungrouped:u']]) {
+      const child = byKey.get(childKey!)!
+      const parent = byKey.get(parentKey!)!
+      expect(Math.abs(child.x - root.x)).toBeGreaterThan(Math.abs(parent.x - root.x))
+      expect(Math.sign(child.x - root.x)).toBe(Math.sign(parent.x - root.x))
+    }
+    assertGeometry(result)
+  })
+  it('соединяет соседние истории общим стволом', () => {
+    const result = layoutSprintMap(tree(), new Set())
+    const first = result.edges.find(edge => edge.from === 'story:a')!
+    const second = result.edges.find(edge => edge.from === 'story:b')!
+    expect(first.to).toBe('epic:e')
+    expect(first.path.match(/H[-\d.]+/)?.[0]).toBe(second.path.match(/H[-\d.]+/)?.[0])
+    expect(first.path.match(/V[-\d.]+ H[-\d.]+$/)?.[0]).toBe(second.path.match(/V[-\d.]+ H[-\d.]+$/)?.[0])
+    expect(result.edges).toHaveLength(result.nodes.length - 1)
+  })
+  it('сохраняет стороны при сворачивании и не меняет данные', () => {
     const root = tree()
-    const before = JSON.stringify(root)
-    const result = layoutSprintMap(root, new Set(['epic:e']))
-    expect(result.nodes.map(item => item.node.key).sort()).toEqual(['sprint:s', 'epic:e', 'ungrouped:u', 'task:4'].sort())
-    expect(result.height).toBeLessThan(layoutSprintMap(root, new Set()).height)
-    expect(result.nodes.find(item => item.node.key === 'epic:e')?.node).toMatchObject({ done: 2, total: 4 })
-    expect(JSON.stringify(root)).toBe(before)
+    const snapshot = JSON.stringify(root)
+    const expanded = layoutSprintMap(root, new Set())
+    const collapsed = layoutSprintMap(root, new Set(['epic:e']))
+    for (const key of ['epic:e', 'ungrouped:u']) {
+      const side = (layout: typeof expanded) => Math.sign(layout.nodes.find(item => item.node.key === key)!.x - layout.width / 2 + MAP_NODE_WIDTH / 2)
+      expect(side(collapsed)).toBe(side(expanded))
+    }
+    expect(collapsed.nodes).toHaveLength(4)
+    expect(collapsed.height).toBeLessThan(expanded.height)
+    expect(JSON.stringify(root)).toBe(snapshot)
   })
-
-  it('не перекрывает карточки одного уровня при любых свёрнутых ветках', () => {
+  it('не допускает пересечений при всех комбинациях свёрнутых веток', () => {
     const root = tree()
     const branches = ['sprint:s', 'epic:e', 'story:a', 'story:b', 'ungrouped:u']
     for (let mask = 0; mask < 2 ** branches.length; mask++) {
       const collapsed = new Set(branches.filter((_, index) => mask & (1 << index)))
       const result = layoutSprintMap(root, collapsed)
-      expect(result.nodes.length).toBeGreaterThan(0)
-      for (const item of result.nodes) {
-        for (const other of result.nodes) {
-          if (item.node.key !== other.node.key && item.x === other.x)
-            expect(Math.abs(item.y - other.y)).toBeGreaterThanOrEqual(MAP_NODE_HEIGHT + MAP_ROW_GAP)
-        }
-      }
+      assertGeometry(result)
       expect(layoutSprintMap(root, collapsed)).toEqual(result)
     }
   })
-
-  it('показывает пустой или свёрнутый спринт одной карточкой', () => {
-    for (const root of [node('sprint', 's'), tree()]) {
-      const result = layoutSprintMap(root, new Set(['sprint:s']))
+  it('разводит 120 задач и несбалансированные ветви', () => {
+    const root = node('sprint', 'large', Array.from({ length: 6 }, (_, epic) => node('epic', `${epic}`, Array.from({ length: 4 }, (_, story) => node('story', `${epic}-${story}`, Array.from({ length: 5 }, (_, task) => node('task', `${epic}-${story}-${task}`)))))))
+    const result = layoutSprintMap(root, new Set())
+    expect(result.nodes).toHaveLength(151)
+    assertGeometry(result)
+    assertGeometry(layoutSprintMap(node('sprint', 'unbalanced', [node('epic', 'many', [node('story', 'large', Array.from({ length: 110 }, (_, index) => node('task', `${index}`)))]), node('epic', 'small')]), new Set()))
+  })
+  it('оставляет пустой и свёрнутый спринт одной центральной карточкой', () => {
+    for (const root of [node('sprint', 'empty'), tree()]) {
+      const result = layoutSprintMap(root, new Set([root.key]))
       expect(result.nodes).toHaveLength(1)
       expect(result.edges).toEqual([])
+      expect(result.width).toBe(MAP_NODE_WIDTH + 2 * MAP_PADDING)
       expect(result.height).toBe(MAP_NODE_HEIGHT + 2 * MAP_PADDING)
+      assertGeometry(result)
     }
   })
 })

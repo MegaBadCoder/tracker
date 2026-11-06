@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-interface MapBounds { width: number, height: number, x?: number }
+interface MapBounds { width: number, height: number, x?: number, y?: number }
 interface MapPoint { x: number, y: number }
 
 /** Управляет масштабом и положением полотна в пикселях контейнера, не изменяя узлы карты. */
@@ -39,7 +39,7 @@ export function useSprintMapViewport(element: Ref<HTMLElement | null>) {
     measure()
     scale.value = Math.max(Number.EPSILON, Math.min(1, (size.value.width - 40) / bounds.width, (size.value.height - 40) / bounds.height))
     minScale.value = Math.min(0.08, scale.value)
-    focus({ x: (bounds.x ?? 0) + bounds.width / 2, y: bounds.height / 2 })
+    focus({ x: (bounds.x ?? 0) + bounds.width / 2, y: (bounds.y ?? 0) + bounds.height / 2 })
   }
 
   function initialize(bounds: MapBounds, root: MapPoint) {

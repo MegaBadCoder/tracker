@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SprintMapNode } from '../lib/sprint-map'
-import { ChevronLeft, ChevronRight, Crosshair, ExternalLink, GitBranch, LockKeyhole, Plus } from 'lucide-vue-next'
+import { ChevronDown, ChevronRight, Crosshair, ExternalLink, GitBranch, LockKeyhole, Plus } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { taskLinkPath } from '@/features/tasks/lib/task-link'
@@ -51,7 +51,7 @@ const details = computed(() => [
         :aria-label="`${collapsed ? 'Развернуть' : 'Свернуть'} ${node.title}`"
         :aria-expanded="!collapsed" @click="emit('toggle')"
       >
-        <ChevronRight v-if="collapsed" class="size-3.5" /><ChevronLeft v-else class="size-3.5" />
+        <ChevronRight v-if="collapsed" class="size-3.5" /><ChevronDown v-else class="size-3.5" />
       </Button>
     </div>
     <button
