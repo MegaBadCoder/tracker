@@ -42,6 +42,31 @@ function forestSpan(nodes: BranchNode[]): number {
   return nodes.reduce((sum, node) => sum + node.span, 0) + Math.max(0, nodes.length - 1) * MAP_ROW_GAP
 }
 
+function balancedSides(branches: BranchNode[]) {
+  let reachableBits = 1n
+  const snapshots = [reachableBits]
+  let total = 0
+  for (const branch of branches) {
+    reachableBits |= reachableBits << BigInt(branch.weight)
+    snapshots.push(reachableBits)
+    total += branch.weight
+  }
+  const half = Math.floor(total / 2)
+  const candidates = reachableBits & ((1n << BigInt(half + 1)) - 1n)
+  let remaining = candidates.toString(2).length - 1
+  const chosen = new Set<BranchNode>()
+  for (let index = branches.length - 1; index >= 0; index--) {
+    if ((snapshots[index]! & (1n << BigInt(remaining))) !== 0n)
+      continue
+    chosen.add(branches[index]!)
+    remaining -= branches[index]!.weight
+  }
+  const firstChosen = branches[0] ? chosen.has(branches[0]) : false
+  const right = branches.filter(branch => chosen.has(branch) === firstChosen)
+  const left = branches.filter(branch => chosen.has(branch) !== firstChosen)
+  return [{ direction: 1, branches: right }, { direction: -1, branches: left }]
+}
+
 function branchPath(child: PositionedMapNode, parent: PositionedMapNode, side: number): string {
   const startX = side > 0 ? child.x : child.x + child.width
   const endX = side > 0 ? parent.x + parent.width : parent.x
@@ -57,12 +82,7 @@ export function layoutSprintMap(root: SprintMapNode, collapsed: ReadonlySet<stri
   height: number
 } {
   const tree = collectBranch(root, collapsed)
-  const sides = [{ direction: 1, weight: 0, branches: [] as BranchNode[] }, { direction: -1, weight: 0, branches: [] as BranchNode[] }]
-  for (const branch of tree.children) {
-    const side = sides[0]!.weight <= sides[1]!.weight ? sides[0]! : sides[1]!
-    side.branches.push(branch)
-    side.weight += branch.weight
-  }
+  const sides = balancedSides(tree.children)
   const nodes: PositionedMapNode[] = [{ node: root, x: -MAP_NODE_WIDTH / 2, y: -MAP_NODE_HEIGHT / 2, width: MAP_NODE_WIDTH, height: MAP_NODE_HEIGHT }]
   const connections: { child: PositionedMapNode, parent: PositionedMapNode, side: number }[] = []
 
@@ -77,11 +97,14 @@ export function layoutSprintMap(root: SprintMapNode, collapsed: ReadonlySet<stri
     }
   }
 
+  const sharedSpan = Math.max(...sides.map(side => forestSpan(side.branches)))
   for (const side of sides) {
-    let top = -forestSpan(side.branches) / 2
+    const contentSpan = side.branches.reduce((sum, branch) => sum + branch.span, 0)
+    const gap = side.branches.length > 1 ? (sharedSpan - contentSpan) / (side.branches.length - 1) : 0
+    let top = -(side.branches.length > 1 ? sharedSpan : contentSpan) / 2
     for (const branch of side.branches) {
       place(branch, nodes[0]!, side.direction, 1, top)
-      top += branch.span + MAP_ROW_GAP
+      top += branch.span + gap
     }
   }
   const halfWidth = Math.max(...nodes.map(node => Math.abs(node.x + node.width / 2) + node.width / 2)) + MAP_PADDING

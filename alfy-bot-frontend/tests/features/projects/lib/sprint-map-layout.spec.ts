@@ -86,6 +86,35 @@ describe('mind map спринта', () => {
     assertGeometry(result)
     assertGeometry(layoutSprintMap(node('sprint', 'unbalanced', [node('epic', 'many', [node('story', 'large', Array.from({ length: 110 }, (_, index) => node('task', `${index}`)))]), node('epic', 'small')]), new Set()))
   })
+  it('распределяет неодинаковые ветки по ближайшему равному числу листьев', () => {
+    const root = node('sprint', 'balanced', [8, 7, 6, 5, 4].map((count, epic) => node('epic', `${epic}`, Array.from({ length: count }, (_, task) => node('task', `${epic}-${task}`)))))
+    const result = layoutSprintMap(root, new Set())
+    const center = result.width / 2
+    const counts = [1, -1].map(side => result.nodes.filter(item => item.node.kind === 'task' && Math.sign(item.x + item.width / 2 - center) === side).length)
+    expect(counts).toEqual([15, 15])
+    assertGeometry(result)
+  })
+  it('находит ближайший допустимый баланс, не разделяя целые ветки', () => {
+    for (const weights of [[11, 3, 2], [2, 2, 3, 3, 5], [1, 1, 1, 1, 10, 6, 2]]) {
+      const root = node('sprint', 'balance', weights.map((count, epic) => node('epic', `${epic}`, Array.from({ length: count }, (_, task) => node('task', `${epic}-${task}`)))))
+      const result = layoutSprintMap(root, new Set())
+      const total = weights.reduce((sum, value) => sum + value, 0)
+      const possibleDifferences = Array.from({ length: 2 ** weights.length }, (_, mask) => Math.abs(total - 2 * weights.reduce((sum, value, index) => sum + (mask & (1 << index) ? value : 0), 0)))
+      const right = result.nodes.filter(item => item.node.kind === 'task' && item.x > result.width / 2).length
+      expect(Math.abs(total - 2 * right)).toBe(Math.min(...possibleDifferences))
+      expect(result.nodes.filter(item => item.node.kind === 'task')).toHaveLength(total)
+      assertGeometry(result)
+    }
+  })
+  it('равномерно распределяет видимые ветки по общей высоте обеих сторон', () => {
+    const root = node('sprint', 'balanced', [8, 7, 6, 5, 4].map((count, epic) => node('epic', `${epic}`, Array.from({ length: count }, (_, task) => node('task', `${epic}-${task}`)))))
+    const collapsed = new Set(root.children.map(child => child.key))
+    const result = layoutSprintMap(root, collapsed)
+    const groups = [1, -1].map(side => result.nodes.filter(item => item.node.kind === 'epic' && Math.sign(item.x + item.width / 2 - result.width / 2) === side))
+    expect(groups.map(group => Math.min(...group.map(item => item.y)))[0]).toBe(groups.map(group => Math.min(...group.map(item => item.y)))[1])
+    expect(groups.map(group => Math.max(...group.map(item => item.y + item.height)))[0]).toBe(groups.map(group => Math.max(...group.map(item => item.y + item.height)))[1])
+    assertGeometry(result)
+  })
   it('оставляет пустой и свёрнутый спринт одной центральной карточкой', () => {
     for (const root of [node('sprint', 'empty'), tree()]) {
       const result = layoutSprintMap(root, new Set([root.key]))
