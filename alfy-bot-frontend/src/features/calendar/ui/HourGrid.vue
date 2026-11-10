@@ -15,7 +15,7 @@
         class="absolute right-0 z-30 pointer-events-none flex items-center -translate-y-1/2"
         :style="{ top: `${currentTimeTop}px` }"
       >
-        <span class="text-[9px] font-medium text-red-500 tabular-nums pr-0.5 bg-white dark:bg-white rounded-full px-1">{{ currentTimeLabel }}</span>
+        <span class="text-[9px] font-medium text-red-500 tabular-nums pr-0.5 bg-card dark:text-destructive rounded-full px-1">{{ currentTimeLabel }}</span>
         <div class="w-2 h-2 rounded-full bg-red-500 translate-x-1/2" />
       </div>
     </div>
