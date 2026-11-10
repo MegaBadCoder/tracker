@@ -12,17 +12,17 @@
         :class="[
           'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200',
           modelValue
-            ? 'bg-blue-500 border-blue-500'
+            ? 'bg-blue-500 border-blue-500 dark:bg-primary dark:border-primary'
             : overdue
               ? 'border-red-500'
-              : 'border-gray-300',
+              : 'border-gray-300 dark:border-muted-foreground',
           disabled && !overdue && 'opacity-50'
         ]"
       >
         <Check
           v-if="modelValue"
           :size="14"
-          class="text-white"
+          class="text-white dark:text-primary-foreground"
           :stroke-width="3"
         />
       </div>
@@ -103,5 +103,17 @@ const handleChange = (event: Event) => {
 .round-checkbox__label {
   font-size: 0.875rem;
   color: #374151;
+}
+
+.dark .round-checkbox__label {
+  color: var(--foreground);
+}
+
+.dark .round-checkbox__input:disabled ~ .round-checkbox__label {
+  color: var(--muted-foreground);
+}
+
+.dark .round-checkbox:hover .round-checkbox__input:not(:disabled):not(:checked) ~ .round-checkbox__icon div {
+  border-color: var(--primary);
 }
 </style>
